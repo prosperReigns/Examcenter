@@ -19,10 +19,10 @@ $total_questions = count($questions);
 // Grade the exam
 foreach ($questions as $question) {
     $question_id = $question['id'];
-    if (isset($submitted_answers[$question_id]) && 
-        $submitted_answers[$question_id] == $question['correct_answer']) {
-        $score++;
-    }
+            if (isset($submitted_answers[$question_id]) && 
+                $submitted_answers[$question_id] == $question['correct_answer']) {
+                $score++;
+            }
 }
 
 // Store result in database with test_id
