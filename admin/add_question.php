@@ -87,8 +87,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
                 VALUES ('$question', '$option1', '$option2', '$option3', '$option4', '$correct_answer', $test_id, '$class', '$subject')";
         
         if (mysqli_query($conn, $sql)) {
-            $success = "Question added successfully!";
-        } else {
+                $success = "Question added successfully!";
+            } else {
             $error = "Error adding question: " . mysqli_error($conn);
         }
     }

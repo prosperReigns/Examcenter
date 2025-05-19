@@ -21,7 +21,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     if (mysqli_num_rows($result) == 1) {
         $row = mysqli_fetch_assoc($result);
-        if ($password === $row['password']) {
+        if (password_verify($password, $row['password'])) {
             $_SESSION['admin_id'] = $row['id'];
             $_SESSION['admin_username'] = $row['username'];
             header("Location: dashboard.php");
@@ -63,7 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
     <div class="container">
         <div class="login-container">
-            <h2 class="login-title">Admin Login</h2>
+            <h2 class="login-title">Teacher Login</h2>
             <?php if(isset($error)): ?>
                 <div class="alert alert-danger"><?php echo $error; ?></div>
             <?php endif; ?>

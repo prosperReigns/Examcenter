@@ -34,7 +34,7 @@
             <p class="lead">Choose your role to continue</p>
             
             <div class="btn-container">
-                <a href="admin/login.php" class="btn btn-primary btn-lg">Admin Login</a>
+                <a href="admin/login.php" class="btn btn-primary btn-lg">Teacher Login</a>
                 <a href="student/register.php" class="btn btn-success btn-lg">Start Exam</a>
             </div>
         </div>
