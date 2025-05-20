@@ -4,8 +4,8 @@ class Database {
     private $conn;
     
     private function __construct() {
-        $host = "localhost";
-        $username = "root";
+        $host = "192.168.0.4";
+        $username = "cbt_user";
         $password = "";  // Using the password from your config
         $database = "cbt_app_db";
         

@@ -27,9 +27,45 @@ $test_id = $test['id'];
 $_SESSION['current_test_id'] = $test_id; // Store test_id in session
 
 // Fetch questions for this specific test
-$sql = "SELECT * FROM questions WHERE test_id = $test_id ORDER BY RAND()";
+$sql = "SELECT q.*, 
+        CASE 
+            WHEN q.question_type = 'single_choice' THEN 'single_choice'
+            WHEN q.question_type = 'multiple_choice' THEN 'multiple_choice'
+            WHEN q.question_type = 'true_false' THEN 'true_false'
+            WHEN q.question_type = 'fill_blank' THEN 'fill_blank'
+            ELSE 'unknown'
+        END as type
+        FROM questions q 
+        WHERE q.test_id = $test_id 
+        ORDER BY RAND()";
 $result = mysqli_query($conn, $sql);
 $questions = mysqli_fetch_all($result, MYSQLI_ASSOC);
+
+// For each question, fetch its specific details based on type
+foreach ($questions as $key => $question) {
+    switch ($question['question_type']) {
+        case 'single_choice':
+            $detail_sql = "SELECT * FROM single_choice_questions WHERE question_id = {$question['id']}";
+            break;
+        case 'multiple_choice':
+            $detail_sql = "SELECT * FROM multiple_choice_questions WHERE question_id = {$question['id']}";
+            break;
+        case 'true_false':
+            $detail_sql = "SELECT * FROM true_false_questions WHERE question_id = {$question['id']}";
+            break;
+        case 'fill_blank':
+            $detail_sql = "SELECT * FROM fill_blank_questions WHERE question_id = {$question['id']}";
+            break;
+        default:
+            $detail_sql = "";
+    }
+    
+    if (!empty($detail_sql)) {
+        $detail_result = mysqli_query($conn, $detail_sql);
+        $detail = mysqli_fetch_assoc($detail_result);
+        $questions[$key] = array_merge($questions[$key], $detail);
+    }
+}
 
 // Store questions in session for validation later
 $_SESSION['exam_questions'] = $questions;
