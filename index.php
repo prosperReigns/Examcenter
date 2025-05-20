@@ -86,7 +86,7 @@
                             </div>
                             <h3 class="card-title mb-3">Student Portal</h3>
                             <p class="card-text mb-4">Take exams in a distraction-free environment with intuitive controls.</p>
-                            <a href="student/login.php" class="btn btn-student">
+                            <a href="student/register.php" class="btn btn-student">
                                 <i class="fas fa-sign-in-alt me-2"></i>Student Login
                             </a>
                         </div>

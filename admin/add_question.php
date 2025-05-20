@@ -12,8 +12,8 @@ $conn = Database::getInstance()->getConnection();
 
 // Define available classes and subjects
 $classes = ['JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'];
-$jss_subjects = ['Mathematics', 'English', 'ICT', 'Agriculture', 'History', 'Civic Education', 'Basic Science', 'Basic Technology'];
-$ss_subjects = ['Mathematics', 'English', 'Data Processing', 'Economics', 'Government', 'Accounting', 'Physics', 'Chemistry', 'Biology'];
+$jss_subjects = ['Mathematics', 'English', 'ICT', 'Agriculture', 'History', 'Civic Education', 'Basic Science', 'Basic Technology', 'Business studies', 'Agricultural sci', 'Physical Health Edu', 'Cultural and Creative Art', 'Social Studies', 'Security Edu', 'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'];
+$ss_subjects = ['Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics', 'Government', 'Commerce', 'Accounting', 'Financial Accounting', 'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology', 'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang', 'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'];
 
 // Handle test creation
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['test_title'])) {
@@ -70,11 +70,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
     } else {
         $test_id = $_SESSION['current_test_id'];
         $question = mysqli_real_escape_string($conn, $_POST['question']);
-        $option1 = mysqli_real_escape_string($conn, $_POST['option1']);
-        $option2 = mysqli_real_escape_string($conn, $_POST['option2']);
-        $option3 = mysqli_real_escape_string($conn, $_POST['option3']);
-        $option4 = mysqli_real_escape_string($conn, $_POST['option4']);
-        $correct_answer = mysqli_real_escape_string($conn, $_POST['correct_answer']);
+        $question_type = mysqli_real_escape_string($conn, $_POST['question_type']) ? mysqli_real_escape_string($conn, $_POST['question_type']) : '';
         
         $test_query = "SELECT class, subject FROM tests WHERE id = $test_id";
         $test_result = mysqli_query($conn, $test_query);
@@ -82,13 +78,66 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
         $class = $test_data['class'];
         $subject = $test_data['subject'];
 
-        
-        $sql = "INSERT INTO questions (question_text, option1, option2, option3, option4, correct_answer, test_id, class, subject) 
-                VALUES ('$question', '$option1', '$option2', '$option3', '$option4', '$correct_answer', $test_id, '$class', '$subject')";
+        // Insert into main questions table
+        $sql = "INSERT INTO new_questions (question_text, test_id, class, subject, question_type) 
+                VALUES ('$question', $test_id, '$class', '$subject', '$question_type')";
         
         if (mysqli_query($conn, $sql)) {
+            $question_id = mysqli_insert_id($conn);
+            $success = false;
+            
+            // Based on question type, insert into appropriate table
+            switch ($question_type) {
+                case 'multiple_choice_single':
+                    $option1 = mysqli_real_escape_string($conn, $_POST['option1']);
+                    $option2 = mysqli_real_escape_string($conn, $_POST['option2']);
+                    $option3 = mysqli_real_escape_string($conn, $_POST['option3']);
+                    $option4 = mysqli_real_escape_string($conn, $_POST['option4']);
+                    $correct_answer = mysqli_real_escape_string($conn, $_POST['correct_answer']);
+                    
+                    $sql = "INSERT INTO single_choice_questions (question_id, option1, option2, option3, option4, correct_answer) 
+                            VALUES ($question_id, '$option1', '$option2', '$option3', '$option4', '$correct_answer')";
+                    $success = mysqli_query($conn, $sql);
+                    break;
+                    
+                case 'multiple_choice_multiple':
+                    $option1 = mysqli_real_escape_string($conn, $_POST['option1']);
+                    $option2 = mysqli_real_escape_string($conn, $_POST['option2']);
+                    $option3 = mysqli_real_escape_string($conn, $_POST['option3']);
+                    $option4 = mysqli_real_escape_string($conn, $_POST['option4']);
+                    $correct_answers = isset($_POST['correct_answers']) ? implode(',', $_POST['correct_answers']) : '';
+                    $correct_answers = mysqli_real_escape_string($conn, $correct_answers);
+                    
+                    $sql = "INSERT INTO multiple_choice_questions (question_id, option1, option2, option3, option4, correct_answers) 
+                            VALUES ($question_id, '$option1', '$option2', '$option3', '$option4', '$correct_answers')";
+                    $success = mysqli_query($conn, $sql);
+                    break;
+                    
+                case 'true_false':
+                    $correct_answer = mysqli_real_escape_string($conn, $_POST['correct_answer']);
+                    
+                    $sql = "INSERT INTO true_false_questions (question_id, correct_answer) 
+                            VALUES ($question_id, '$correct_answer')";
+                    $success = mysqli_query($conn, $sql);
+                    break;
+                    
+                case 'fill_blanks':
+                    $correct_answer = mysqli_real_escape_string($conn, $_POST['correct_answer']);
+                    
+                    $sql = "INSERT INTO fill_blank_questions (question_id, correct_answer) 
+                            VALUES ($question_id, '$correct_answer')";
+                    $success = mysqli_query($conn, $sql);
+                    break;
+            }
+            
+            if ($success) {
                 $success = "Question added successfully!";
             } else {
+                $error = "Error adding question details: " . mysqli_error($conn);
+                // Delete the main question if details insertion failed
+                mysqli_query($conn, "DELETE FROM questions WHERE id = $question_id");
+            }
+        } else {
             $error = "Error adding question: " . mysqli_error($conn);
         }
     }
@@ -239,9 +288,10 @@ if (isset($_SESSION['current_test_id'])) {
 
                 <div class="container-lg">
                     <h3 class="mb-3">Add New Question</h3>
+                    <form method="POST" id="questionForm">
                     <div class="mb-3">
                         <label class="form-label">Question Type</label>
-                        <select class="form-select" name="question_type" id="questionType" required>
+                        <select class="form-select" name="question_type" id="questionType" required onchange="showQuestionOptions()"> 
                             <option value="multiple_choice_single">Multiple Choice (Single Answer)</option>
                             <option value="multiple_choice_multiple">Multiple Choice (Multiple Answers)</option>
                             <option value="true_false">True or False</option>
@@ -250,7 +300,7 @@ if (isset($_SESSION['current_test_id'])) {
                             <option value="fill_blanks">Fill in the Blanks</option>
                         </select>
                     </div>
-                    <form method="POST" id="questionForm">
+                    
                         <div class="mb-3">
                             <label class="form-label">Question Text</label>
                             <textarea class="form-control" name="question" rows="3" required></textarea>
@@ -367,6 +417,18 @@ if (isset($_SESSION['current_test_id'])) {
 <script src="../js/sidebar.js"></script>
 <script src="../js/updateSubjects.js"></script>
 <script src="../js/previewQuestions.js"></script>
-
+<script>
+        function showQuestionOptions() {
+            const questionType = document.getElementById('questionType').value;
+            
+            // Hide all option divs
+            document.querySelectorAll('.question-options').forEach(div => {
+                div.style.display = 'none';
+            });
+            
+            // Show the selected option div
+            document.getElementById(questionType + '_options').style.display = 'block';
+        }
+    </script>
 </body>
 </html>
