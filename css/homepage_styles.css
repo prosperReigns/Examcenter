@@ -185,3 +185,102 @@
                 font-size: 1.2rem;
             }
         }
+/* Page Transition Styles */
+.page {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.page.active {
+    display: block;
+    opacity: 1;
+}
+
+/* FAQ Page Styles */
+.accordion-button {
+    font-weight: 500;
+    padding: 1.25rem;
+    background-color: white;
+}
+
+.accordion-button:not(.collapsed) {
+    color: var(--primary);
+    background-color: rgba(67, 97, 238, 0.05);
+}
+
+.accordion-body {
+    padding: 1.25rem;
+}
+
+/* About Page Styles */
+.about-image .image-wrapper {
+    height: 400px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+}
+
+.about-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.feature-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.feature-list li {
+    margin-bottom: 0.75rem;
+}
+
+.features-card {
+    background: white;
+    border-radius: 15px;
+}
+
+.feature-icon {
+    color: var(--primary);
+}
+
+/* Navigation Active State */
+.nav-link.active {
+    font-weight: 600;
+    color: var(--primary) !important;
+    position: relative;
+}
+
+.nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(to right, var(--primary), var(--secondary));
+    border-radius: 2px;
+}
+
+/* Page System */
+.page {
+    display: none;
+    opacity: 1 !important; /* Force visibility */
+    visibility: visible !important;
+}
+
+.page.active {
+    display: block;
+}
+
+/* Make absolutely sure FAQ/About are visible */
+#faq_page,
+#about_page {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* When not active */
+.page:not(.active) {
+    display: none !important;
+}

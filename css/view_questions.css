@@ -1,0 +1,33 @@
+:root {
+    --primary: #4361ee;
+    --secondary: #3f37c9;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+    min-height: 80vh;
+    color: var(--dark);
+    overflow-x: hidden;
+}
+.filter-card {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.question-card {
+    border-left: 4px solid var(--primary);
+    transition: all 0.3s;
+}
+.question-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+.correct-option {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-left: 3px solid #28a745;
+}
+.badge-subject {
+    background-color: rgba(67, 97, 238, 0.1);
+    color: var(--primary);
+}
