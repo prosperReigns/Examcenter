@@ -1,0 +1,38 @@
+:root {
+    --primary: #4361ee;
+    --secondary: #3f37c9;
+}
+.filter-card {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.analytics-card {
+    border-radius: 10px;
+    padding: 1.5rem;
+    color: white;
+    height: 100%;
+}
+.score-badge {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+}
+.student-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.progress-thin {
+    height: 8px;
+    border-radius: 4px;
+}
+.badge-passed {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+.badge-failed {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}

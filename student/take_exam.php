@@ -35,21 +35,29 @@ $sql = "SELECT q.*,
             WHEN q.question_type = 'fill_blank' THEN 'fill_blank'
             ELSE 'unknown'
         END as type
-        FROM questions q 
+        FROM new_questions q 
         WHERE q.test_id = $test_id 
         ORDER BY RAND()";
-$result = mysqli_query($conn, $sql);
-$questions = mysqli_fetch_all($result, MYSQLI_ASSOC);
+
+$questions_result = mysqli_query($conn, $sql);
+
+if (!$questions_result) {
+    die("Query failed: " . mysqli_error($conn));  // Helps you debug
+}
+
+$questions = mysqli_fetch_all($questions_result, MYSQLI_ASSOC);
+
 
 // For each question, fetch its specific details based on type
 foreach ($questions as $key => $question) {
-    switch ($question['question_type']) {
-        case 'single_choice':
-            $detail_sql = "SELECT * FROM single_choice_questions WHERE question_id = {$question['id']}";
-            break;
-        case 'multiple_choice':
-            $detail_sql = "SELECT * FROM multiple_choice_questions WHERE question_id = {$question['id']}";
-            break;
+  switch ($question['question_type']) {
+    case 'multiple_choice_single':
+        $detail_sql = "SELECT * FROM single_choice_questions WHERE question_id = {$question['id']}";
+        break;
+    case 'multiple_choice_multiple':
+        $detail_sql = "SELECT * FROM multiple_choice_questions WHERE question_id = {$question['id']}";
+        break;
+
         case 'true_false':
             $detail_sql = "SELECT * FROM true_false_questions WHERE question_id = {$question['id']}";
             break;
@@ -58,11 +66,22 @@ foreach ($questions as $key => $question) {
             break;
         default:
             $detail_sql = "";
-    }
+}
+
     
     if (!empty($detail_sql)) {
         $detail_result = mysqli_query($conn, $detail_sql);
         $detail = mysqli_fetch_assoc($detail_result);
+        $questions[$key] = array_merge($questions[$key], $detail);
+    }
+}
+if (!empty($detail_sql)) {
+    $detail_result = mysqli_query($conn, $detail_sql);
+    if (!$detail_result) {
+        die("Detail query failed: " . mysqli_error($conn)); // Debug missing options
+    }
+    $detail = mysqli_fetch_assoc($detail_result);
+    if ($detail) {
         $questions[$key] = array_merge($questions[$key], $detail);
     }
 }
