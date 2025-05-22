@@ -6,7 +6,7 @@ class Database {
     private function __construct() {
         $host = "192.168.0.4";
         $username = "cbt_user";
-        $password = "";  // Using the password from your config
+        $password = "";
         $database = "cbt_app_db";
         
         $this->conn = mysqli_connect($host, $username, $password, $database);
