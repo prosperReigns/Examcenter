@@ -5,8 +5,8 @@ class Database {
     
     private function __construct() {
 
-        $host = "192.168.0.4";
-        $username = "cbt_user";
+        $host = "localhost";
+        $username = "root";
 
         $password = "";
         $database = "cbt_app_db";

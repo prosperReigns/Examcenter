@@ -76,7 +76,7 @@ if($result) {
 }
 
 // Get active students count
-$query = "SELECT COUNT(DISTINCT student_id) as count FROM exam_results";
+$query = "SELECT COUNT(DISTINCT user_id) as count FROM results";
 $result = $conn->query($query);
 if($result) {
     $row = $result->fetch_assoc();
@@ -104,53 +104,53 @@ if($result) {
 }
 
 // Get performance data for chart
-$query = "SELECT subject, AVG(score) as average_score 
-          FROM exam_results 
-          GROUP BY subject";
-$result = $conn->query($query);
-if($result) {
-    while($row = $result->fetch_assoc()) {
-        $stats['performance_data'][$row['subject']] = round($row['average_score'], 1);
-    }
-    $result->free();
-}
+// $query = "SELECT subject, AVG(score) as average_score 
+//           FROM results 
+//           GROUP BY subject";
+// $result = $conn->query($query);
+// if($result) {
+//     while($row = $result->fetch_assoc()) {
+//         $stats['performance_data'][$row['subject']] = round($row['average_score'], 1);
+//     }
+//     $result->free();
+// }
 
 // Get recent exam results
-$recent_results = [];
-$query = "SELECT r.student_id, s.fullname, r.exam_date, r.score, r.status 
-          FROM exam_results r
-          JOIN students s ON r.student_id = s.id
-          ORDER BY r.exam_date DESC LIMIT 10";
-$result = $conn->query($query);
-if($result) {
-    while($row = $result->fetch_assoc()) {
-        $recent_results[] = $row;
-    }
-    $result->free();
-}
+// $recent_results = [];
+// $query = "SELECT r.student_id, s.fullname, r.exam_date, r.score, r.status 
+//           FROM results r
+//           JOIN students s ON r.student_id = s.id
+//           ORDER BY r.exam_date DESC LIMIT 10";
+// $result = $conn->query($query);
+// if($result) {
+//     while($row = $result->fetch_assoc()) {
+//         $recent_results[] = $row;
+//     }
+//     $result->free();
+// }
 
 // Get pending exams count for notifications
-$pending_exams = 0;
-$query = "SELECT COUNT(*) as count FROM exam_results WHERE status = 'pending'";
-$result = $conn->query($query);
-if($result) {
-    $row = $result->fetch_assoc();
-    $pending_exams = $row['count'];
-    $result->free();
-}
+// $pending_exams = 0;
+// $query = "SELECT COUNT(*) as count FROM exam_results WHERE status = 'pending'";
+// $result = $conn->query($query);
+// if($result) {
+//     $row = $result->fetch_assoc();
+//     $pending_exams = $row['count'];
+//     $result->free();
+// }
 
 // Get recent activities
-$recent_activities = [];
-$query = "SELECT activity, created_at FROM activities_log 
-          ORDER BY created_at DESC LIMIT 5";
-$result = $conn->query($query);
-if($result) {
-    while($row = $result->fetch_assoc()) {
-        $recent_activities[] = $row;
-    }
-    $result->free();
-}
-$conn->close();
+// $recent_activities = [];
+// $query = "SELECT activity, created_at FROM activities_log 
+//           ORDER BY created_at DESC LIMIT 5";
+// $result = $conn->query($query);
+// if($result) {
+//     while($row = $result->fetch_assoc()) {
+//         $recent_activities[] = $row;
+//     }
+//     $result->free();
+// }
+// $conn->close();
 ?>
 
 <!DOCTYPE html>

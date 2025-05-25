@@ -6,8 +6,8 @@ $conn = Database::getInstance()->getConnection();
 
 // Define available classes and subjects
 $classes = ['JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'];
-$jss_subjects = ['Mathematics', 'English', 'ICT', 'Agriculture', 'History', 'Civic Education', 'Basic Science', 'Basic Technology'];
-$ss_subjects = ['Mathematics', 'English', 'Data Processing', 'Economics', 'Government', 'Accounting', 'Physics', 'Chemistry', 'Biology'];
+$jss_subjects = ['Mathematics', 'English', 'ICT', 'Agriculture', 'History', 'Civic Education', 'Basic Science', 'Basic Technology', 'Business studies', 'Agricultural sci', 'Physical Health Edu', 'Cultural and Creative Art', 'Social Studies', 'Security Edu', 'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'];
+$ss_subjects = ['Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics', 'Government', 'Commerce', 'Accounting', 'Financial Accounting', 'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology', 'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang', 'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'];
 
 // Fetch available tests
 $sql = "SELECT DISTINCT title FROM tests ORDER BY id DESC";
