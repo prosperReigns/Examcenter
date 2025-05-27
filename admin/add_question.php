@@ -26,6 +26,7 @@ $ss_subjects = [
     'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
     'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
 ];
+
 // Initialize variables
 $error = $success = '';
 $current_test = null;
@@ -39,7 +40,7 @@ $tests_result = $conn->query($tests_query);
 if ($tests_result) {
     $tests = $tests_result->fetch_all(MYSQLI_ASSOC);
 }
-// Add this near the top of your PHP code
+
 function is_valid_subject($class, $subject) {
     global $jss_subjects, $ss_subjects;
     
@@ -57,39 +58,46 @@ function is_valid_subject($class, $subject) {
     return in_array($subject, $valid_subjects);
 }
 
-// Handle test creation
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
     $title = $conn->real_escape_string($_POST['test_title'] ?? '');
     $class = $conn->real_escape_string($_POST['class'] ?? '');
     $subject = $conn->real_escape_string($_POST['subject'] ?? '');
     $duration = intval($_POST['duration'] ?? 0);
 
-    // Validate subject-class relationship
     if (!is_valid_subject($class, $subject)) {
         $error = "Invalid subject for selected class!";
         error_log("Invalid subject attempt: {$subject} for {$class}");
     } elseif ($title && $class && $subject && $duration > 0) {
-        $sql = "INSERT INTO tests (title, class, subject, duration) VALUES (?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
+        $check_sql = "SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ?";
+        $check_stmt = $conn->prepare($check_sql);
+        $check_stmt->bind_param("sss", $title, $class, $subject);
+        $check_stmt->execute();
+        $existing_test = $check_stmt->get_result()->fetch_assoc();
+        $check_stmt->close();
 
-        if ($stmt === false) {
-            die("Prepare failed: " . $conn->error);
-        }
-
-        $stmt->bind_param("sssi", $title, $class, $subject, $duration);
-        if ($stmt->execute()) {
-            $_SESSION['current_test_id'] = $stmt->insert_id;
-            $success = "Test created successfully!";
+        if ($existing_test) {
+            $error = "A test with the same title, class, and subject already exists!";
         } else {
-            $error = "Error creating test: " . $conn->error;
-        }
+            $sql = "INSERT INTO tests (title, class, subject, duration) VALUES (?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
 
-        $stmt->close();
+            if ($stmt === false) {
+                die("Prepare failed: " . $conn->error);
+            }
+
+            $stmt->bind_param("sssi", $title, $class, $subject, $duration);
+            if ($stmt->execute()) {
+                $_SESSION['current_test_id'] = $stmt->insert_id;
+                $success = "Test created successfully!";
+            } else {
+                $error = "Error creating test: " . $conn->error;
+            }
+            $stmt->close();
+        }
     } else {
         $error = "Please fill in all test details, including a valid duration.";
     }
 }
-
 
 // Handle test selection
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['select_test'])) {
@@ -114,12 +122,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_question'])) {
     $question_type = $conn->real_escape_string($_POST['question_type'] ?? '');
     
     if ($question_id && $question_type) {
-        // Delete from type-specific table
         $table_map = [
             'multiple_choice_single' => 'single_choice_questions',
             'multiple_choice_multiple' => 'multiple_choice_questions',
             'true_false' => 'true_false_questions',
-            'fill_blanks' => 'fill_blank_questions'
+            'fill_blanks' => 'fill_blank_questions',
         ];
         
         $table = $table_map[$question_type] ?? '';
@@ -131,7 +138,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_question'])) {
             $stmt->close();
         }
         
-        // Delete from main questions table
         $sql = "DELETE FROM new_questions WHERE id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("i", $question_id);
@@ -158,13 +164,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['edit_question'])) {
         $edit_question = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         
-        // Fetch type-specific data
         switch ($edit_question['question_type']) {
             case 'multiple_choice_single':
-                $sql = "SELECT * FROM single_choice_questions WHERE question_id = ?";
+                $sql = "SELECT *, image_path FROM single_choice_questions WHERE question_id = ?";
                 break;
             case 'multiple_choice_multiple':
-                $sql = "SELECT * FROM multiple_choice_questions WHERE question_id = ?";
+                $sql = "SELECT *, image_path FROM multiple_choice_questions WHERE question_id = ?";
                 break;
             case 'true_false':
                 $sql = "SELECT * FROM true_false_questions WHERE question_id = ?";
@@ -182,17 +187,58 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['edit_question'])) {
     }
 }
 
-// Handle question submission (new or edited)
+function handleImageUpload($question_id) {
+    global $conn;
+    
+    if (!isset($_FILES['question_image']) || $_FILES['question_image']['error'] === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+
+    $max_size = 2 * 1024 * 1024;
+    if ($_FILES['question_image']['size'] > $max_size) {
+        return false;
+    }
+
+    $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!in_array($_FILES['question_image']['type'], $allowed_types)) {
+        return false;
+    }
+
+    $upload_dir = '../uploads/questions/';
+    if (!is_dir($upload_dir)) {
+        mkdir($upload_dir, 0777, true);
+    }
+    
+    $ext = pathinfo($_FILES['question_image']['name'], PATHINFO_EXTENSION);
+    $filename = 'question_' . $question_id . '_' . time() . '.' . $ext;
+    $full_path = $upload_dir . $filename;
+    
+    if (move_uploaded_file($_FILES['question_image']['tmp_name'], $full_path)) {
+        return 'uploads/questions/' . $filename;
+    }
+    
+    return false;
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
     if (!isset($_SESSION['current_test_id'])) {
         $error = "Please create or select a test first";
     } else {
         $test_id = $_SESSION['current_test_id'];
-        $question_id = intval($_POST['question_id'] ?? 0); // For editing
+        $question_id = intval($_POST['question_id'] ?? 0);
         $question = $conn->real_escape_string($_POST['question']);
         $question_type = $conn->real_escape_string($_POST['question_type'] ?? '');
 
-        // Fetch test details
+        if (isset($_POST['remove_image']) && $_POST['remove_image'] === 'on') {
+            if (!empty($edit_question['options']['image_path'])) {
+                $file_path = '../' . $edit_question['options']['image_path'];
+                if (file_exists($file_path)) {
+                    unlink($file_path);
+                }
+            }
+            $image_path = null;
+        }
+
         $test_query = "SELECT class, subject FROM tests WHERE id = ?";
         $stmt = $conn->prepare($test_query);
         $stmt->bind_param("i", $test_id);
@@ -203,7 +249,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
         $class = $test_data['class'];
         $subject = $test_data['subject'];
 
-        // Insert or update main questions table
         if ($question_id) {
             $sql = "UPDATE new_questions SET question_text = ?, question_type = ? WHERE id = ?";
             $stmt = $conn->prepare($sql);
@@ -216,114 +261,106 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
         }
         
         if ($stmt->execute()) {
-            $question_id = $question_id ?: $stmt->insert_id;
-            $success = false;
+    $question_id = $question_id ?: $stmt->insert_id;
+    $success = ''; 
+    
+    switch ($question_type) {
+        case 'multiple_choice_single':
+            $option1 = $conn->real_escape_string($_POST['option1'] ?? '');
+            $option2 = $conn->real_escape_string($_POST['option2'] ?? '');
+            $option3 = $conn->real_escape_string($_POST['option3'] ?? '');
+            $option4 = $conn->real_escape_string($_POST['option4'] ?? '');
+            $correct_answer = $conn->real_escape_string($_POST['correct_answer'] ?? '');
+            $image_path = handleImageUpload($question_id);
             
-            // Delete existing type-specific data if editing
-            if ($question_id && $_POST['question_id']) {
-                $table_map = [
-                    'multiple_choice_single' => 'single_choice_questions',
-                    'multiple_choice_multiple' => 'multiple_choice_questions',
-                    'true_false' => 'true_false_questions',
-                    'fill_blanks' => 'fill_blank_questions'
-                ];
-                $table = $table_map[$question_type] ?? '';
-                if ($table) {
-                    $sql = "DELETE FROM $table WHERE question_id = ?";
-                    $stmt = $conn->prepare($sql);
-                    $stmt->bind_param("i", $question_id);
-                    $stmt->execute();
+            if ($image_path === false) {
+                $error = "Image upload failed";
+                break;
+            }
+            
+            if ($option1 && $option2 && $option3 && $option4 && $correct_answer) {
+                $sql = "INSERT INTO single_choice_questions 
+                        (question_id, option1, option2, option3, option4, correct_answer, image_path) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("issssss", $question_id, $option1, $option2, $option3, $option4, 
+                                 $correct_answer, $image_path);
+                if ($stmt->execute()) {
+                    $success = "Question " . ($edit_question ? 'updated' : 'added') . " successfully!";
+                } else {
+                    $error = "Error saving question options: " . $conn->error;
                 }
             }
+            break;
             
-            // Handle question type-specific data
-            switch ($question_type) {
-                case 'multiple_choice_single':
-                    $option1 = $conn->real_escape_string($_POST['option1'] ?? '');
-                    $option2 = $conn->real_escape_string($_POST['option2'] ?? '');
-                    $option3 = $conn->real_escape_string($_POST['option3'] ?? '');
-                    $option4 = $conn->real_escape_string($_POST['option4'] ?? '');
-                    $correct_answer = $conn->real_escape_string($_POST['correct_answer'] ?? '');
-                    
-                    if ($option1 && $option2 && $option3 && $option4 && $correct_answer) {
-                        $sql = "INSERT INTO single_choice_questions (question_id, option1, option2, option3, option4, correct_answer) 
-                                VALUES (?, ?, ?, ?, ?, ?)";
-                        $stmt = $conn->prepare($sql);
-                        $stmt->bind_param("isssss", $question_id, $option1, $option2, $option3, $option4, $correct_answer);
-                        $success = $stmt->execute();
-                    } else {
-                        $error = "All options and correct answer are required for single choice questions";
-                    }
-                    break;
-                    
-                case 'multiple_choice_multiple':
-                    $option1 = $conn->real_escape_string($_POST['option1'] ?? '');
-                    $option2 = $conn->real_escape_string($_POST['option2'] ?? '');
-                    $option3 = $conn->real_escape_string($_POST['option3'] ?? '');
-                    $option4 = $conn->real_escape_string($_POST['option4'] ?? '');
-                    $correct_answers = isset($_POST['correct_answers']) ? implode(',', array_map('intval', $_POST['correct_answers'])) : '';
-                    $correct_answers = $conn->real_escape_string($correct_answers);
-                    
-                    if ($option1 && $option2 && $option3 && $option4 && $correct_answers) {
-                        $sql = "INSERT INTO multiple_choice_questions (question_id, option1, option2, option3, option4, correct_answers) 
-                                VALUES (?, ?, ?, ?, ?, ?)";
-                        $stmt = $conn->prepare($sql);
-                        $stmt->bind_param("isssss", $question_id, $option1, $option2, $option3, $option4, $correct_answers);
-                        $success = $stmt->execute();
-                    } else {
-                        $error = "All options and at least one correct answer are required for multiple choice questions";
-                    }
-                    break;
-                    
-                case 'true_false':
-                    $correct_answer = $conn->real_escape_string($_POST['correct_answer'] ?? '');
-                    
-                    if ($correct_answer) {
-                        $sql = "INSERT INTO true_false_questions (question_id, correct_answer) 
-                                VALUES (?, ?)";
-                        $stmt = $conn->prepare($sql);
-                        $stmt->bind_param("is", $question_id, $correct_answer);
-                        $success = $stmt->execute();
-                    } else {
-                        $error = "Correct answer is required for true/false questions";
-                    }
-                    break;
-                    
-                case 'fill_blanks':
-                    $correct_answer = $conn->real_escape_string($_POST['correct_answer'] ?? '');
-                    
-                    if ($correct_answer) {
-                        $sql = "INSERT INTO fill_blank_questions (question_id, correct_answer) 
-                                VALUES (?, ?)";
-                        $stmt = $conn->prepare($sql);
-                        $stmt->bind_param("is", $question_id, $correct_answer);
-                        $success = $stmt->execute();
-                    } else {
-                        $error = "Correct answer is required for fill-in-the-blank questions";
-                    }
-                    break;
+        case 'multiple_choice_multiple':
+            $option1 = $conn->real_escape_string($_POST['option1'] ?? '');
+            $option2 = $conn->real_escape_string($_POST['option2'] ?? '');
+            $option3 = $conn->real_escape_string($_POST['option3'] ?? '');
+            $option4 = $conn->real_escape_string($_POST['option4'] ?? '');
+            $correct_answers = isset($_POST['correct_answers']) ? implode(',', array_map('intval', $_POST['correct_answers'])) : '';
+            $correct_answers = $conn->real_escape_string($correct_answers);
+            $image_path = handleImageUpload($question_id);
+            
+            if ($image_path === false) {
+                $error = "Image upload failed";
+                break;
             }
             
-            if ($success) {
-                $success = $question_id ? "Question updated successfully!" : "Question added successfully!";
-            } else {
-                $error = $error ?: "Error adding question details: " . $conn->error;
-                if (!$question_id) {
-                    $conn->query("DELETE FROM new_questions WHERE id = $question_id");
+            if ($option1 && $option2 && $option3 && $option4 && $correct_answers) {
+                $sql = "INSERT INTO multiple_choice_questions 
+                        (question_id, option1, option2, option3, option4, correct_answers, image_path) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("issssss", $question_id, $option1, $option2, $option3, $option4, 
+                                 $correct_answers, $image_path);
+                if ($stmt->execute()) {
+                    $success = "Question " . ($edit_question ? 'updated' : 'added') . " successfully!";
+                } else {
+                    $error = "Error saving question options: " . $conn->error;
                 }
             }
-            $stmt->close();
-        } else {
-            $error = "Error saving question: " . $conn->error;
-        }
+            break;
+            
+        case 'true_false':
+            $correct_answer = $conn->real_escape_string($_POST['correct_answer'] ?? '');
+            
+            if ($correct_answer) {
+                $sql = "INSERT INTO true_false_questions (question_id, correct_answer) 
+                        VALUES (?, ?)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("is", $question_id, $correct_answer);
+                if ($stmt->execute()) {
+                    $success = "Question " . ($edit_question ? 'updated' : 'added') . " successfully!";
+                } else {
+                    $error = "Error saving question options: " . $conn->error;
+                }
+            }
+            break;
+            
+        case 'fill_blanks':
+            $correct_answer = $conn->real_escape_string($_POST['correct_answer'] ?? '');
+            
+            if ($correct_answer) {
+                $sql = "INSERT INTO fill_blank_questions (question_id, correct_answer) 
+                        VALUES (?, ?)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("is", $question_id, $correct_answer);
+                if ($stmt->execute()) {
+                    $success = "Question " . ($edit_question ? 'updated' : 'added') . " successfully!";
+                } else {
+                    $error = "Error saving question options: " . $conn->error;
+                }
+            }
+            break;
+    }
+}
     }
 }
 
-// Fetch current test and questions
 if (isset($_SESSION['current_test_id'])) {
     $test_id = $_SESSION['current_test_id'];
     
-    // Fetch test details
     $test_query = "SELECT * FROM tests WHERE id = ?";
     $stmt = $conn->prepare($test_query);
     $stmt->bind_param("i", $test_id);
@@ -332,7 +369,6 @@ if (isset($_SESSION['current_test_id'])) {
     $current_test = $test_result->fetch_assoc();
     $stmt->close();
     
-    // Fetch questions
     $questions_query = "SELECT * FROM new_questions WHERE test_id = ? ORDER BY id ASC";
     $stmt = $conn->prepare($questions_query);
     $stmt->bind_param("i", $test_id);
@@ -342,13 +378,10 @@ if (isset($_SESSION['current_test_id'])) {
     if ($questions_result) {
         $questions = $questions_result->fetch_all(MYSQLI_ASSOC);
         $total_questions = count($questions);
-    } else {
-        $error = "Failed to fetch questions: " . $conn->error;
     }
     $stmt->close();
 }
 
-// Prepare edit data for JavaScript
 $edit_data = [
     'options' => $edit_question['options'] ?? [],
     'question_type' => $edit_question['question_type'] ?? ''
@@ -367,95 +400,12 @@ if (isset($edit_question['options']['correct_answers'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Question</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="stylesheet" href="../css/all.min.css">
+    <link rel="stylesheet" href="../css/animate.min.css">
+    <link rel="stylesheet" href="../css/add_question.css">
     <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-            --accent: #4cc9f0;
-            --light-bg: #f8f9fa;
-        }
-
-        .gradient-header {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            padding: 2rem;
-            border-radius: 0 0 30px 30px;
-            margin-bottom: 2rem;
-        }
-
-        .question-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-            padding: 2rem;
-        }
-
-        .question-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .option-highlight {
-            border-left: 4px solid var(--accent);
-            background: var(--light-bg);
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 5px;
-        }
-
-        .preview-card {
-            position: sticky;
-            top: 20px;
-            max-height: 80vh;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
-        .type-indicator {
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            background: var(--primary);
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            box-shadow: 0 5px 15px rgba(67,97,238,0.3);
-        }
-
-        .floating-action {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            box-shadow: 0 10px 30px rgba(67,97,238,0.3);
-            border-radius: 50%;
-        }
-
-        .form-group-spacing {
-            margin-bottom: 1.5rem;
-        }
-
-        .error-message {
-            color: #dc3545;
-            font-size: 0.9em;
-            margin-top: 0.5rem;
-        }
-
-        .success-message {
-            color: #28a745;
-            font-size: 0.9em;
-            margin-top: 0.5rem;
-        }
-
-        .modal-preview .modal-body {
-            max-height: 60vh;
-            overflow-y: auto;
-        }
-
-        .action-buttons .btn {
-            margin-left: 0.5rem;
+        #imageUploadContainer {
+            display: none;
         }
     </style>
 </head>
@@ -489,19 +439,24 @@ if (isset($edit_question['options']['correct_answers'])) {
                         <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
                     <?php endif; ?>
 
-                    <!-- Test Creation/Selection Form (shown only if no test is selected) -->
                     <?php if (!$current_test): ?>
                         <h5 class="mb-3">Test Setup</h5>
                         <div class="card mb-4">
                             <div class="card-body">
-                                <h6>Create New Test</h6>
+                                <h6> <b> Create new Test</b></h6>
                                 <form method="POST">
                                     <div class="row g-3">
-                                        <div class="col-md-4 form-group-spacing">
-                                            <label class="form-label fw-bold">Test Title</label>
-                                            <input type="text" class="form-control" name="test_title" required placeholder="e.g., Midterm Exam">
-                                        </div>
                                         <div class="col-md-3 form-group-spacing">
+                                            <label class="form-label fw-bold">Test Title</label>
+                                           <select class="form-select" name="test_title" required>
+                                                <option value="">Select Test title</option>
+                                                <option value="First term exam">First term exam</option>
+                                                <option value="First term test">First term test</option>
+                                                <option value="Second term exam">Second term exam</option>
+                                                <option value="Second term test">Second term test</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 form-group-spacing">
                                             <label class="form-label fw-bold">Class</label>
                                             <select class="form-select" name="class" required>
                                                 <option value="">Select Class</option>
@@ -513,17 +468,15 @@ if (isset($edit_question['options']['correct_answers'])) {
                                                 <option value="SS3">SS3</option>
                                             </select>
                                         </div>
-                                    <!-- Replace the existing subject dropdown with this -->
-<div class="col-md-3 form-group-spacing">
-    <label class="form-label fw-bold">Subject</label>
-    <select class="form-select" name="subject" required id="subjectSelect">
-        <option value="">Select Subject</option>
-        <!-- Options populated by JavaScript -->
-    </select>
-</div>
-                                        <div class="col-md-2 form-group-spacing">
+                                        <div class="col-md-3 form-group-spacing">
+                                            <label class="form-label fw-bold">Subject</label>
+                                            <select class="form-select" name="subject" required id="subjectSelect">
+                                                <option value="">Select Subject</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3 form-group-spacing">
                                             <label class="form-label fw-bold">Duration (min)</label>
-                                            <input type="number" class="form-control" name="duration" required placeholder="e.g., 30" min="1">
+                                            <input type="number" class="form-control" name="duration" required placeholder="e.g. 30" min="1">
                                         </div>
                                     </div>
                                     <button type="submit" name="create_test" class="btn btn-primary mt-3">
@@ -558,7 +511,7 @@ if (isset($edit_question['options']['correct_answers'])) {
                     <!-- Question Form -->
                     <?php if ($current_test): ?>
                         <h5 class="mb-3"><?php echo $edit_question ? 'Edit Question' : 'Add Question'; ?></h5>
-                        <form method="POST" id="questionForm">
+                        <form method="POST" id="questionForm" enctype="multipart/form-data">
                             <input type="hidden" name="question_id" value="<?php echo $edit_question['id'] ?? ''; ?>">
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Type</label>
@@ -569,7 +522,7 @@ if (isset($edit_question['options']['correct_answers'])) {
                                     <option value="fill_blanks" <?php echo ($edit_question && $edit_question['question_type'] == 'fill_blanks') ? 'selected' : ''; ?>>Fill in Blanks</option>
                                 </select>
                             </div>
-
+                            
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Text</label>
                                 <textarea class="form-control" name="question" rows="4" 
@@ -683,12 +636,17 @@ if (isset($edit_question['options']['correct_answers'])) {
                                     <?php
                                     switch ($question['question_type']) {
                                         case 'multiple_choice_single':
-                                            $option_query = "SELECT option1, option2, option3, option4, correct_answer FROM single_choice_questions WHERE question_id = ?";
+                                            $option_query = "SELECT option1, option2, option3, option4, correct_answer, image_path FROM single_choice_questions WHERE question_id = ?";
                                             $stmt = $conn->prepare($option_query);
                                             $stmt->bind_param("i", $question['id']);
                                             $stmt->execute();
                                             $options = $stmt->get_result()->fetch_assoc();
                                             $stmt->close();
+                                            if (!empty($options['image_path'])) {
+                                                echo '<div class="mb-3">';
+                                                echo '<img src="../' . htmlspecialchars($options['image_path']) . '" class="img-fluid mb-2" style="max-height: 200px;">';
+                                                echo '</div>';
+                                            }   
                                             foreach (['option1', 'option2', 'option3', 'option4'] as $i => $opt) {
                                                 $option_number = $i + 1;
                                                 echo "<div>" . ($options['correct_answer'] == $option_number ? '<i class="fas fa-check text-success me-2"></i>' : '') . 
@@ -696,12 +654,17 @@ if (isset($edit_question['options']['correct_answers'])) {
                                             }
                                             break;
                                         case 'multiple_choice_multiple':
-                                            $option_query = "SELECT option1, option2, option3, option4, correct_answers FROM multiple_choice_questions WHERE question_id = ?";
+                                            $option_query = "SELECT option1, option2, option3, option4, correct_answers, image_path FROM multiple_choice_questions WHERE question_id = ?";
                                             $stmt = $conn->prepare($option_query);
                                             $stmt->bind_param("i", $question['id']);
                                             $stmt->execute();
                                             $options = $stmt->get_result()->fetch_assoc();
                                             $stmt->close();
+                                            if (!empty($options['image_path'])) {
+                                                echo '<div class="mb-3">';
+                                                echo '<img src="../' . htmlspecialchars($options['image_path']) . '" class="img-fluid mb-2" style="max-height: 200px;">';
+                                                echo '</div>';
+                                            }
                                             $correct = explode(',', $options['correct_answers']);
                                             foreach (['option1', 'option2', 'option3', 'option4'] as $i => $opt) {
                                                 $option_number = $i + 1;
@@ -743,48 +706,7 @@ if (isset($edit_question['options']['correct_answers'])) {
         </div>
     </div>
 
-
-
-
-    
     <script src="../js/bootstrap.bundle.min.js"></script>
-
-    // Add this script before closing </body>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const classSelect = document.querySelector('select[name="class"]');
-    const subjectSelect = document.querySelector('#subjectSelect');
-    
-    // Define subjects from PHP
-    const subjects = {
-        jss: <?php echo json_encode(array_map('strtolower', $jss_subjects)); ?>,
-        ss: <?php echo json_encode(array_map('strtolower', $ss_subjects)); ?>
-    };
-
-    function updateSubjects() {
-        const selectedClass = classSelect.value.toLowerCase();
-        subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-        
-        // Determine subject category
-        let category = '';
-        if (selectedClass.startsWith('jss')) category = 'jss';
-        else if (selectedClass.startsWith('ss')) category = 'ss';
-        
-        if (category && subjects[category]) {
-            subjects[category].forEach(subject => {
-                const option = document.createElement('option');
-                option.value = subject;
-                option.textContent = subject.charAt(0).toUpperCase() + subject.slice(1);
-                subjectSelect.appendChild(option);
-            });
-        }
-    }
-
-    // Initial population and event listener
-    classSelect.addEventListener('change', updateSubjects);
-    updateSubjects();
-});
-</script>
     <script>
         // Pass PHP edit data to JavaScript
         const editData = <?php echo json_encode($edit_data); ?>;
@@ -792,12 +714,33 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize question type templates
         const questionTemplates = {
             multiple_choice_single: `
+                <div class="mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
+                        <i class="fas fa-image"></i> Add Image to Question
+                    </button>
+                    <div id="imageUploadContainer">
+                        <label class="form-label mt-3">Question Image</label>
+                        <input type="file" class="form-control" name="question_image" accept="image/*">
+                        ${editData.options?.image_path ? `
+                            <div class="mt-2">
+                                <p>Current Image:</p>
+                                <img src="../${editData.options.image_path}" style="max-height: 100px;" class="img-thumbnail">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage">
+                                    <label class="form-check-label" for="removeImage">Remove current image</label>
+                                </div>
+                            </div>
+                        ` : ''}
+                        <small class="text-muted">Optional. Max size: 2MB. Formats: JPG, PNG, GIF</small>
+                    </div>
+                </div>
                 <div class="option-group">
                     ${[1,2,3,4].map(i => `
                         <div class="mb-3 option-highlight">
                             <label class="form-label">Option ${i}</label>
-                            <input type="text" class="form-control" name="option${i}" required placeholder="Enter option ${i}" 
-                                value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
+                            <input type="text" class="form-control" name="option${i}" required 
+                                   placeholder="Enter option ${i}" 
+                                   value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
                         </div>
                     `).join('')}
                     <div class="mb-3">
@@ -805,86 +748,132 @@ document.addEventListener('DOMContentLoaded', function() {
                         <select class="form-select" name="correct_answer" required>
                             <option value="">Select Correct Answer</option>
                             ${[1,2,3,4].map(i => `
-                                <option value="${i}" ${editData.options.correct_answer && parseInt(editData.options.correct_answer) === i ? 'selected' : ''}>Option ${i}</option>
+                                <option value="${i}" ${editData.options.correct_answer && parseInt(editData.options.correct_answer) === i ? 'selected' : ''}>
+                                    Option ${i}
+                                </option>
                             `).join('')}
                         </select>
                     </div>
                 </div>
             `,
             multiple_choice_multiple: `
+                <div class="mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
+                                                <i class="fas fa-image"></i> Add Image to Question
+                    </button>
+                    <div id="imageUploadContainer">
+                        <label class="form-label mt-3">Question Image</label>
+                        <input type="file" class="form-control" name="question_image" accept="image/*">
+                        ${editData.options?.image_path ? `
+                            <div class="mt-2">
+                                <p>Current Image:</p>
+                                <img src="../${editData.options.image_path}" style="max-height: 100px;" class="img-thumbnail">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage">
+                                    <label class="form-check-label" for="removeImage">Remove current image</label>
+                                </div>
+                            </div>
+                        ` : ''}
+                        <small class="text-muted">Optional. Max size: 2MB. Formats: JPG, PNG, GIF</small>
+                    </div>
+                </div>
                 <div class="option-group">
                     ${[1,2,3,4].map(i => `
                         <div class="mb-3 option-highlight">
                             <label class="form-label">Option ${i}</label>
-                            <input type="text" class="form-control" name="option${i}" required placeholder="Enter option ${i}" 
-                                value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
+                            <input type="text" class="form-control" name="option${i}" required 
+                                   placeholder="Enter option ${i}" 
+                                   value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
                         </div>
                     `).join('')}
                     <div class="mb-3">
-                        <label class="form-label">Correct Answers (select all that apply)</label>
-                        ${[1,2,3,4].map(i => `
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="correct_answers[]" value="${i}" id="correct${i}" 
-                                    ${editData.correct_answers.includes(i) ? 'checked' : ''}>
-                                <label class="form-check-label" for="correct${i}">Option ${i}</label>
-                            </div>
-                        `).join('')}
+                        <label class="form-label">Correct Answers</label>
+                        <div class="form-check">
+                            ${[1,2,3,4].map(i => `
+                                <div>
+                                    <input class="form-check-input" type="checkbox" name="correct_answers[]" 
+                                           value="${i}" id="correct${i}" 
+                                           ${editData.correct_answers.includes(i) ? 'checked' : ''}>
+                                    <label class="form-check-label" for="correct${i}">
+                                        Option ${i}
+                                    </label>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 </div>
             `,
             true_false: `
-                <div class="option-group">
-                    <div class="mb-3">
-                        <label class="form-label">Correct Answer</label>
-                        <select class="form-select" name="correct_answer" required>
-                            <option value="">Select Correct Answer</option>
-                            <option value="True" ${editData.options.correct_answer === 'True' ? 'selected' : ''}>True</option>
-                            <option value="False" ${editData.options.correct_answer === 'False' ? 'selected' : ''}>False</option>
-                        </select>
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label">Correct Answer</label>
+                    <select class="form-select" name="correct_answer" required>
+                        <option value="">Select Correct Answer</option>
+                        <option value="True" ${editData.options?.correct_answer === 'True' ? 'selected' : ''}>True</option>
+                        <option value="False" ${editData.options?.correct_answer === 'False' ? 'selected' : ''}>False</option>
+                    </select>
                 </div>
             `,
             fill_blanks: `
-                <div class="option-group">
-                    <div class="mb-3">
-                        <label class="form-label">Correct Answer</label>
-                        <input type="text" class="form-control" name="correct_answer" required placeholder="Enter the correct answer" 
-                            value="${editData.options.correct_answer ? editData.options.correct_answer.replace(/"/g, '&quot;') : ''}">
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label">Correct Answer</label>
+                    <input type="text" class="form-control" name="correct_answer" required 
+                           placeholder="Enter the correct answer" 
+                           value="${editData.options?.correct_answer ? editData.options.correct_answer.replace(/"/g, '&quot;') : ''}">
                 </div>
             `
         };
 
-        // Initialize options on page load
-        const questionTypeSelect = document.getElementById('questionType');
-        const optionsContainer = document.getElementById('optionsContainer');
-        if (questionTypeSelect && optionsContainer) {
-            optionsContainer.innerHTML = questionTemplates[questionTypeSelect.value];
-
-            // Update options when question type changes
-            questionTypeSelect.addEventListener('change', function() {
-                optionsContainer.innerHTML = questionTemplates[this.value];
-            });
+        // Function to update options container based on question type
+        function updateOptionsContainer() {
+            const questionType = document.getElementById('questionType').value;
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = questionTemplates[questionType] || '';
+            
+            // Initialize image upload toggle
+            const toggleImageBtn = document.getElementById('toggleImageBtn');
+            if (toggleImageBtn) {
+                toggleImageBtn.addEventListener('click', function() {
+                    const container = document.getElementById('imageUploadContainer');
+                    container.style.display = container.style.display === 'none' ? 'block' : 'none';
+                });
+            }
         }
 
-        // Client-side form validation
-        document.getElementById('questionForm')?.addEventListener('submit', function(e) {
-            const questionType = questionTypeSelect.value;
-            let isValid = true;
-            const errorContainer = document.createElement('div');
-            errorContainer.className = 'error-message';
-
-            if (questionType === 'multiple_choice_multiple') {
-                const checkboxes = document.querySelectorAll('input[name="correct_answers[]"]:checked');
-                if (checkboxes.length === 0) {
-                    isValid = false;
-                    errorContainer.textContent = 'At least one correct answer must be selected for multiple choice questions.';
-                }
-            }
-
-            if (!isValid) {
-                e.preventDefault();
-                optionsContainer.appendChild(errorContainer);
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateOptionsContainer();
+            
+            // Update when question type changes
+            document.getElementById('questionType').addEventListener('change', updateOptionsContainer);
+            
+            // Class-subject mapping
+            const classSubjectMapping = {
+                'JSS1': <?php echo json_encode($jss_subjects); ?>,
+                'JSS2': <?php echo json_encode($jss_subjects); ?>,
+                'JSS3': <?php echo json_encode($jss_subjects); ?>,
+                'SS1': <?php echo json_encode($ss_subjects); ?>,
+                'SS2': <?php echo json_encode($ss_subjects); ?>,
+                'SS3': <?php echo json_encode($ss_subjects); ?>
+            };
+            
+            // Update subjects when class changes
+            const classSelect = document.querySelector('select[name="class"]');
+            const subjectSelect = document.getElementById('subjectSelect');
+            
+            if (classSelect && subjectSelect) {
+                classSelect.addEventListener('change', function() {
+                    const selectedClass = this.value;
+                    subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+                    
+                    if (selectedClass && classSubjectMapping[selectedClass]) {
+                        classSubjectMapping[selectedClass].forEach(subject => {
+                            const option = document.createElement('option');
+                            option.value = subject;
+                            option.textContent = subject;
+                            subjectSelect.appendChild(option);
+                        });
+                    }
+                });
             }
         });
     </script>

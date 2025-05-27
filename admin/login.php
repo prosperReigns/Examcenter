@@ -149,7 +149,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="login-container mx-auto">
         <div class="text-center mb-5">
             <i class="fas fa-user-shield fa-4x mb-3"></i>
-            <h2 class="fw-bold">Admin Portal</h2>
+            <h2 class="fw-bold">Staff Portal</h2>
             <p class="text-muted mb-0">Secure Access to Examination Management</p>
         </div>
         
