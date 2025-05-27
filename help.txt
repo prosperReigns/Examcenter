@@ -86,3 +86,28 @@ CREATE TABLE IF NOT EXISTS fill_blank_questions (
     correct_answer TEXT NOT NULL,
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
+// CREATE TABLE teacher_subjects (
+                //     id INT AUTO_INCREMENT PRIMARY KEY,
+                //     teacher_id INT NOT NULL,
+                //     subject VARCHAR(100) NOT NULL,
+                //     FOREIGN KEY (teacher_id) REFERENCES teachers(id)
+                // );
+
+
+CREATE TABLE staff (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('admin', 'staff') NOT NULL DEFAULT 'staff',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ CREATE TABLE teachers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

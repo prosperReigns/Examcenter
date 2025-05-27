@@ -2,6 +2,10 @@
 session_start();
 require_once '../db.php';
 
+// Show errors (for development)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 if (!isset($_SESSION['student_id'])) {
     header("Location: register.php");
     exit();
@@ -9,84 +13,55 @@ if (!isset($_SESSION['student_id'])) {
 
 $conn = Database::getInstance()->getConnection();
 
-// Fetch questions for specific test title, class and subject
 $class = mysqli_real_escape_string($conn, $_SESSION['student_class']);
 $subject = mysqli_real_escape_string($conn, $_SESSION['student_subject']);
 $test_title = mysqli_real_escape_string($conn, $_SESSION['test_title']);
 
-// Get the specific test based on title, class and subject
 $test_query = "SELECT id FROM tests WHERE title = '$test_title' AND class = '$class' AND subject = '$subject'";
 $test_result = mysqli_query($conn, $test_query);
 $test = mysqli_fetch_assoc($test_result);
 
 if (!$test) {
-    die("No test available for this combination of test title, class and subject.");
+    die("No test available for this combination of test title, class, and subject.");
 }
 
 $test_id = $test['id'];
-$_SESSION['current_test_id'] = $test_id; // Store test_id in session
+$_SESSION['current_test_id'] = $test_id;
 
-// Fetch questions for this specific test
-$sql = "SELECT q.*, 
-        CASE 
-            WHEN q.question_type = 'single_choice' THEN 'single_choice'
-            WHEN q.question_type = 'multiple_choice' THEN 'multiple_choice'
-            WHEN q.question_type = 'true_false' THEN 'true_false'
-            WHEN q.question_type = 'fill_blank' THEN 'fill_blank'
-            ELSE 'unknown'
-        END as type
-        FROM new_questions q 
-        WHERE q.test_id = $test_id 
-        ORDER BY RAND()";
-
+$sql = "SELECT * FROM new_questions WHERE test_id = $test_id ORDER BY id ASC";
 $questions_result = mysqli_query($conn, $sql);
 
-if (!$questions_result) {
-    die("Query failed: " . mysqli_error($conn));  // Helps you debug
-}
+$questions = [];
+while ($row = mysqli_fetch_assoc($questions_result)) {
+    $question_id = $row['id'];
+    $type = $row['question_type'];
 
-$questions = mysqli_fetch_all($questions_result, MYSQLI_ASSOC);
-
-
-// For each question, fetch its specific details based on type
-foreach ($questions as $key => $question) {
-  switch ($question['question_type']) {
-    case 'multiple_choice_single':
-        $detail_sql = "SELECT * FROM single_choice_questions WHERE question_id = {$question['id']}";
-        break;
-    case 'multiple_choice_multiple':
-        $detail_sql = "SELECT * FROM multiple_choice_questions WHERE question_id = {$question['id']}";
-        break;
-
+    switch ($type) {
+        case 'single_choice':
+            $detail_query = "SELECT option1, option2, option3, option4 FROM single_choice_questions WHERE question_id = $question_id";
+            break;
+        case 'multiple_choice':
+            $detail_query = "SELECT option1, option2, option3, option4 FROM multiple_choice_questions WHERE question_id = $question_id";
+            break;
         case 'true_false':
-            $detail_sql = "SELECT * FROM true_false_questions WHERE question_id = {$question['id']}";
+            $detail_query = "SELECT correct_answer FROM true_false_questions WHERE question_id = $question_id";
             break;
         case 'fill_blank':
-            $detail_sql = "SELECT * FROM fill_blank_questions WHERE question_id = {$question['id']}";
+            $detail_query = "SELECT correct_answer FROM fill_blank_questions WHERE question_id = $question_id";
             break;
         default:
-            $detail_sql = "";
-}
+            $detail_query = null;
+    }
 
-    
-    if (!empty($detail_sql)) {
-        $detail_result = mysqli_query($conn, $detail_sql);
+    if ($detail_query) {
+        $detail_result = mysqli_query($conn, $detail_query);
         $detail = mysqli_fetch_assoc($detail_result);
-        $questions[$key] = array_merge($questions[$key], $detail);
-    }
-}
-if (!empty($detail_sql)) {
-    $detail_result = mysqli_query($conn, $detail_sql);
-    if (!$detail_result) {
-        die("Detail query failed: " . mysqli_error($conn)); // Debug missing options
-    }
-    $detail = mysqli_fetch_assoc($detail_result);
-    if ($detail) {
-        $questions[$key] = array_merge($questions[$key], $detail);
+        $questions[] = array_merge($row, $detail ?? []);
+    } else {
+        $questions[] = $row;
     }
 }
 
-// Store questions in session for validation later
 $_SESSION['exam_questions'] = $questions;
 ?>
 
@@ -94,126 +69,135 @@ $_SESSION['exam_questions'] = $questions;
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Take Exam - CBT Application</title>
+    <title>Take Exam</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/calculator.css" rel="stylesheet">
-    <link href="../css/takeExam.css" rel="stylesheet">
+    <style>
+        .question-container { display: none; }
+        .question-container.active { display: block; }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h2>Welcome, <?php echo htmlspecialchars($_SESSION['student_name']); ?></h2>
-        <div class="alert alert-info">
-            <strong>Test:</strong> <?php echo htmlspecialchars($_SESSION['test_title']); ?> |
-            <strong>Class:</strong> <?php echo htmlspecialchars($_SESSION['student_class']); ?> |
-            <strong>Subject:</strong> <?php echo htmlspecialchars($_SESSION['student_subject']); ?>
-        </div>
-        
-        <!-- calculator toggle button -->
-        <div class="calculator-btn" onclick="openCalculator()">
-        <i class="bi bi-calculator"></i>
-        🔢
-        </div>
-        <?php if(empty($questions)): ?>
-            <div class="alert alert-warning">
-                No questions available for this test. Please contact your administrator.
-            </div>
-        <?php else: ?>
-            <div class="question-progress">
-                Question <span id="currentQuestionNum">1</span> of <?php echo count($questions); ?>
-            </div>
+<div class="container mt-5">
+    <h2>Welcome, <?php echo htmlspecialchars($_SESSION['student_name']); ?></h2>
+    <div class="alert alert-info">
+        <strong>Test:</strong> <?php echo htmlspecialchars($_SESSION['test_title']); ?> |
+        <strong>Class:</strong> <?php echo htmlspecialchars($_SESSION['student_class']); ?> |
+        <strong>Subject:</strong> <?php echo htmlspecialchars($_SESSION['student_subject']); ?>
+    </div>
 
-<!-- Calculator Modal -->
-<div class="modal fade" id="calculatorModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Calculator</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="calculator">
-                    <input type="text" class="calculator-display" id="display" readonly>
-                    <div class="calculator-grid">
-                        <button class="calculator-btn-grid" onclick="clearDisplay()">C</button>
-                        <button class="calculator-btn-grid" onclick="backspace()">⌫</button>
-                        <button class="calculator-btn-grid operator" onclick="appendOperator('%')">%</button>
-                        <button class="calculator-btn-grid operator" onclick="appendOperator('/')">/</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('7')">7</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('8')">8</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('9')">9</button>
-                        <button class="calculator-btn-grid operator" onclick="appendOperator('*')">×</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('4')">4</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('5')">5</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('6')">6</button>
-                        <button class="calculator-btn-grid operator" onclick="appendOperator('-')">-</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('1')">1</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('2')">2</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('3')">3</button>
-                        <button class="calculator-btn-grid operator" onclick="appendOperator('+')">+</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('0')">0</button>
-                        <button class="calculator-btn-grid" onclick="appendNumber('.')">.</button>
-                        <button class="calculator-btn-grid equals" onclick="calculate()" style="grid-column: span 2">=</button>
+    <!-- Calculator Button -->
+    <div class="calculator-btn mb-3" onclick="openCalculator()">
+        <i class="bi bi-calculator"></i> 🔢 Calculator
+    </div>
+
+    <!-- Calculator Modal -->
+    <div class="modal fade" id="calculatorModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Calculator</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="display" readonly class="form-control mb-2">
+                    <div class="d-grid gap-2">
+                        <button onclick="appendNumber('1')">1</button>
+                        <button onclick="appendNumber('2')">2</button>
+                        <button onclick="appendNumber('+')">+</button>
+                        <button onclick="calculate()">=</button>
+                        <button onclick="clearDisplay()">C</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-            <!-- question and answer section -->
-            <form method="POST" action="submit_exam.php" id="examForm">
-                <?php foreach ($questions as $index => $question): ?>
-                    <div class="question-container <?php echo $index === 0 ? 'active' : ''; ?>" data-question="<?php echo $index; ?>">
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">Question <?php echo $index + 1; ?></h5>
-                                <p class="card-text"><?php echo htmlspecialchars($question['question_text']); ?></p>
-                                
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="radio" name="answers[<?php echo $question['id']; ?>]" value="1" required>
-                                    <label class="form-check-label"><?php echo htmlspecialchars($question['option1']); ?></label>
-                                </div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="radio" name="answers[<?php echo $question['id']; ?>]" value="2">
-                                    <label class="form-check-label"><?php echo htmlspecialchars($question['option2']); ?></label>
-                                </div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="radio" name="answers[<?php echo $question['id']; ?>]" value="3">
-                                    <label class="form-check-label"><?php echo htmlspecialchars($question['option3']); ?></label>
-                                </div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="radio" name="answers[<?php echo $question['id']; ?>]" value="4">
-                                    <label class="form-check-label"><?php echo htmlspecialchars($question['option4']); ?></label>
-                                </div>
-                            </div>
+    <?php if (empty($questions)): ?>
+        <div class="alert alert-warning">No questions available for this test.</div>
+    <?php else: ?>
+        <form method="POST" action="submit_exam.php" id="examForm">
+            <?php foreach ($questions as $index => $question): ?>
+                <div class="question-container <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5>Question <?php echo $index + 1; ?></h5>
+                            <p><?php echo htmlspecialchars($question['question_text']); ?></p>
+
+                            <?php if ($question['question_type'] === 'single_choice'): ?>
+                                <?php for ($i = 1; $i <= 4; $i++): ?>
+                                    <?php if (!empty($question["option$i"])): ?>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio"
+                                                name="answers[<?php echo $question['id']; ?>]"
+                                                value="<?php echo $i; ?>" required>
+                                            <label class="form-check-label"><?php echo htmlspecialchars($question["option$i"]); ?></label>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
-                <?php endforeach; ?>
-                
-                <div class="navigation-buttons">
-                    <button type="button" class="btn btn-secondary" onclick="previousQuestion()">Previous</button>
-                    <button type="button" class="btn btn-primary" onclick="nextQuestion()">Next</button>
-                    <button type="submit" class="btn btn-success" id="submitBtn" style="display: none;">Submit Exam</button>
                 </div>
-            </form>
-        <?php endif; ?>
-    </div>
+            <?php endforeach; ?>
 
-    <!-- Add progress boxes -->
-    <div class="progress-boxes" id="progressBoxes">
-                <?php for($i = 0; $i < count($questions); $i++): ?>
-                    <div class="question-box" data-index="<?php echo $i; ?>" onclick="jumpToQuestion(<?php echo $i; ?>)">
-                        <?php echo $i + 1; ?>
-                    </div>
-                <?php endfor; ?>
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-secondary" onclick="previousQuestion()">Previous</button>
+                <button type="button" class="btn btn-primary" onclick="nextQuestion()">Next</button>
+                <button type="submit" class="btn btn-success" id="submitBtn" style="display: none;">Submit Exam</button>
             </div>
-    
-        <script>
-       window.totalQuestions = <?php echo count($questions); ?>;
-    </script>
-    <script src="../js/bootstrap.bundle.min.js"></script>
-    <script src="../js/takeExam.js"></script>
-    <script src="../js/calculator.js"></script>
+        </form>
+    <?php endif; ?>
+</div>
+
+<script src="../js/bootstrap.bundle.min.js"></script>
+<script>
+    let current = 0;
+    const total = <?php echo count($questions); ?>;
+    const containers = document.querySelectorAll('.question-container');
+
+    function showQuestion(index) {
+        containers.forEach(c => c.classList.remove('active'));
+        containers[index].classList.add('active');
+        document.getElementById('submitBtn').style.display = index === total - 1 ? 'inline-block' : 'none';
+    }
+
+    function nextQuestion() {
+        if (current < total - 1) {
+            current++;
+            showQuestion(current);
+        }
+    }
+
+    function previousQuestion() {
+        if (current > 0) {
+            current--;
+            showQuestion(current);
+        }
+    }
+
+    // Calculator
+    function openCalculator() {
+        const modal = new bootstrap.Modal(document.getElementById('calculatorModal'));
+        modal.show();
+    }
+
+    function appendNumber(val) {
+        document.getElementById('display').value += val;
+    }
+
+    function calculate() {
+        const display = document.getElementById('display');
+        try {
+            display.value = eval(display.value);
+        } catch {
+            display.value = "Error";
+        }
+    }
+
+    function clearDisplay() {
+        document.getElementById('display').value = '';
+    }
+</script>
 </body>
 </html>

@@ -76,7 +76,7 @@ if($result) {
 }
 
 // Get active students count
-$query = "SELECT COUNT(DISTINCT student_id) as count FROM exam_results";
+$query = "SELECT COUNT(DISTINCT student_id) as count FROM results";
 $result = $conn->query($query);
 if($result) {
     $row = $result->fetch_assoc();
@@ -105,7 +105,7 @@ if($result) {
 
 // Get performance data for chart
 $query = "SELECT subject, AVG(score) as average_score 
-          FROM exam_results 
+          FROM results 
           GROUP BY subject";
 $result = $conn->query($query);
 if($result) {
@@ -117,17 +117,34 @@ if($result) {
 
 // Get recent exam results
 $recent_results = [];
-$query = "SELECT r.student_id, s.fullname, r.exam_date, r.score, r.status 
-          FROM exam_results r
-          JOIN students s ON r.student_id = s.id
-          ORDER BY r.exam_date DESC LIMIT 10";
+
+$query = "SELECT 
+            r.user_id, 
+            s.name, 
+            r.created_at, 
+            r.score, 
+            s.class,
+            r.status
+          FROM results r
+          JOIN students s ON r.user_id = s.id
+          ORDER BY r.created_at DESC 
+          LIMIT 10";
+
 $result = $conn->query($query);
-if($result) {
-    while($row = $result->fetch_assoc()) {
+
+if (!$result) {
+    echo "Query failed: " . $conn->error;
+} else {
+    while ($row = $result->fetch_assoc()) {
         $recent_results[] = $row;
     }
     $result->free();
 }
+
+if (empty($recent_results)) {
+    echo "No recent exam results found.";
+}
+
 
 // Get pending exams count for notifications
 $pending_exams = 0;
@@ -380,76 +397,7 @@ $conn->close();
             text-align: center !important;
         }
 
-        /* Dark Mode Styles */
-        .dark-mode {
-            background-color: #121212;
-            color: #e0e0e0;
-        }
-
-        .dark-mode .sidebar {
-            background-color: #1e1e1e;
-        }
-
-        .dark-mode .main-content {
-            background-color: #121212;
-        }
-
-        .dark-mode .card,
-        .dark-mode .stat-card,
-        .dark-mode .notification-menu {
-            background-color: #1e1e1e;
-            border-color: #333;
-        }
-
-        .dark-mode .card-header {
-            background-color: #1e1e1e;
-            border-bottom: 1px solid #333;
-        }
-
-        .dark-mode .notification-item:hover {
-            background-color: #2a2a2a;
-        }
-
-        .dark-mode .btn-action {
-            border-color: #333;
-            color: #e0e0e0;
-        }
-
-        .dark-mode .btn-action:hover {
-            border-color: var(--primary);
-        }
-
-        .dark-mode .text-muted,
-        .dark-mode .btn-action small {
-            color: #b0b0b0 !important;
-        }
-
-        .dark-mode .empty-state i {
-            color: #b0b0b0;
-        }
-
-        .dark-mode .table {
-            color: #e0e0e0;
-        }
-
-        .dark-mode .table-hover tbody tr:hover {
-            background-color: #2a2a2a;
-        }
-
-        .dark-mode .notification-header {
-            border-bottom: 1px solid #333;
-        }
-
-        .dark-mode-toggle {
-            cursor: pointer;
-            font-size: 1.2rem;
-            color: #6c757d;
-            transition: color 0.3s ease;
-        }
-
-        .dark-mode-toggle:hover {
-            color: var(--primary);
-        }
+        
     </style>
 </head>
 <body>
@@ -479,9 +427,13 @@ $conn->close();
                 <i class="fas fa-chart-bar"></i>
                 Exam Results
             </a>
+            <a href="add_teacher.php">
+                <i class="fas fa-plus-circle"></i>
+                Add Teachers
+            </a>
             <a href="manage_students.php">
                 <i class="fas fa-users"></i>
-                Manage Students
+                Manage Teachers
             </a>
             <a href="settings.php">
                 <i class="fas fa-cog"></i>
@@ -539,9 +491,7 @@ $conn->close();
                         <?php endif; ?>
                     </div>
                 </div>
-                <button class="dark-mode-toggle mt-2" title="Toggle Dark Mode">
-                    <i class="fas fa-moon"></i>
-                </button>
+                
             </div>
         </div>
         
@@ -596,64 +546,69 @@ $conn->close();
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card bg-white border-0 shadow-sm h-100">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Performance Overview</h5>
-                    </div>
-                    <div class="card-body position-relative">
-                        <div class="chart-container">
-                            <div class="loading-spinner"></div>
-                            <canvas id="performanceChart"></canvas>
-                        </div>
-                    </div>
-                </div>
+      <div class="col-md-6">
+    <div class="card bg-white border-0 shadow-sm h-100">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Performance Overview</h5>
+            <select id="classSelector" class="form-select form-select-sm w-auto">
+                <option value="all">All Classes</option>
+                <option value="SS1">SS1</option>
+                <option value="SS2">SS2</option>
+                <option value="SS3">SS3</option>
+                <!-- Add more classes as needed -->
+            </select>
+        </div>
+        <div class="card-body position-relative">
+            <div class="chart-container">
+                <div class="loading-spinner"></div>
+                <canvas id="performanceChart"></canvas>
             </div>
         </div>
+    </div>
+</div>
+</div>
+      
         
         <!-- Recent Exams Table -->
         <div class="card data-table mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Exam Results</h5>
-            </div>
-            <div class="card-body">
-                <table id="resultsTable" class="table table-hover" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th>Student ID</th>
-                            <th>Name</th>
-                            <th>Exam Date</th>
-                            <th>Score</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach($recent_results as $result): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($result['student_id']); ?></td>
-                            <td><?php echo htmlspecialchars($result['fullname']); ?></td>
-                            <td><?php echo date('M j, Y', strtotime($result['exam_date'])); ?></td>
-                            <td><?php echo $result['score']; ?>%</td>
-                            <td>
-                                <span class="badge <?php 
-                                    echo $result['status'] === 'Passed' ? 'badge-passed' : 
-                                        ($result['status'] === 'Failed' ? 'badge-failed' : 'badge-pending');
-                                ?>">
-                                    <?php echo $result['status']; ?>
-                                </span>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary view-result" data-id="<?php echo $result['student_id']; ?>">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Exam Results</h5>
+    </div>
+    <div class="card-body">
+        <table id="resultsTable" class="table table-hover" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Exam Date</th>
+                    <th>Score</th>
+                    <th>Class</th>
+                    <th>Status</th> <!-- Changed header -->
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach($recent_results as $result): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($result['user_id']); ?></td>
+                    <td><?php echo htmlspecialchars($result['name']); ?></td>
+                    <td><?php echo date('M j, Y', strtotime($result['created_at'])); ?></td>
+                    <td><?php echo $result['score']; ?>%</td>
+                    <td><?php echo htmlspecialchars($result['class']); ?></td>
+
+                    <td>
+                        <span class="badge <?php 
+                            echo $result['status'] === 'Passed' ? 'badge-passed' : 
+                                ($result['status'] === 'Failed' ? 'badge-failed' : 'badge-pending');
+                        ?>">
+                            <?php echo htmlspecialchars($result['status']); ?>
+                        </span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
 
         <!-- Quick Actions -->
         <div class="row g-4">
@@ -739,123 +694,132 @@ $conn->close();
     <script src="../js/dataTables.bootstrap5.min.js"></script>
     <script src="../js/chart.min.js"></script>
     <script>
-        $(document).ready(function() {
-            // Initialize dark mode based on localStorage
-            if (localStorage.getItem('darkMode') === 'enabled') {
-                $('body').addClass('dark-mode');
-                $('.dark-mode-toggle i').removeClass('fa-moon').addClass('fa-sun');
-            }
-
-            // Dark mode toggle
-            $('.dark-mode-toggle').click(function() {
-                $('body').toggleClass('dark-mode');
-                if ($('body').hasClass('dark-mode')) {
-                    localStorage.setItem('darkMode', 'enabled');
-                    $('.dark-mode-toggle i').removeClass('fa-moon').addClass('fa-sun');
-                } else {
-                    localStorage.setItem('darkMode', 'disabled');
-                    $('.dark-mode-toggle i').removeClass('fa-sun').addClass('fa-moon');
-                }
+      $(document).ready(function() {
+    // Initialize DataTable (unchanged)
+    $('#resultsTable').DataTable({
+        responsive: true,
+        order: [[2, 'desc']],
+        language: {
+            emptyTable: '<div class="text-center py-4 empty-state">' +
+                          '<i class="fas fa-inbox"></i>' +
+                          '<p class="text-muted">No exam results found</p>' +
+                        '</div>'
+        },
+        createdRow: function(row, data, index) {
+            $(row).children().each(function(index) {
+                $(this).attr('data-dt-column', index);
             });
+        }
+    });
 
-            $('#resultsTable').DataTable({
-                responsive: true,
-                order: [[2, 'desc']],
-                language: {
-                    emptyTable: '<div class="text-center py-4 empty-state">' +
-                                  '<i class="fas fa-inbox"></i>' +
-                                  '<p class="text-muted">No exam results found</p>' +
-                                '</div>'
-                },
-                createdRow: function(row, data, index) {
-                    $(row).children().each(function(index) {
-                        $(this).attr('data-dt-column', index);
-                    });
-                }
-            });
+    // Toggle sidebar on mobile (unchanged)
+    $('#sidebarToggle').click(function() {
+        $('.sidebar').toggleClass('active');
+    });
 
-            // Toggle sidebar on mobile
-            $('#sidebarToggle').click(function() {
-                $('.sidebar').toggleClass('active');
-            });
-
-            // Chart initialization
-            const chartConfig = {
-                type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Average Score',
-                        data: [],
-                        backgroundColor: 'rgba(67, 97, 238, 0.7)',
-                        borderColor: 'rgba(67, 97, 238, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100
+    // Enhanced chart configuration
+    const chartConfig = {
+        type: 'bar',
+        data: {
+            labels: ['Loading...'],
+            datasets: [{
+                label: 'Average Score',
+                data: [0],
+                backgroundColor: 'rgba(67, 97, 238, 0.7)',
+                borderColor: 'rgba(67, 97, 238, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
                         }
                     }
                 }
-            };
-
-            const ctx = document.getElementById('performanceChart').getContext('2d');
-            const performanceChart = new Chart(ctx, chartConfig);
-
-            // Fetch chart data
-            function fetchChartData() {
-                fetch('chart-data.php')
-                    .then(response => response.json())
-                    .then(data => {
-                        document.querySelector('.chart-container').classList.add('chart-loaded');
-                        performanceChart.data.labels = data.labels;
-                        performanceChart.data.datasets[0].data = data.data;
-                        performanceChart.update();
-                    });
-            }
-
-            // Initial load and periodic refresh
-            fetchChartData();
-            setInterval(fetchChartData, 60000);
-
-            // Animated number counters
-            document.querySelectorAll('.count').forEach(el => {
-                const target = +el.innerText;
-                let current = 0;
-                const increment = target / 100;
-                
-                const updateCount = () => {
-                    if(current < target) {
-                        current += increment;
-                        el.innerText = Math.ceil(current);
-                        requestAnimationFrame(updateCount);
-                    } else {
-                        el.innerText = target;
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y.toFixed(1) + '%';
+                        }
                     }
                 }
-                
-                requestAnimationFrame(updateCount);
-            });
+            }
+        }
+    };
 
-            // View result modal handling
-            $('.view-result').click(function() {
-                const studentId = $(this).data('id');
-                $.ajax({
-                    url: 'get-result-details.php',
-                    method: 'POST',
-                    data: { student_id: studentId },
-                    success: function(response) {
-                        $('#resultDetails').html(response);
-                        $('#resultModal').modal('show');
-                    }
-                });
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const performanceChart = new Chart(ctx, chartConfig);
+
+    // Function to fetch chart data with class parameter
+    function fetchChartData(selectedClass = 'all') {
+        const spinner = document.querySelector('.chart-container .loading-spinner');
+        spinner.style.display = 'block';
+        
+        fetch(`chart-data.php?class=${selectedClass}`)
+            .then(response => response.json())
+            .then(data => {
+                spinner.style.display = 'none';
+                document.querySelector('.chart-container').classList.add('chart-loaded');
+                
+                // Handle empty data case
+                if (data.labels.length === 0) {
+                    performanceChart.data.labels = ['No data available'];
+                    performanceChart.data.datasets[0].data = [0];
+                } else {
+                    performanceChart.data.labels = data.labels;
+                    performanceChart.data.datasets[0].data = data.data;
+                }
+                
+                performanceChart.update();
+            })
+            .catch(error => {
+                spinner.style.display = 'none';
+                console.error('Error fetching chart data:', error);
+                performanceChart.data.labels = ['Error loading data'];
+                performanceChart.data.datasets[0].data = [0];
+                performanceChart.update();
             });
-        });
+    }
+
+    // Event listener for class selector
+    document.getElementById('classSelector').addEventListener('change', function() {
+        fetchChartData(this.value);
+    });
+
+    // Initial load
+    fetchChartData();
+
+    // Animated number counters (unchanged)
+    document.querySelectorAll('.count').forEach(el => {
+        const target = +el.innerText;
+        let current = 0;
+        const increment = target / 100;
+        
+        const updateCount = () => {
+            if(current < target) {
+                current += increment;
+                el.innerText = Math.ceil(current);
+                requestAnimationFrame(updateCount);
+            } else {
+                el.innerText = target;
+            }
+        }
+        
+        requestAnimationFrame(updateCount);
+    });
+});
     </script>
 </body>
 </html>
