@@ -75,12 +75,12 @@ if($result) {
     $result->free();
 }
 
-// Get active students count
-$query = "SELECT COUNT(DISTINCT student_id) as count FROM results";
+// Get registered teachers count
+$query = "SELECT COUNT(DISTINCT id) as count FROM teachers";
 $result = $conn->query($query);
 if($result) {
     $row = $result->fetch_assoc();
-    $stats['active_students'] = $row['count'];
+    $stats['teachers'] = $row['count'];
     $result->free();
 }
 
@@ -178,227 +178,10 @@ $conn->close();
     <title>Admin Dashboard | D-Portal CBT</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
+    <link rel="stylesheet" href="../css/all.min.css">
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
-    <style>
-        :root {
-            --sidebar-width: 280px;
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-            --accent: #4cc9f0;
-            --dark: #1a1a2e;
-            --light: #f8f9fa;
-            --success: #4BB543;
-            --danger: #FF4444;
-            --warning: #FFC107;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .admin-container {
-            max-width: 100%;
-            padding: 0;
-        }
-
-        .subject-card {
-            border-left: 4px solid var(--primary);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            flex: 1 1 30%; /* Each card takes roughly 1/3 of the container */
-            max-width: 33.33%; /* Ensure no more than 3 cards per row */
-            margin: 0.5rem;
-            padding: 1rem;
-            box-sizing: border-box;
-        }
-
-        .subject-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        }
-
-        .stats-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            justify-content: space-between;
-            max-width: 100%;
-            overflow: hidden; /* Prevent overflow */
-        }
-
-        .badge-passed {
-            background-color: var(--success);
-        }
-
-        .badge-failed {
-            background-color: var(--danger);
-        }
-
-        .badge-pending {
-            background-color: var(--warning);
-        }
-
-        .chart-container {
-            position: relative;
-            height: 300px;
-            width: 100%;
-            opacity: 0;
-            transition: opacity 0.6s ease;
-        }
-
-        .chart-loaded {
-            opacity: 1;
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 2rem;
-            height: 2rem;
-            border: 3px solid rgba(0,0,0,0.1);
-            border-radius: 50%;
-            border-top-color: var(--primary);
-            animation: spin 1s ease-in-out infinite;
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-        }
-
-        @keyframes spin {
-            to { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-
-        .stat-card {
-            animation: fadeIn 0.6s ease forwards;
-            opacity: 0;
-        }
-
-        .stat-card:nth-child(1) { animation-delay: 0.2s; }
-        .stat-card:nth-child(2) { animation-delay: 0.4s; }
-        .stat-card:nth-child(3) { animation-delay: 0.6s; }
-
-        .empty-state {
-            text-align: center;
-            padding: 2rem;
-            opacity: 0;
-            animation: fadeIn 0.6s ease forwards;
-        }
-
-        .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            color: #6c757d;
-        }
-
-        /* Notification Dropdown */
-        .notification-dropdown {
-            position: relative;
-        }
-
-        .notification-menu {
-            position: absolute;
-            right: 0;
-            top: 120%;
-            width: 320px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(10px);
-            transition: all 0.3s ease;
-            z-index: 1000;
-        }
-
-        .notification-dropdown:hover .notification-menu {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .notification-header {
-            padding: 1rem;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .notification-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .notification-item {
-            padding: 1rem;
-            display: flex;
-            align-items: center;
-            transition: background 0.2s ease;
-        }
-
-        .notification-item:hover {
-            background: #f8f9fa;
-        }
-
-        .pulse {
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-
-        /* Quick Actions */
-        .btn-action {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem;
-            border: 1px solid #eee;
-            transition: all 0.3s ease;
-        }
-
-        .btn-action:hover {
-            transform: translateX(5px);
-            border-color: var(--primary);
-        }
-
-        .action-content {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .btn-action h6 {
-            margin: 0;
-            font-weight: 500;
-        }
-
-        .btn-action small {
-            font-size: 0.85em;
-            color: #6c757d;
-        }
-
-        .btn-action i.fa-chevron-right {
-            color: #ddd;
-            transition: transform 0.3s ease;
-        }
-
-        .btn-action:hover i.fa-chevron-right {
-            color: var(--primary);
-            transform: translateX(3px);
-        }
-
-        .dataTables_empty {
-            padding: 2rem !important;
-            text-align: center !important;
-        }
-
-        
-    </style>
+   
 </head>
 <body>
     <!-- Sidebar -->
@@ -431,7 +214,7 @@ $conn->close();
                 <i class="fas fa-plus-circle"></i>
                 Add Teachers
             </a>
-            <a href="manage_students.php">
+            <a href="manage_teachers.php">
                 <i class="fas fa-users"></i>
                 Manage Teachers
             </a>
@@ -507,7 +290,7 @@ $conn->close();
             <div class="col-md-4">
                 <div class="stat-card bg-white">
                     <i class="fas fa-user-graduate text-success"></i>
-                    <div class="count"><?php echo $stats['active_students']; ?></div>
+                    <div class="count"><?php echo $stats['teachers']; ?></div>
                     <div class="text-muted">Registered teachers</div>
                 </div>
             </div>
