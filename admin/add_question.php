@@ -707,175 +707,185 @@ if (isset($edit_question['options']['correct_answers'])) {
     </div>
 
     <script src="../js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Pass PHP edit data to JavaScript
-        const editData = <?php echo json_encode($edit_data); ?>;
+   <script>
+// Pass PHP edit data to JavaScript
+const editData = <?php echo json_encode($edit_data); ?>;
 
-        // Initialize question type templates
-        const questionTemplates = {
-            multiple_choice_single: `
-                <div class="mb-3">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
-                        <i class="fas fa-image"></i> Add Image to Question
-                    </button>
-                    <div id="imageUploadContainer">
-                        <label class="form-label mt-3">Question Image</label>
-                        <input type="file" class="form-control" name="question_image" accept="image/*">
-                        ${editData.options?.image_path ? `
-                            <div class="mt-2">
-                                <p>Current Image:</p>
-                                <img src="../${editData.options.image_path}" style="max-height: 100px;" class="img-thumbnail">
-                                <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage">
-                                    <label class="form-check-label" for="removeImage">Remove current image</label>
-                                </div>
-                            </div>
-                        ` : ''}
-                        <small class="text-muted">Optional. Max size: 2MB. Formats: JPG, PNG, GIF</small>
+// Initialize question type templates
+const questionTemplates = {
+    multiple_choice_single: `
+        <div class="mb-3">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
+                <i class="fas fa-image"></i> Add Image to Question
+            </button>
+            <div id="imageUploadContainer">
+                <label class="form-label mt-3">Question Image</label>
+                <input type="file" class="form-control" name="question_image" accept="image/*">
+                ${editData.options?.image_path ? `
+                    <div class="mt-2">
+                        <p>Current Image:</p>
+                        <img src="../${editData.options.image_path}" style="max-height: 100px;" class="img-thumbnail">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage">
+                            <label class="form-check-label" for="removeImage">Remove current image</label>
+                        </div>
                     </div>
+                ` : ''}
+                <small class="text-muted">Optional. Max size: 2MB. Formats: JPG, PNG, GIF</small>
+            </div>
+        </div>
+        <div class="option-group">
+            ${[1,2,3,4].map(i => `
+                <div class="mb-3 option-highlight">
+                    <label class="form-label">Option ${i}</label>
+                    <input type="text" class="form-control" name="option${i}" required 
+                           placeholder="Enter option ${i}" 
+                           value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
                 </div>
-                <div class="option-group">
+            `).join('')}
+            <div class="mb-3">
+                <label class="form-label">Correct Answer</label>
+                <select class="form-select" name="correct_answer" required>
+                    <option value="">Select Correct Answer</option>
                     ${[1,2,3,4].map(i => `
-                        <div class="mb-3 option-highlight">
-                            <label class="form-label">Option ${i}</label>
-                            <input type="text" class="form-control" name="option${i}" required 
-                                   placeholder="Enter option ${i}" 
-                                   value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
+                        <option value="${i}" ${editData.options.correct_answer && parseInt(editData.options.correct_answer) === i ? 'selected' : ''}>
+                            Option ${i}
+                        </option>
+                    `).join('')}
+                </select>
+            </div>
+        </div>
+    `,
+    multiple_choice_multiple: `
+        <div class="mb-3">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
+                <i class="fas fa-image"></i> Add Image to Question
+            </button>
+            <div id="imageUploadContainer">
+                <label class="form-label mt-3">Question Image</label>
+                <input type="file" class="form-control" name="question_image" accept="image/*">
+                ${editData.options?.image_path ? `
+                    <div class="mt-2">
+                        <p>Current Image:</p>
+                        <img src="../${editData.options.image_path}" style="max-height: 100px;" class="img-thumbnail">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage">
+                            <label class="form-check-label" for="removeImage">Remove current image</label>
+                        </div>
+                    </div>
+                ` : ''}
+                <small class="text-muted">Optional. Max size: 2MB. Formats: JPG, PNG, GIF</small>
+            </div>
+        </div>
+        <div class="option-group">
+            ${[1,2,3,4].map(i => `
+                <div class="mb-3 option-highlight">
+                    <label class="form-label">Option ${i}</label>
+                    <input type="text" class="form-control" name="option${i}" required 
+                           placeholder="Enter option ${i}" 
+                           value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
+                </div>
+            `).join('')}
+            <div class="mb-3">
+                <label class="form-label">Correct Answers</label>
+                <div class="form-check">
+                    ${[1,2,3,4].map(i => `
+                        <div>
+                            <input class="form-check-input" type="checkbox" name="correct_answers[]" 
+                                   value="${i}" id="correct${i}" 
+                                   ${editData.correct_answers.includes(i) ? 'checked' : ''}>
+                            <label class="form-check-label" for="correct${i}">
+                                Option ${i}
+                            </label>
                         </div>
                     `).join('')}
-                    <div class="mb-3">
-                        <label class="form-label">Correct Answer</label>
-                        <select class="form-select" name="correct_answer" required>
-                            <option value="">Select Correct Answer</option>
-                            ${[1,2,3,4].map(i => `
-                                <option value="${i}" ${editData.options.correct_answer && parseInt(editData.options.correct_answer) === i ? 'selected' : ''}>
-                                    Option ${i}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </div>
                 </div>
-            `,
-            multiple_choice_multiple: `
-                <div class="mb-3">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
-                                                <i class="fas fa-image"></i> Add Image to Question
-                    </button>
-                    <div id="imageUploadContainer">
-                        <label class="form-label mt-3">Question Image</label>
-                        <input type="file" class="form-control" name="question_image" accept="image/*">
-                        ${editData.options?.image_path ? `
-                            <div class="mt-2">
-                                <p>Current Image:</p>
-                                <img src="../${editData.options.image_path}" style="max-height: 100px;" class="img-thumbnail">
-                                <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" name="remove_image" id="removeImage">
-                                    <label class="form-check-label" for="removeImage">Remove current image</label>
-                                </div>
-                            </div>
-                        ` : ''}
-                        <small class="text-muted">Optional. Max size: 2MB. Formats: JPG, PNG, GIF</small>
-                    </div>
-                </div>
-                <div class="option-group">
-                    ${[1,2,3,4].map(i => `
-                        <div class="mb-3 option-highlight">
-                            <label class="form-label">Option ${i}</label>
-                            <input type="text" class="form-control" name="option${i}" required 
-                                   placeholder="Enter option ${i}" 
-                                   value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '&quot;') : ''}">
-                        </div>
-                    `).join('')}
-                    <div class="mb-3">
-                        <label class="form-label">Correct Answers</label>
-                        <div class="form-check">
-                            ${[1,2,3,4].map(i => `
-                                <div>
-                                    <input class="form-check-input" type="checkbox" name="correct_answers[]" 
-                                           value="${i}" id="correct${i}" 
-                                           ${editData.correct_answers.includes(i) ? 'checked' : ''}>
-                                    <label class="form-check-label" for="correct${i}">
-                                        Option ${i}
-                                    </label>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `,
-            true_false: `
-                <div class="mb-3">
-                    <label class="form-label">Correct Answer</label>
-                    <select class="form-select" name="correct_answer" required>
-                        <option value="">Select Correct Answer</option>
-                        <option value="True" ${editData.options?.correct_answer === 'True' ? 'selected' : ''}>True</option>
-                        <option value="False" ${editData.options?.correct_answer === 'False' ? 'selected' : ''}>False</option>
-                    </select>
-                </div>
-            `,
-            fill_blanks: `
-                <div class="mb-3">
-                    <label class="form-label">Correct Answer</label>
-                    <input type="text" class="form-control" name="correct_answer" required 
-                           placeholder="Enter the correct answer" 
-                           value="${editData.options?.correct_answer ? editData.options.correct_answer.replace(/"/g, '&quot;') : ''}">
-                </div>
-            `
-        };
+            </div>
+        </div>
+    `,
+    true_false: `
+        <div class="mb-3">
+            <label class="form-label">Correct Answer</label>
+            <select class="form-select" name="correct_answer" required>
+                <option value="">Select Correct Answer</option>
+                <option value="True" ${editData.options?.correct_answer === 'True' ? 'selected' : ''}>True</option>
+                <option value="False" ${editData.options?.correct_answer === 'False' ? 'selected' : ''}>False</option>
+            </select>
+        </div>
+    `,
+    fill_blanks: `
+        <div class="mb-3">
+            <label class="form-label">Correct Answer</label>
+            <input type="text" class="form-control" name="correct_answer" required 
+                   placeholder="Enter the correct answer" 
+                   value="${editData.options?.correct_answer ? editData.options.correct_answer.replace(/"/g, '&quot;') : ''}">
+        </div>
+    `
+};
 
-        // Function to update options container based on question type
-        function updateOptionsContainer() {
-            const questionType = document.getElementById('questionType').value;
-            const optionsContainer = document.getElementById('optionsContainer');
-            optionsContainer.innerHTML = questionTemplates[questionType] || '';
-            
-            // Initialize image upload toggle
-            const toggleImageBtn = document.getElementById('toggleImageBtn');
-            if (toggleImageBtn) {
-                toggleImageBtn.addEventListener('click', function() {
-                    const container = document.getElementById('imageUploadContainer');
-                    container.style.display = container.style.display === 'none' ? 'block' : 'none';
-                });
+// Function to update options container based on question type
+function updateOptionsContainer() {
+    const questionTypeSelect = document.getElementById('questionType');
+    if (!questionTypeSelect) return; // Exit if #questionType doesn't exist
+    
+    const questionType = questionTypeSelect.value;
+    const optionsContainer = document.getElementById('optionsContainer');
+    if (optionsContainer) {
+        optionsContainer.innerHTML = questionTemplates[questionType] || '';
+    }
+    
+    // Initialize image upload toggle
+    const toggleImageBtn = document.getElementById('toggleImageBtn');
+    if (toggleImageBtn) {
+        toggleImageBtn.addEventListener('click', function() {
+            const container = document.getElementById('imageUploadContainer');
+            if (container) {
+                container.style.display = container.style.display === 'none' ? 'block' : 'none';
             }
-        }
+        });
+    }
+}
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            updateOptionsContainer();
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Only run if question form is present
+    if (document.getElementById('questionType')) {
+        updateOptionsContainer();
+        
+        // Update when question type changes
+        document.getElementById('questionType').addEventListener('change', updateOptionsContainer);
+    }
+    
+    // Class-subject mapping
+    const classSubjectMapping = {
+        'JSS1': <?php echo json_encode($jss_subjects); ?>,
+        'JSS2': <?php echo json_encode($jss_subjects); ?>,
+        'JSS3': <?php echo json_encode($jss_subjects); ?>,
+        'SS1': <?php echo json_encode($ss_subjects); ?>,
+        'SS2': <?php echo json_encode($ss_subjects); ?>,
+        'SS3': <?php echo json_encode($ss_subjects); ?>
+    };
+    
+    // Update subjects when class changes
+    const classSelect = document.querySelector('select[name="class"]');
+    const subjectSelect = document.getElementById('subjectSelect');
+    
+    if (classSelect && subjectSelect) {
+        classSelect.addEventListener('change', function() {
+            const selectedClass = this.value;
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>';
             
-            // Update when question type changes
-            document.getElementById('questionType').addEventListener('change', updateOptionsContainer);
-            
-            // Class-subject mapping
-            const classSubjectMapping = {
-                'JSS1': <?php echo json_encode($jss_subjects); ?>,
-                'JSS2': <?php echo json_encode($jss_subjects); ?>,
-                'JSS3': <?php echo json_encode($jss_subjects); ?>,
-                'SS1': <?php echo json_encode($ss_subjects); ?>,
-                'SS2': <?php echo json_encode($ss_subjects); ?>,
-                'SS3': <?php echo json_encode($ss_subjects); ?>
-            };
-            
-            // Update subjects when class changes
-            const classSelect = document.querySelector('select[name="class"]');
-            const subjectSelect = document.getElementById('subjectSelect');
-            
-            if (classSelect && subjectSelect) {
-                classSelect.addEventListener('change', function() {
-                    const selectedClass = this.value;
-                    subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-                    
-                    if (selectedClass && classSubjectMapping[selectedClass]) {
-                        classSubjectMapping[selectedClass].forEach(subject => {
-                            const option = document.createElement('option');
-                            option.value = subject;
-                            option.textContent = subject;
-                            subjectSelect.appendChild(option);
-                        });
-                    }
+            if (selectedClass && classSubjectMapping[selectedClass]) {
+                classSubjectMapping[selectedClass].forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject;
+                    option.textContent = subject;
+                    subjectSelect.appendChild(option);
                 });
             }
         });
-    </script>
+    }
+});
+</script>
 </body>
 </html>

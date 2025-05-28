@@ -86,12 +86,7 @@ CREATE TABLE IF NOT EXISTS fill_blank_questions (
     correct_answer TEXT NOT NULL,
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
-// CREATE TABLE teacher_subjects (
-                //     id INT AUTO_INCREMENT PRIMARY KEY,
-                //     teacher_id INT NOT NULL,
-                //     subject VARCHAR(100) NOT NULL,
-                //     FOREIGN KEY (teacher_id) REFERENCES teachers(id)
-                // );
+
 
 
 CREATE TABLE staff (
@@ -103,11 +98,53 @@ CREATE TABLE staff (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
- CREATE TABLE teachers (
+CREATE TABLE teachers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE teacher_subjects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL,
+    subject VARCHAR(100) NOT NULL,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE active_exams (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subject VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE,
+    exam_date DATE,
+    UNIQUE KEY (subject)
+);
+-- Drop the existing unique key
+ALTER TABLE active_exams DROP INDEX subject;
+
+-- Add a new composite unique key
+ALTER TABLE active_exams ADD UNIQUE KEY subject_date (subject, exam_date);
+
+CREATE TABLE IF NOT EXISTS settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_name VARCHAR(100) UNIQUE,
+    setting_value TEXT
+);
+INSERT IGNORE INTO settings (setting_name, setting_value) VALUES ('show_results_immediately', '0');
+
+
+-- Add 'role' column to teachers table
+ALTER TABLE teachers
+ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'teacher';
+
+-- Add 'role' column to students table
+ALTER TABLE students
+ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'student';
+
+-- Add 'role' column to admin table
+ALTER TABLE admin
+ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin';
