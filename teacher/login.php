@@ -3,7 +3,7 @@ session_start();
 require_once '../db.php';
 
 if(isset($_SESSION['admin_id'])) {
-    header("Location: manage_teachers.php");
+    header("Location: dashboard.php");
     Logger::log("Successful login from " . $_SERVER['REMOTE_ADDR']);
     exit();
 }
@@ -14,18 +14,18 @@ $conn = Database::getInstance()->getConnection();
 $error = null;
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = mysqli_real_escape_string($conn, $_POST['username']);
+    $fullname = mysqli_real_escape_string($conn, $_POST['fullname']);
     $password = mysqli_real_escape_string($conn, $_POST['password']);
     
-    $sql = "SELECT * FROM admins WHERE username = '$username'";
+    $sql = "SELECT * FROM teacher WHERE full_name = '$fullname'";
     $result = mysqli_query($conn, $sql);
     
     if (mysqli_num_rows($result) == 1) {
         $row = mysqli_fetch_assoc($result);
         if (password_verify($password, $row['password'])) {
-            $_SESSION['admin_id'] = $row['id'];
-            $_SESSION['admin_username'] = $row['username'];
-            header("Location: manage_teachers.php");
+            $_SESSION['teacher_id'] = $row['id'];
+            $_SESSION['teacher_fullname'] = $row['fullname'];
+            header("Location: dashboard.php");
             exit();
         } else {
             $error = "Invalid login credentials";
@@ -40,7 +40,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D-Portal | Admin Login</title>
+    <title>D-Portal | Teacher Login</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
@@ -149,7 +149,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="login-container mx-auto">
         <div class="text-center mb-5">
             <i class="fas fa-user-shield fa-4x mb-3"></i>
-            <h2 class="fw-bold">Admin Portal</h2>
+            <h2 class="fw-bold">Teacher Portal</h2>
             <p class="text-muted mb-0">Secure Access to Examination Management</p>
         </div>
         
@@ -161,13 +161,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         <form method="POST" action="" id="loginForm" novalidate>
             <div class="mb-3">
-                <label for="fullname" class="form-label fw-semibold">username</label>
+                <label for="fullname" class="form-label fw-semibold">fullname</label>
                 <input type="text" 
-                       id="username"
-                       name="username"
+                       id="fullname"
+                       name="fullname"
                        class="form-control form-control-lg"
                        required
-                       autocomplete="username"
+                       autocomplete="fullname"
                        autofocus
                        value="<?php echo isset($_POST['fullname']) ? htmlspecialchars($_POST['fullname']) : ''; ?>">
             </div>

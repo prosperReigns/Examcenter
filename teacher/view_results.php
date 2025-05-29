@@ -3,7 +3,7 @@ session_start();
 require_once '../db.php';
 
 // Check if admin is logged in
-if(!isset($_SESSION['admin_id'])) {
+if(!isset($_SESSION['teacher_id'])) {
     header("Location: login.php");
     exit();
 }

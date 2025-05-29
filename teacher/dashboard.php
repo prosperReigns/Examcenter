@@ -4,7 +4,7 @@ require_once '../db.php';
 
 // Check if admin is logged in
 if(!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
+    header("Location: ../teacher/login.php");
     exit();
 }
 
@@ -158,7 +158,7 @@ if($result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | D-Portal CBT</title>
+    <title>Teacher Dashboard | D-Portal CBT</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
