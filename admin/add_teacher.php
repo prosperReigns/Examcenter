@@ -302,7 +302,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </style>
 </head>
 <body>
-    <div class="gradient-header">
+
+<div class="gradient-header">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
                 <h1 class="mb-0"><?php echo $is_edit_mode ? 'Edit' : 'Add'; ?> Teacher</h1>
