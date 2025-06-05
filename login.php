@@ -7,12 +7,15 @@ error_reporting(E_ALL);
 ini_set('log_errors', 1);
 ini_set('error_log', '../logs/errors.log');
 
+// Define base path
+define('BASE_PATH', dirname(dirname(__FILE__)));
 try {
-    require_once 'db.php';
+    require_once __DIR__ . '/db.php';
 } catch (Exception $e) {
     error_log("Failed to include db.php: " . $e->getMessage());
     $error = "System error. Please try again later.";
 }
+
 
 $error = '';
 
@@ -56,20 +59,26 @@ function getUserRole($conn, $user_id) {
 }
 
 // Helper function to redirect based on role
-function redirectByRole($role, $user_id) {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    Logger::log("Redirecting user_id=$user_id, role=$role from $ip");
+function redirectByRole($role) {
+    $base_url = 'http://' . $_SERVER['HTTP_HOST'];
     
-    if ($role === 'admin') {
-        header("Location: /EXAMCENTER/admin/dashboard.php");
+    switch($role) {
+        case 'admin':
+            $target = $base_url . '/EXAMCENTER/admin/dashboard.php';
+            break;
+        case 'teacher':
+            $target = $base_url . '/EXAMCENTER/teacher/dashboard.php';
+            break;
+        default:
+            session_destroy();
+            header("Location: " . $base_url . "/EXAMCENTER/admin/login.php");
+            exit();
+    }
+    
+    // Only redirect if we're not already on the target page
+    if ($_SERVER['PHP_SELF'] !== parse_url($target, PHP_URL_PATH)) {
+        header("Location: $target");
         exit();
-    } elseif ($role === 'teacher') {
-        header("Location: /EXAMCENTER/teacher/dashboard.php");
-        exit();
-    } else {
-        error_log("Invalid role for user_id=$user_id: $role");
-        session_destroy();
-        return "Invalid user role";
     }
 }
 
@@ -85,11 +94,24 @@ try {
     $error = "System error";
 }
 
-// Check if already logged in
-if (isset($_SESSION['user_id']) && !$error) {
+// Check if already logged in and redirect if needed
+if (isset($_SESSION['user_id']) && empty($error)) {
     $user_id = (int)$_SESSION['user_id'];
     if ($user = getUserRole($conn, $user_id)) {
-        $error = redirectByRole($user['role'], $user_id);
+        // Store role in session if not already set
+        if (!isset($_SESSION['user_role'])) {
+            $_SESSION['user_role'] = $user['role'];
+        }
+        
+        // Check if we're already on the correct dashboard
+        $current_page = $_SERVER['PHP_SELF'];
+        $is_admin_dashboard = strpos($current_page, 'admin/dashboard.php') !== false;
+        $is_teacher_dashboard = strpos($current_page, 'teacher/dashboard.php') !== false;
+        
+        if (($user['role'] === 'admin' && !$is_admin_dashboard) || 
+            ($user['role'] === 'teacher' && !$is_teacher_dashboard)) {
+            redirectByRole($user['role']);
+        }
     } else {
         error_log("No user found for user_id=$user_id");
         session_destroy();
@@ -98,7 +120,7 @@ if (isset($_SESSION['user_id']) && !$error) {
 }
 
 // Handle login form submission
-if ($_SERVER["REQUEST_METHOD"] == "POST" && !$error) {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
     try {
         $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
@@ -121,9 +143,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !$error) {
                     if (password_verify($password, $row['password'])) {
                         $_SESSION['user_id'] = $row['id'];
                         $_SESSION['user_username'] = $row['username'];
-                        $role = strtolower($row['role']);
-                        Logger::log("Successful login for username=$username, role=$role from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-                        $error = redirectByRole($role, $row['id']);
+                        $_SESSION['user_role'] = strtolower($row['role']);
+                        Logger::log("Successful login for username=$username, role={$row['role']} from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+                        redirectByRole($_SESSION['user_role']);
                     } else {
                         $error = "Invalid login credentials";
                         Logger::log("Failed login attempt for username=$username: Invalid password from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
@@ -145,9 +167,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !$error) {
                             if (password_verify($password, $row['password'])) {
                                 $_SESSION['user_id'] = $row['id'];
                                 $_SESSION['user_username'] = $row['username'];
-                                $role = strtolower($row['role']);
-                                Logger::log("Successful login for username=$username, role=$role from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-                                $error = redirectByRole($role, $row['id']);
+                                $_SESSION['user_role'] = strtolower($row['role']);
+                                Logger::log("Successful login for username=$username, role={$row['role']} from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+                                redirectByRole($_SESSION['user_role']);
                             } else {
                                 $error = "Invalid login credentials";
                                 Logger::log("Failed login attempt for username=$username: Invalid password from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
@@ -175,10 +197,10 @@ ob_end_flush();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D-Portal | Staff Login</title>
-    <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../css/all.css">
-    <link rel="stylesheet" href="../css/toastr.min.css">
+    <link rel="stylesheet" href="css/all.css">
+    <link rel="stylesheet" href="css/toastr.min.css">
     <style>
         body {
             background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
@@ -325,9 +347,9 @@ ob_end_flush();
     </div>
 </div>
 
-<script src="../js/bootstrap.bundle.min.js"></script>
-<script src="../js/toastr.min.js"></script>
-<script src="../js/gsap-public/minified/gsap.min.js"></script>
-<script src="../js/login-animation.js"></script>
+<script src="js/bootstrap.bundle.min.js"></script>
+<script src="js/toastr.min.js"></script>
+<script src="js/gsap-public/minified/gsap.min.js"></script>
+<script src="js/login-animation.js"></script>
 </body>
 </html>
