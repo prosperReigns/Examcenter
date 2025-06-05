@@ -2,22 +2,51 @@
 session_start();
 require_once '../db.php';
 
-// Check if admin is logged in
-if(!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    error_log("Redirecting to login: No user_id in session");
+    header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
 }
 
 // Initialize database connection
-$database = Database::getInstance();
-$conn = $database->getConnection();
+try {
+    $database = Database::getInstance();
+    $conn = $database->getConnection();
 
-// Verify connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+    if ($conn->connect_error) {
+        error_log("Database connection failed: " . $conn->connect_error);
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    // Verify user is an admin
+    $user_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT role FROM admins WHERE id = ?");
+    if (!$stmt) {
+        error_log("Prepare failed for admin role check: " . $conn->error);
+        die("Database error");
+    }
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$user || strtolower($user['role']) !== 'admin') {
+        error_log("Unauthorized access attempt by user_id=$user_id, role=" . ($user['role'] ?? 'none'));
+        session_destroy();
+        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        exit();
+    }
+} catch (Exception $e) {
+    error_log("Dashboard error: " . $e->getMessage());
+    die("System error");
 }
 
-$admin_username = $_SESSION['admin_username'];
+$admin_username = $_SESSION['user_username'];
+
+// Log session data for debugging
+error_log("Admin dashboard session: " . print_r($_SESSION, true));
 
 // Initialize stats array with default values
 $stats = [
@@ -30,10 +59,21 @@ $stats = [
 
 // Example of logging an activity
 function log_activity($conn, $activity) {
-    $stmt = $conn->prepare("INSERT INTO activities_log (activity) VALUES (?)");
-    $stmt->bind_param("s", $activity);
-    $stmt->execute();
-    $stmt->close();
+    try {
+        $stmt = $conn->prepare("INSERT INTO activities_log (activity, user_id, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+        if (!$stmt) {
+            error_log("log_activity: Prepare failed: " . $conn->error);
+            return;
+        }
+        $user_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        $ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
+        $agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+        $stmt->bind_param("siss", $activity, $user_id, $ip, $agent);
+        $stmt->execute();
+        $stmt->close();
+    } catch (Exception $e) {
+        error_log("log_activity error: " . $e->getMessage());
+    }
 }
 
 function time_ago($datetime) {
@@ -69,7 +109,7 @@ function time_ago($datetime) {
 // Get total questions count
 $query = "SELECT COUNT(*) as count FROM new_questions";
 $result = $conn->query($query);
-if($result) {
+if ($result) {
     $row = $result->fetch_assoc();
     $stats['total_questions'] = $row['count'];
     $result->free();
@@ -78,7 +118,7 @@ if($result) {
 // Get registered teachers count
 $query = "SELECT COUNT(DISTINCT id) as count FROM teachers";
 $result = $conn->query($query);
-if($result) {
+if ($result) {
     $row = $result->fetch_assoc();
     $stats['teachers'] = $row['count'];
     $result->free();
@@ -87,8 +127,8 @@ if($result) {
 // Get completed exams count
 $query = "SELECT COUNT(*) as count FROM results";
 $result = $conn->query($query);
-if($result) {
-    $row = $result->fetch_assoc();
+if ($result) {
+    $row = $result->fetch_assoc();  
     $stats['completed_exams'] = $row['count'];
     $result->free();
 }
@@ -96,8 +136,8 @@ if($result) {
 // Get question distribution by subject (limited to top 3 subjects)
 $query = "SELECT subject, COUNT(*) as count FROM new_questions GROUP BY subject ORDER BY count DESC LIMIT 3";
 $result = $conn->query($query);
-if($result) {
-    while($row = $result->fetch_assoc()) {
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
         $stats['question_distribution'][$row['subject']] = $row['count'];
     }
     $result->free();
@@ -108,8 +148,8 @@ $query = "SELECT subject, AVG(score) as average_score
           FROM results 
           GROUP BY subject";
 $result = $conn->query($query);
-if($result) {
-    while($row = $result->fetch_assoc()) {
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
         $stats['performance_data'][$row['subject']] = round($row['average_score'], 1);
     }
     $result->free();
@@ -117,7 +157,6 @@ if($result) {
 
 // Get recent exam results
 $recent_results = [];
-
 $query = "SELECT 
             r.user_id, 
             s.name, 
@@ -129,28 +168,19 @@ $query = "SELECT
           JOIN students s ON r.user_id = s.id
           ORDER BY r.created_at DESC 
           LIMIT 10";
-
 $result = $conn->query($query);
-
-if (!$result) {
-    echo "Query failed: " . $conn->error;
-} else {
+if ($result) {
     while ($row = $result->fetch_assoc()) {
         $recent_results[] = $row;
     }
     $result->free();
 }
 
-if (empty($recent_results)) {
-    echo "No recent exam results found.";
-}
-
-
 // Get pending exams count for notifications
 $pending_exams = 0;
 $query = "SELECT COUNT(*) as count FROM exam_results WHERE status = 'pending'";
 $result = $conn->query($query);
-if($result) {
+if ($result) {
     $row = $result->fetch_assoc();
     $pending_exams = $row['count'];
     $result->free();
@@ -158,15 +188,16 @@ if($result) {
 
 // Get recent activities
 $recent_activities = [];
-$query = "SELECT activity, created_at FROM activities_log 
+$query = "SELECT activity, created_at, user_id, ip_address FROM activities_log 
           ORDER BY created_at DESC LIMIT 5";
 $result = $conn->query($query);
-if($result) {
-    while($row = $result->fetch_assoc()) {
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
         $recent_activities[] = $row;
     }
     $result->free();
 }
+
 $conn->close();
 ?>
 
@@ -181,7 +212,6 @@ $conn->close();
     <link rel="stylesheet" href="../css/all.min.css">
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
-   
 </head>
 <body>
     <!-- Sidebar -->
@@ -241,20 +271,20 @@ $conn->close();
                 <div class="notification-dropdown">
                     <button class="notification-icon" id="notificationDropdown">
                         <i class="fas fa-bell"></i>
-                        <?php if($pending_exams > 0): ?>
+                        <?php if ($pending_exams > 0): ?>
                             <span class="badge bg-danger pulse"><?php echo $pending_exams; ?></span>
                         <?php endif; ?>
                     </button>
                     <div class="notification-menu">
                         <div class="notification-header">
                             <h6>Recent Activities</h6>
-                            <?php if($pending_exams > 0): ?>
+                            <?php if ($pending_exams > 0): ?>
                                 <span class="badge bg-danger"><?php echo $pending_exams; ?> Pending</span>
                             <?php endif; ?>
                         </div>
-                        <?php if(!empty($recent_activities)): ?>
+                        <?php if (!empty($recent_activities)): ?>
                             <div class="notification-list">
-                                <?php foreach($recent_activities as $activity): ?>
+                                <?php foreach ($recent_activities as $activity): ?>
                                 <div class="notification-item">
                                     <div class="activity-icon bg-primary">
                                         <i class="fas fa-bell"></i>
@@ -274,7 +304,6 @@ $conn->close();
                         <?php endif; ?>
                     </div>
                 </div>
-                
             </div>
         </div>
         
@@ -311,14 +340,14 @@ $conn->close();
                         <h5 class="mb-0"><i class="fas fa-book me-2"></i>Question Distribution</h5>
                     </div>
                     <div class="card-body">
-                        <?php if(empty($stats['question_distribution'])): ?>
+                        <?php if (empty($stats['question_distribution'])): ?>
                             <div class="empty-state">
                                 <i class="fas fa-inbox"></i>
                                 <p class="text-muted">No questions found in the database</p>
                             </div>
                         <?php else: ?>
                             <div class="stats-grid">
-                                <?php foreach($stats['question_distribution'] as $subject => $count): ?>
+                                <?php foreach ($stats['question_distribution'] as $subject => $count): ?>
                                 <div class="stat-card subject-card" data-subject="<?php echo strtolower($subject); ?>">
                                     <h3><?php echo htmlspecialchars($subject); ?></h3>
                                     <p><?php echo $count; ?> Questions</p>
@@ -329,69 +358,66 @@ $conn->close();
                     </div>
                 </div>
             </div>
-      <div class="col-md-6">
-    <div class="card bg-white border-0 shadow-sm h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Performance Overview</h5>
-            <select id="classSelector" class="form-select form-select-sm w-auto">
-                <option value="all">All Classes</option>
-                <option value="SS1">SS1</option>
-                <option value="SS2">SS2</option>
-                <option value="SS3">SS3</option>
-                <!-- Add more classes as needed -->
-            </select>
-        </div>
-        <div class="card-body position-relative">
-            <div class="chart-container">
-                <div class="loading-spinner"></div>
-                <canvas id="performanceChart"></canvas>
+            <div class="col-md-6">
+                <div class="card bg-white border-0 shadow-sm h-100">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Performance Overview</h5>
+                        <select id="classSelector" class="form-select form-select-sm w-auto">
+                            <option value="all">All Classes</option>
+                            <option value="SS1">SS1</option>
+                            <option value="SS2">SS2</option>
+                            <option value="SS3">SS3</option>
+                        </select>
+                    </div>
+                    <div class="card-body position-relative">
+                        <div class="chart-container">
+                            <div class="loading-spinner"></div>
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
-</div>
-      
         
         <!-- Recent Exams Table -->
         <div class="card data-table mb-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Exam Results</h5>
-    </div>
-    <div class="card-body">
-        <table id="resultsTable" class="table table-hover" style="width:100%">
-            <thead>
-                <tr>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Exam Date</th>
-                    <th>Score</th>
-                    <th>Class</th>
-                    <th>Status</th> <!-- Changed header -->
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($recent_results as $result): ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($result['user_id']); ?></td>
-                    <td><?php echo htmlspecialchars($result['name']); ?></td>
-                    <td><?php echo date('M j, Y', strtotime($result['created_at'])); ?></td>
-                    <td><?php echo $result['score']; ?>%</td>
-                    <td><?php echo htmlspecialchars($result['class']); ?></td>
-
-                    <td>
-                        <span class="badge <?php 
-                            echo $result['status'] === 'Passed' ? 'badge-passed' : 
-                                ($result['status'] === 'Failed' ? 'badge-failed' : 'badge-pending');
-                        ?>">
-                            <?php echo htmlspecialchars($result['status']); ?>
-                        </span>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Exam Results</h5>
+            </div>
+            <div class="card-body">
+                <table id="resultsTable" class="table table-hover" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Exam Date</th>
+                            <th>Score</th>
+                            <th>Class</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($recent_results as $result): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($result['user_id']); ?></td>
+                            <td><?php echo htmlspecialchars($result['name']); ?></td>
+                            <td><?php echo date('M j, Y', strtotime($result['created_at'])); ?></td>
+                            <td><?php echo $result['score']; ?>%</td>
+                            <td><?php echo htmlspecialchars($result['class']); ?></td>
+                            <td>
+                                <span class="badge <?php 
+                                    echo $result['status'] === 'Passed' ? 'badge-passed' : 
+                                        ($result['status'] === 'Failed' ? 'badge-failed' : 'badge-pending');
+                                ?>">
+                                    <?php echo htmlspecialchars($result['status']); ?>
+                                </span>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
         <!-- Quick Actions -->
         <div class="row g-4">
@@ -410,12 +436,12 @@ $conn->close();
                                 </div>
                                 <i class="fas fa-chevron-right"></i>
                             </a>
-                            <a href="manage_students.php" class="btn btn-action">
+                            <a href="manage_teachers.php" class="btn btn-action">
                                 <div class="action-content">
                                     <i class="fas fa-user-plus me-2"></i>
                                     <div>
                                         <h6>Manage Teachers</h6>
-                                        <small>Active: <?php echo $stats['active_students']; ?></small>
+                                        <small>Active: <?php echo $stats['teachers']; ?></small>
                                     </div>
                                 </div>
                                 <i class="fas fa-chevron-right"></i>
@@ -440,18 +466,14 @@ $conn->close();
                         <div class="me-2"><i class="fas fa-info-circle"></i></div>    
                         <h4 class="mb-0"><b>Recent activities</b></h4>
                     </div>
-                    <?php if(!empty($recent_activities)): ?>
-                        <?php foreach($recent_activities as $activity): ?>
+                    <?php if (!empty($recent_activities)): ?>
+                        <?php foreach ($recent_activities as $activity): ?>
                         <div class="activity-item d-flex align-items-center ms-2 ps-2">
                             <div class="activity-icon">
                                 <i class="fas fa-info-circle"></i>
                             </div>
                             <div class="activity-content">
-                                <p><?php echo htmlspecialchars($activity['activity']); ?>
-                                    <?php if(isset($activity['username'])): ?>
-                                        <br><small>by <?php echo htmlspecialchars($activity['username']); ?></small>
-                                    <?php endif; ?>
-                                </p>
+                                <p><?php echo htmlspecialchars($activity['activity']); ?></p>
                                 <small>
                                     <?php echo time_ago($activity['created_at']); ?> 
                                     • <?php echo htmlspecialchars($activity['ip_address'] ?? 'Unknown IP'); ?>
@@ -477,132 +499,131 @@ $conn->close();
     <script src="../js/dataTables.bootstrap5.min.js"></script>
     <script src="../js/chart.min.js"></script>
     <script>
-      $(document).ready(function() {
-    // Initialize DataTable (unchanged)
-    $('#resultsTable').DataTable({
-        responsive: true,
-        order: [[2, 'desc']],
-        language: {
-            emptyTable: '<div class="text-center py-4 empty-state">' +
-                          '<i class="fas fa-inbox"></i>' +
-                          '<p class="text-muted">No exam results found</p>' +
-                        '</div>'
-        },
-        createdRow: function(row, data, index) {
-            $(row).children().each(function(index) {
-                $(this).attr('data-dt-column', index);
-            });
-        }
-    });
-
-    // Toggle sidebar on mobile (unchanged)
-    $('#sidebarToggle').click(function() {
-        $('.sidebar').toggleClass('active');
-    });
-
-    // Enhanced chart configuration
-    const chartConfig = {
-        type: 'bar',
-        data: {
-            labels: ['Loading...'],
-            datasets: [{
-                label: 'Average Score',
-                data: [0],
-                backgroundColor: 'rgba(67, 97, 238, 0.7)',
-                borderColor: 'rgba(67, 97, 238, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false
+        $(document).ready(function() {
+            // Initialize DataTable
+            $('#resultsTable').DataTable({
+                responsive: true,
+                order: [[2, 'desc']],
+                language: {
+                    emptyTable: '<div class="text-center py-4 empty-state">' +
+                                '<i class="fas fa-inbox"></i>' +
+                                '<p class="text-muted">No exam results found</p>' +
+                                '</div>'
                 },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.parsed.y.toFixed(1) + '%';
+                createdRow: function(row, data, index) {
+                    $(row).children().each(function(index) {
+                        $(this).attr('data-dt-column', index);
+                    });
+                }
+            });
+
+            // Toggle sidebar on mobile
+            $('#sidebarToggle').click(function() {
+                $('.sidebar').toggleClass('active');
+            });
+
+            // Chart configuration
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: ['Loading...'],
+                    datasets: [{
+                        label: 'Average Score',
+                        data: [0],
+                        backgroundColor: 'rgba(67, 97, 238, 0.7)',
+                        borderColor: 'rgba(67, 97, 238, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y.toFixed(1) + '%';
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
-    };
+            };
 
-    const ctx = document.getElementById('performanceChart').getContext('2d');
-    const performanceChart = new Chart(ctx, chartConfig);
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            const performanceChart = new Chart(ctx, chartConfig);
 
-    // Function to fetch chart data with class parameter
-    function fetchChartData(selectedClass = 'all') {
-        const spinner = document.querySelector('.chart-container .loading-spinner');
-        spinner.style.display = 'block';
-        
-        fetch(`chart-data.php?class=${selectedClass}`)
-            .then(response => response.json())
-            .then(data => {
-                spinner.style.display = 'none';
-                document.querySelector('.chart-container').classList.add('chart-loaded');
+            // Function to fetch chart data
+            function fetchChartData(selectedClass = 'all') {
+                const spinner = document.querySelector('.chart-container .loading-spinner');
+                spinner.style.display = 'block';
                 
-                // Handle empty data case
-                if (data.labels.length === 0) {
-                    performanceChart.data.labels = ['No data available'];
-                    performanceChart.data.datasets[0].data = [0];
-                } else {
-                    performanceChart.data.labels = data.labels;
-                    performanceChart.data.datasets[0].data = data.data;
+                fetch(`chart-data.php?class=${selectedClass}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        spinner.style.display = 'none';
+                        document.querySelector('.chart-container').classList.add('chart-loaded');
+                        
+                        if (data.labels.length === 0) {
+                            performanceChart.data.labels = ['No data available'];
+                            performanceChart.data.datasets[0].data = [0];
+                        } else {
+                            performanceChart.data.labels = data.labels;
+                            performanceChart.data.datasets[0].data = data.data;
+                        }
+                        
+                        performanceChart.update();
+                    })
+                    .catch(error => {
+                        spinner.style.display = 'none';
+                        console.error('Error fetching chart data:', error);
+                        performanceChart.data.labels = ['Error loading data'];
+                        performanceChart.data.datasets[0].data = [0];
+                        performanceChart.update();
+                    });
+            }
+
+            // Event listener for class selector
+            document.getElementById('classSelector').addEventListener('change', function() {
+                fetchChartData(this.value);
+            });
+
+            // Initial load
+            fetchChartData();
+
+            // Animated number counters
+            document.querySelectorAll('.count').forEach(el => {
+                const target = +el.innerText;
+                let current = 0;
+                const increment = target / 100;
+                
+                const updateCount = () => {
+                    if (current < target) {
+                        current += increment;
+                        el.innerText = Math.ceil(current);
+                        requestAnimationFrame(updateCount);
+                    } else {
+                        el.innerText = target;
+                    }
                 }
                 
-                performanceChart.update();
-            })
-            .catch(error => {
-                spinner.style.display = 'none';
-                console.error('Error fetching chart data:', error);
-                performanceChart.data.labels = ['Error loading data'];
-                performanceChart.data.datasets[0].data = [0];
-                performanceChart.update();
-            });
-    }
-
-    // Event listener for class selector
-    document.getElementById('classSelector').addEventListener('change', function() {
-        fetchChartData(this.value);
-    });
-
-    // Initial load
-    fetchChartData();
-
-    // Animated number counters (unchanged)
-    document.querySelectorAll('.count').forEach(el => {
-        const target = +el.innerText;
-        let current = 0;
-        const increment = target / 100;
-        
-        const updateCount = () => {
-            if(current < target) {
-                current += increment;
-                el.innerText = Math.ceil(current);
                 requestAnimationFrame(updateCount);
-            } else {
-                el.innerText = target;
-            }
-        }
-        
-        requestAnimationFrame(updateCount);
-    });
-});
+            });
+        });
     </script>
 </body>
 </html>

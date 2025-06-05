@@ -7,10 +7,41 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Check admin authentication
-if (!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
+if (!isset($_SESSION['user_id'])) {
+    error_log("Redirecting to login: No user_id in session");
+    header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
+}
+
+try {
+    $database = Database::getInstance();
+    $conn = $database->getConnection();
+    if ($conn->connect_error) {
+        error_log("Database connection failed: " . $conn->connect_error);
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    $user_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT role FROM admins WHERE id = ?");
+    if (!$stmt) {
+        error_log("Prepare failed for admin role check: " . $conn->error);
+        die("Database error");
+    }
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$user || strtolower($user['role']) !== 'admin') {
+        error_log("Unauthorized access attempt by user_id=$user_id, role=" . ($user['role'] ?? 'none'));
+        session_destroy();
+        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        exit();
+    }
+} catch (Exception $e) {
+    error_log("Page error: " . $e->getMessage());
+    die("System error");
 }
 
 $conn = Database::getInstance()->getConnection();

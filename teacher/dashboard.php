@@ -2,22 +2,60 @@
 session_start();
 require_once '../db.php';
 
-// Check if teacher is logged in
-if(!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    error_log("Redirecting to login: No user_id in session");
+    header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
 }
 
 // Initialize database connection
-$database = Database::getInstance();
-$conn = $database->getConnection();
+try {
+    $database = Database::getInstance();
+    $conn = $database->getConnection();
 
-// Verify connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+    if ($conn->connect_error) {
+        error_log("Database connection failed: " . $conn->connect_error);
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    // Verify user is a teacher
+    $user_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT role FROM teachers WHERE id = ?");
+    if (!$stmt) {
+        error_log("Prepare failed for teacher role check: " . $conn->error);
+        die("Database error");
+    }
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$user || strtolower($user['role']) !== 'teacher') {
+        error_log("Unauthorized access attempt by user_id=$user_id, role=" . ($user['role'] ?? 'none'));
+        session_destroy();
+        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        exit();
+    }
+} catch (Exception $e) {
+    error_log("Dashboard error: " . $e->getMessage());
+    die("System error");
 }
 
-$admin_username = $_SESSION['admin_username'];
+$teacher_username = $_SESSION['user_username'];
+$stmt = $conn->prepare("SELECT last_name FROM teachers WHERE id = ?");
+if (!$stmt) {
+    error_log("Prepare failed for teacher last_name: " . $conn->error);
+    $teacher_last_name = 'Teacher'; // Fallback
+} else {
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $teacher = $result->fetch_assoc();
+    $teacher_last_name = $teacher['last_name'] ?? 'Teacher'; // Fallback if null
+    $stmt->close();
+}
 
 // Initialize stats array with default values
 $stats = [
@@ -189,7 +227,7 @@ $conn->close();
             <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
             <div class="admin-info">
                 <small>Welcome back,</small>
-                <h6><?php echo htmlspecialchars($admin_username); ?></h6>
+                <h6><?php echo htmlspecialchars($teacher_last_name); ?></h6>
             </div>
         </div>
         <div class="sidebar-menu mt-4">
