@@ -3,8 +3,8 @@ session_start();
 require_once '../db.php';
 
 // Check if admin is logged in
-if(!isset($_SESSION['admin_id']) || $_SESSION['user_type'] !== 'admin') {
-    header("Location: login.php");
+if(!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../login.php");
     exit();
 }
 
@@ -88,7 +88,7 @@ $teachers = mysqli_fetch_all($teachers_result, MYSQLI_ASSOC);
             <a class="navbar-brand" href="dashboard.php">CBT Admin</a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="dashboard.php">Dashboard</a>
-                <a class="nav-link" href="logout.php">Logout</a>
+                <a class="nav-link" href="../logout.php">Logout</a>
             </div>
         </div>
     </nav>
@@ -103,18 +103,18 @@ $teachers = mysqli_fetch_all($teachers_result, MYSQLI_ASSOC);
                         <li class="nav-item">
                             <a class="nav-link" href="dashboard.php">Dashboard</a>
                         </li>
-                        <li class="nav-item">
+                        <!-- <li class="nav-item">
                             <a class="nav-link" href="add_question.php">Add Questions</a>
-                        </li>
+                        </li> -->
                         <li class="nav-item">
                             <a class="nav-link active" href="manage_teachers.php">Manage Teachers</a>
                         </li>
-                        <li class="nav-item">
+                        <!-- <li class="nav-item">
                             <a class="nav-link" href="set_academic_year.php">Set Academic Year</a>
-                        </li>
-                        <li class="nav-item">
+                        </li> -->
+                        <!-- <li class="nav-item">
                             <a class="nav-link" href="view_results.php">View Results</a>
-                        </li>
+                        </li> -->
                     </ul>
                 </div>
             </div>
@@ -137,7 +137,7 @@ $teachers = mysqli_fetch_all($teachers_result, MYSQLI_ASSOC);
                             <div class="row">
                                 <!-- <div class="col-md-6 mb-3">
                                     <label class="form-label">Username</label>
-                                    <input type="text" class="form-control" name="username" required>
+                                    <input type="text" class="form-control"  name="username" required>
                                 </div> -->
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Password</label>

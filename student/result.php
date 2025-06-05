@@ -31,12 +31,9 @@ $percentage = ($score / $total) * 100;
                         <h4>Congratulations, <?php echo htmlspecialchars($_SESSION['student_name']); ?>!</h4>
                         <p class="lead">You have completed the exam.</p>
                         
-                        <div class="alert alert-info">
-                            <h5>Your Score: <?php echo $score; ?> out of <?php echo $total; ?></h5>
-                            <h5>Percentage: <?php echo number_format($percentage, 2); ?>%</h5>
-                        </div>
                         
-                        <a href="../index.php" class="btn btn-primary" onclick="<?php session_destroy(); ?>">End Exam</a>
+                        
+                        <a href="register.php" class="btn btn-primary" onclick="<?php session_destroy(); ?>">End Exam</a>
                     </div>
                 </div>
             </div>

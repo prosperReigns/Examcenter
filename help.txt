@@ -1,4 +1,4 @@
-kingly log on to http://127.0.0.1/phpmyadmin/index.php?route=/sql&pos=0&db=cbt_app_db&table=new_questions under SQL insert the commands below
+kingly log on to http://127.0.0.1/phpmyadmin/index.php?route=/sql&pos=0&db=cbt_app_db&table=new_questions click under SQL insert the commands below
 
 -- Create new admins table structure
 CREATE TABLE IF NOT EXISTS admins (
@@ -85,4 +85,59 @@ CREATE TABLE IF NOT EXISTS fill_blank_questions (
     question_id INT NOT NULL,
     correct_answer TEXT NOT NULL,
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS teachers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    role VARCHAR(50) NOT NULL DEFAULT 'teacher',
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS teacher_subjects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL,
+    subject VARCHAR(50) NOT NULL,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS teacher_classes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL,
+    class VARCHAR(10) NOT NULL,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
+);
+
+-- Update teachers table to include role and created_by fields
+ALTER TABLE teachers ADD COLUMN role VARCHAR(50) NOT NULL DEFAULT 'teacher' AFTER password;
+ALTER TABLE teachers ADD COLUMN created_by INT NULL AFTER role;
+
+-- Update tests table to include created_by field
+ALTER TABLE tests ADD COLUMN created_by INT NULL AFTER subject;
+
+-- Update new_questions table to include created_by field
+ALTER TABLE new_questions ADD COLUMN created_by INT NULL AFTER question_type;
+
+-- Create teacher_subjects table for subject assignments
+CREATE TABLE IF NOT EXISTS teacher_subjects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL,
+    subject VARCHAR(100) NOT NULL,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
+);
+
+-- Create activities_log table for tracking user actions
+CREATE TABLE IF NOT EXISTS activities_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    activity TEXT NOT NULL,
+    user_id INT DEFAULT 0,
+    ip_address VARCHAR(45) NOT NULL,
+    user_agent VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

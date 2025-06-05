@@ -2,18 +2,29 @@
 session_start();
 require_once '../db.php';
 
-// Check if admin is logged in
-if(!isset($_SESSION['teacher_id'])) {
-    header("Location: login.php");
+// Check if teacher is logged in
+if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
+    header("Location: ../login.php");
     exit();
 }
 
 $conn = Database::getInstance()->getConnection();
+$teacher_id = $_SESSION['user_id'];
 
-// Define available classes and subjects
+// Get teacher's assigned subjects
+$subjects_query = "SELECT subject FROM teacher_subjects WHERE teacher_id = ?";
+$stmt = $conn->prepare($subjects_query);
+$stmt->bind_param("i", $teacher_id);
+$stmt->execute();
+$subjects_result = $stmt->get_result();
+$teacher_subjects = [];
+
+while ($row = $subjects_result->fetch_assoc()) {
+    $teacher_subjects[] = $row['subject'];
+}
+
+// Define available classes
 $classes = ['JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'];
-$jss_subjects = ['Mathematics', 'English', 'ICT', 'Agriculture', 'History', 'Civic Education', 'Basic Science', 'Basic Technology', 'Business studies', 'Agricultural sci', 'Physical Health Edu', 'Cultural and Creative Art', 'Social Studies', 'Security Edu', 'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'];
-$ss_subjects = ['Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics', 'Government', 'Commerce', 'Accounting', 'Financial Accounting', 'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology', 'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang', 'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'];
 
 // Handle test creation
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['test_title'])) {
@@ -21,25 +32,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['test_title'])) {
     $class = mysqli_real_escape_string($conn, $_POST['selected_class']);
     $subject = mysqli_real_escape_string($conn, $_POST['selected_subject']);
     
-    // Check if test already exists
-    $check_sql = "SELECT id FROM tests WHERE title = '$test_title' AND class = '$class' AND subject = '$subject'";
-    $check_result = mysqli_query($conn, $check_sql);
-    
-    if (mysqli_num_rows($check_result) > 0) {
-        // Test exists, use existing test
-        $test = mysqli_fetch_assoc($check_result);
-        $_SESSION['current_test_id'] = $test['id'];
+    // Verify teacher is allowed to create tests for this subject
+    if (!in_array($subject, $teacher_subjects)) {
+        $error = "You are not authorized to create tests for this subject";
     } else {
-        // Create new test
-        $test_sql = "INSERT INTO tests (title, class, subject) VALUES ('$test_title', '$class', '$subject')";
-        if (mysqli_query($conn, $test_sql)) {
-            $_SESSION['current_test_id'] = mysqli_insert_id($conn);
+        // Check if test already exists
+        $check_sql = "SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ? AND created_by = ?";
+        $stmt = $conn->prepare($check_sql);
+        $stmt->bind_param("sssi", $test_title, $class, $subject, $teacher_id);
+        $stmt->execute();
+        $check_result = $stmt->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            // Test exists, use existing test
+            $test = $check_result->fetch_assoc();
+            $_SESSION['current_test_id'] = $test['id'];
         } else {
-            $error = "Error creating test: " . mysqli_error($conn);
+            // Create new test
+            $test_sql = "INSERT INTO tests (title, class, subject, created_by) VALUES (?, ?, ?, ?)";
+            $stmt = $conn->prepare($test_sql);
+            $stmt->bind_param("sssi", $test_title, $class, $subject, $teacher_id);
+            
+            if ($stmt->execute()) {
+                $_SESSION['current_test_id'] = $stmt->insert_id;
+            } else {
+                $error = "Error creating test: " . $stmt->error;
+            }
         }
     }
 }
-
 // Fetch all questions
 $sql = "SELECT * FROM questions";
 $result = mysqli_query($conn, $sql);
@@ -150,20 +171,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
         }
     }
 }
-
 // Get current test info if exists
 $current_test = null;
 $questions = [];
 if (isset($_SESSION['current_test_id'])) {
     $test_id = $_SESSION['current_test_id'];
-    $test_query = "SELECT * FROM tests WHERE id = $test_id";
-    $test_result = mysqli_query($conn, $test_query);
-    $current_test = mysqli_fetch_assoc($test_result);
+    $test_query = "SELECT * FROM tests WHERE id = ? AND created_by = ?";
+    $stmt = $conn->prepare($test_query);
+    $stmt->bind_param("ii", $test_id, $teacher_id);
+    $stmt->execute();
+    $test_result = $stmt->get_result();
+    $current_test = $test_result->fetch_assoc();
     
     // Fetch all questions for this test
-    $questions_query = "SELECT * FROM questions WHERE test_id = $test_id ORDER BY id ASC";
-    $questions_result = mysqli_query($conn, $questions_query);
-    $questions = mysqli_fetch_all($questions_result, MYSQLI_ASSOC);
+    if ($current_test) {
+        $questions_query = "SELECT * FROM new_questions WHERE test_id = ? ORDER BY id ASC";
+        $stmt = $conn->prepare($questions_query);
+        $stmt->bind_param("i", $test_id);
+        $stmt->execute();
+        $questions_result = $stmt->get_result();
+        $questions = $questions_result->fetch_all(MYSQLI_ASSOC);
+    }
 }
 ?>
 
@@ -178,20 +206,20 @@ if (isset($_SESSION['current_test_id'])) {
 </head>
 <body>
     <!-- navigation bar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-    <button class="btn btn-primary btn-sm toggle-sidebar" id="sidebarToggle">
-                    <i class="bi bi-list"></i>☰
-                </button>
-        <a class="navbar-brand" href="dashboard.php">CBT Admin</a>
-        <div class="navbar-nav ms-auto">
-            <a class="nav-link" href="dashboard.php">Dashboard</a>
-            <a class="nav-link" href="logout.php">Logout</a>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <button class="btn btn-primary btn-sm toggle-sidebar" id="sidebarToggle">
+                <i class="bi bi-list"></i>☰
+            </button>
+            <a class="navbar-brand" href="dashboard.php">Teacher Portal</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="dashboard.php">Dashboard</a>
+                <a class="nav-link" href="../logout.php">Logout</a>
+            </div>
         </div>
-    </div>
-</nav>
+    </nav>
 
-<!-- sidebar -->
+    <!-- sidebar -->
 <div class="container-fluid">
     <div class="row">
         <div class="sidebar col-md-3 col-lg-2" id="sidebar">

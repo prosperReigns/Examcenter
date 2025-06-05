@@ -67,8 +67,8 @@
                                         <i class="fas fa-user-shield"></i>
                                     </div>
                                     <h3 class="card-title mb-3"> Staff Portal</h3>
-                                    <p class="card-text mb-4">Manage questions, exams, and analyze student performance with powerful tools.</p>
-                                    <a href="admin/staff.php" class="btn btn-primary">
+                                    <p class="card-text mb-4">Manage questions, exams, and analyze student performance with 
+                                    <a href="login.php" class="btn btn-primary">
                                         <i class="fas fa-sign-in-alt me-2"></i>Staff Login
                                     </a>
                                 </div>

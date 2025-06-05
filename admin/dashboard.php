@@ -2,53 +2,35 @@
 session_start();
 require_once '../db.php';
 
-// Check if teacher is logged in
-if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
+// Check if admin is logged in
+if(!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     header("Location: ../login.php");
     exit();
 }
 
 $conn = Database::getInstance()->getConnection();
-$teacher_id = $_SESSION['user_id'];
-$teacher_name = $_SESSION['user_fullname'] ?? 'Teacher';
+$admin_id = $_SESSION['user_id'];
+$admin_name = $_SESSION['username'] ?? 'Admin';
 
-// Get teacher's assigned subjects
-$subjects_query = "SELECT subject FROM teacher_subjects WHERE teacher_id = ?";
-$stmt = $conn->prepare($subjects_query);
-$stmt->bind_param("i", $teacher_id);
-$stmt->execute();
-$subjects_result = $stmt->get_result();
-$subjects = [];
-
-while ($row = $subjects_result->fetch_assoc()) {
-    $subjects[] = $row['subject'];
-}
-
-// Count questions created by this teacher
-$questions_query = "SELECT COUNT(*) as total FROM new_questions WHERE created_by = ?";
-$stmt = $conn->prepare($questions_query);
-$stmt->bind_param("i", $teacher_id);
-$stmt->execute();
-$questions_result = $stmt->get_result()->fetch_assoc();
+// Count total questions in the system
+$questions_query = "SELECT COUNT(*) as total FROM new_questions";
+$questions_result = $conn->query($questions_query)->fetch_assoc();
 $total_questions = $questions_result['total'] ?? 0;
 
-// Count tests created by this teacher
-$tests_query = "SELECT COUNT(*) as total FROM tests WHERE created_by = ?";
-$stmt = $conn->prepare($tests_query);
-$stmt->bind_param("i", $teacher_id);
-$stmt->execute();
-$tests_result = $stmt->get_result()->fetch_assoc();
-$total_tests = $tests_result['total'] ?? 0;
+// Count total teachers
+$teachers_query = "SELECT COUNT(*) as total FROM teachers";
+$teachers_result = $conn->query($teachers_query)->fetch_assoc();
+$total_teachers = $teachers_result['total'] ?? 0;
 
-// Count students who took tests created by this teacher
-$students_query = "SELECT COUNT(DISTINCT user_id) as total FROM results r 
-                  JOIN tests t ON r.test_id = t.id 
-                  WHERE t.created_by = ?";
-$stmt = $conn->prepare($students_query);
-$stmt->bind_param("i", $teacher_id);
-$stmt->execute();
-$students_result = $stmt->get_result()->fetch_assoc();
+// Count total students
+$students_query = "SELECT COUNT(*) as total FROM students WHERE role = 'student'";
+$students_result = $conn->query($students_query)->fetch_assoc();
 $total_students = $students_result['total'] ?? 0;
+
+// Count total tests
+$tests_query = "SELECT COUNT(*) as total FROM tests";
+$tests_result = $conn->query($tests_query)->fetch_assoc();
+$total_tests = $tests_result['total'] ?? 0;
 ?>
 
 <!DOCTYPE html>
@@ -56,7 +38,7 @@ $total_students = $students_result['total'] ?? 0;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Dashboard</title>
+    <title>Admin Dashboard</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/admin-dashboard.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
@@ -69,9 +51,9 @@ $total_students = $students_result['total'] ?? 0;
             <button class="btn btn-primary btn-sm toggle-sidebar" id="sidebarToggle">
                 <i class="bi bi-list"></i>☰
             </button>
-            <a class="navbar-brand" href="dashboard.php">Teacher Portal</a>
+            <a class="navbar-brand" href="dashboard.php">Admin Portal</a>
             <div class="navbar-nav ms-auto">
-                <span class="nav-link">Welcome, <?php echo htmlspecialchars($teacher_name); ?></span>
+                <span class="nav-link">Welcome, <?php echo htmlspecialchars($admin_name); ?></span>
                 <a class="nav-link" href="../logout.php">Logout</a>
             </div>
         </div>
@@ -82,16 +64,16 @@ $total_students = $students_result['total'] ?? 0;
             <!-- Sidebar -->
             <div class="sidebar col-md-3 col-lg-2" id="sidebar">
                 <div class="p-3">
-                    <h5 class="sidebar-heading">Teacher Menu</h5>
+                    <h5 class="sidebar-heading">Admin Menu</h5>
                     <ul class="nav flex-column">
-                        <li class="nav-item">
+                        <!-- <li class="nav-item">
                             <a class="nav-link active" href="dashboard.php">
                                 <i class="fas fa-tachometer-alt"></i> Dashboard
                             </a>
-                        </li>
+                        </li> -->
                         <li class="nav-item">
-                            <a class="nav-link" href="add_question.php">
-                                <i class="fas fa-question-circle"></i> Add Questions
+                            <a class="nav-link" href="add_teacher.php">
+                                <i class="fas fa-chalkboard-teacher"></i> Manage Teachers
                             </a>
                         </li>
                         <li class="nav-item">
@@ -105,8 +87,8 @@ $total_students = $students_result['total'] ?? 0;
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="profile.php">
-                                <i class="fas fa-user"></i> My Profile
+                            <a class="nav-link" href="settings.php">
+                                <i class="fas fa-cog"></i> Settings
                             </a>
                         </li>
                     </ul>
@@ -115,11 +97,11 @@ $total_students = $students_result['total'] ?? 0;
 
             <!-- Main content -->
             <div class="main-content col-md-9 col-lg-10 p-4">
-                <h2 class="mb-4">Teacher Dashboard</h2>
+                <h2 class="mb-4">Admin Dashboard</h2>
                 
                 <!-- Stats cards -->
                 <div class="row mb-4">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <div class="card stats-card">
                             <div class="card-body">
                                 <h5 class="card-title">Total Questions</h5>
@@ -128,7 +110,25 @@ $total_students = $students_result['total'] ?? 0;
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Teachers</h5>
+                                <p class="card-text display-4"><?php echo $total_teachers; ?></p>
+                                <a href="manage_teachers.php" class="btn btn-sm btn-primary">Manage</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Students</h5>
+                                <p class="card-text display-4"><?php echo $total_students; ?></p>
+                                <a href="view_students.php" class="btn btn-sm btn-primary">View All</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
                         <div class="card stats-card">
                             <div class="card-body">
                                 <h5 class="card-title">Total Tests</h5>
@@ -136,38 +136,6 @@ $total_students = $students_result['total'] ?? 0;
                                 <a href="view_tests.php" class="btn btn-sm btn-primary">View All</a>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <div class="card stats-card">
-                            <div class="card-body">
-                                <h5 class="card-title">Students Tested</h5>
-                                <p class="card-text display-4"><?php echo $total_students; ?></p>
-                                <a href="view_results.php" class="btn btn-sm btn-primary">View Results</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Assigned subjects -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Your Assigned Subjects</h5>
-                    </div>
-                    <div class="card-body">
-                        <?php if (count($subjects) > 0): ?>
-                            <div class="row">
-                                <?php foreach($subjects as $subject): ?>
-                                    <div class="col-md-4 mb-2">
-                                        <div class="subject-badge p-2 bg-light rounded">
-                                            <i class="fas fa-book me-2"></i>
-                                            <?php echo htmlspecialchars($subject); ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <p>No subjects assigned yet.</p>
-                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -177,8 +145,24 @@ $total_students = $students_result['total'] ?? 0;
                         <h5>Recent Activity</h5>
                     </div>
                     <div class="card-body">
-                        <p>Your recent activities will appear here.</p>
-                        <!-- You can add code to display recent activities from a log table -->
+                        <?php
+                        // Get recent activities from log
+                        $activity_query = "SELECT * FROM activities_log ORDER BY created_at DESC LIMIT 10";
+                        $activity_result = $conn->query($activity_query);
+                        
+                        if ($activity_result && $activity_result->num_rows > 0) {
+                            echo '<ul class="list-group">';
+                            while ($activity = $activity_result->fetch_assoc()) {
+                                echo '<li class="list-group-item">';
+                                echo '<small class="text-muted">' . htmlspecialchars($activity['created_at']) . '</small><br>';
+                                echo htmlspecialchars($activity['activity']);
+                                echo '</li>';
+                            }
+                            echo '</ul>';
+                        } else {
+                            echo '<p>No recent activities found.</p>';
+                        }
+                        ?>
                     </div>
                 </div>
             </div>
