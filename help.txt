@@ -1,150 +1,151 @@
 kingly log on to http://127.0.0.1/phpmyadmin/index.php?route=/sql&pos=0&db=cbt_app_db&table=new_questions under SQL insert the commands below
 
 -- Create new admins table structure
-CREATE TABLE IF NOT EXISTS admins (
+-- Create the database
+CREATE DATABASE IF NOT EXISTS cbt_app;
+USE cbt_app;
+
+-- 1. active_exams
+CREATE TABLE active_exams (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    subject VARCHAR(100),
+    is_active BOOLEAN,
+    exam_date DATETIME
 );
 
--- Create new students table structure
-CREATE TABLE IF NOT EXISTS students (
+-- 2. activities_log
+CREATE TABLE activities_log (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name varchar(100)NOT NULL,
-    email varchar(100) UNIQUE,
-    class varchar(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    activity TEXT,
+    admin_id INT,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at DATETIME
 );
 
--- Create new tests table structure
-CREATE TABLE IF NOT EXISTS tests (
+-- 3. admins
+CREATE TABLE admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    title varchar(255) NOT NULL,
-    class varchar(50),
-    subject varchar(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    username VARCHAR(100) UNIQUE,
+    password VARCHAR(255),
+    created_at DATETIME,
+    role VARCHAR(50)
 );
 
--- Create new results table structure
-CREATE TABLE IF NOT EXISTS results (
+-- 4. fill_blank_questions
+CREATE TABLE fill_blank_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT,
+    correct_answer TEXT
+);
+
+-- 5. image_questions
+CREATE TABLE image_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT,
+    image_path TEXT,
+    description TEXT,
+    correct_answer TEXT
+);
+
+-- 6. multiple_choice_questions
+CREATE TABLE multiple_choice_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT,
+    option1 TEXT,
+    option2 TEXT,
+    option3 TEXT,
+    option4 TEXT,
+    correct_answers TEXT,
+    image_path TEXT
+);
+
+-- 7. new_questions
+CREATE TABLE new_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT,
+    test_id INT,
+    class VARCHAR(20),
+    subject VARCHAR(100),
+    question_type VARCHAR(50),
+    created_at DATETIME
+);
+
+-- 8. results
+CREATE TABLE results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     test_id INT,
     score INT,
     total_questions INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME,
+    status VARCHAR(50),
+    reattempt_approved BOOLEAN
 );
 
--- Create new questions table structure
-CREATE TABLE IF NOT EXISTS new_questions (
+-- 9. settings
+CREATE TABLE settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    question_text TEXT NOT NULL,
-    test_id INT NOT NULL,
-    class VARCHAR(10) NOT NULL,
-    subject VARCHAR(50) NOT NULL,
-    question_type VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create single choice questions table
-CREATE TABLE IF NOT EXISTS single_choice_questions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    option1 TEXT NOT NULL,
-    option2 TEXT NOT NULL,
-    option3 TEXT NOT NULL,
-    option4 TEXT NOT NULL,
-    correct_answer VARCHAR(10) NOT NULL,
-    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
-);
-
--- Create multiple choice questions table
-CREATE TABLE IF NOT EXISTS multiple_choice_questions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    option1 TEXT NOT NULL,
-    option2 TEXT NOT NULL,
-    option3 TEXT NOT NULL,
-    option4 TEXT NOT NULL,
-    correct_answers TEXT NOT NULL, -- Stored as JSON or comma-separated values
-    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
-);
-
--- Create true/false questions table
-CREATE TABLE IF NOT EXISTS true_false_questions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    correct_answer BOOLEAN NOT NULL,
-    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
-);
-
--- Create fill in the blank questions table
-CREATE TABLE IF NOT EXISTS fill_blank_questions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    correct_answer TEXT NOT NULL,
-    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
-);
-
-
-
-CREATE TABLE staff (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'staff') NOT NULL DEFAULT 'staff',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE teachers (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    first_name VARCHAR(50) NOT NULL,
-    last_name VARCHAR(50) NOT NULL,
-    username VARCHAR(100) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    phone VARCHAR(20),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE teacher_subjects (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    teacher_id INT NOT NULL,
-    subject VARCHAR(100) NOT NULL,
-    FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
-);
-
-CREATE TABLE active_exams (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    subject VARCHAR(100) NOT NULL,
-    is_active BOOLEAN DEFAULT FALSE,
-    exam_date DATE,
-    UNIQUE KEY (subject)
-);
--- Drop the existing unique key
-ALTER TABLE active_exams DROP INDEX subject;
-
--- Add a new composite unique key
-ALTER TABLE active_exams ADD UNIQUE KEY subject_date (subject, exam_date);
-
-CREATE TABLE IF NOT EXISTS settings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    setting_name VARCHAR(100) UNIQUE,
+    setting_name VARCHAR(100),
     setting_value TEXT
 );
-INSERT IGNORE INTO settings (setting_name, setting_value) VALUES ('show_results_immediately', '0');
 
+-- 10. single_choice_questions
+CREATE TABLE single_choice_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT,
+    option1 TEXT,
+    option2 TEXT,
+    option3 TEXT,
+    option4 TEXT,
+    correct_answer TEXT,
+    image_path TEXT
+);
 
--- Add 'role' column to teachers table
-ALTER TABLE teachers
-ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'teacher';
+-- 11. students
+CREATE TABLE students (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150),
+    email VARCHAR(100),
+    class VARCHAR(20),
+    created_at DATETIME,
+    role VARCHAR(50)
+);
 
--- Add 'role' column to students table
-ALTER TABLE students
-ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'student';
+-- 12. teachers
+CREATE TABLE teachers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    username VARCHAR(100) UNIQUE,
+    email VARCHAR(100),
+    password VARCHAR(255),
+    phone VARCHAR(20),
+    created_at DATETIME,
+    role VARCHAR(50)
+);
 
--- Add 'role' column to admin table
-ALTER TABLE admin
-ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin';
+-- 13. teacher_subjects
+CREATE TABLE teacher_subjects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT,
+    subject VARCHAR(100),
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id)
+);
+
+-- 14. tests
+CREATE TABLE tests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200),
+    class VARCHAR(20),
+    subject VARCHAR(100),
+    created_at DATETIME,
+    duration INT
+);
+
+-- 15. true_false_questions
+CREATE TABLE true_false_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT,
+    correct_answer BOOLEAN
+);
