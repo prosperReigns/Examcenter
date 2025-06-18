@@ -2,13 +2,9 @@
 session_start();
 require_once '../db.php';
 
-// Enable error reporting
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-if (!isset($_SESSION['user_id'])) {
-    error_log("Redirecting to login: No user_id in session");
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'teacher') {
+    error_log("Redirecting to login: No user_id or invalid role in session");
     header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
 }
@@ -23,134 +19,127 @@ try {
         die("Connection failed: " . $conn->connect_error);
     }
 
-    // Verify user is a teacher
-    $user_id = (int)$_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT role FROM teachers WHERE id = ?");
+    // Fetch teacher profile
+    $teacher_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username, last_name, password FROM teachers WHERE id = ?");
     if (!$stmt) {
-        error_log("Prepare failed for teacher role check: " . $conn->error);
+        error_log("Prepare failed for teacher profile: " . $conn->error);
         die("Database error");
     }
-    $stmt->bind_param("i", $user_id);
+    $stmt->bind_param("i", $teacher_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    $user = $result->fetch_assoc();
+    $teacher = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    if (!$user || strtolower($user['role']) !== 'teacher') {
-        error_log("Unauthorized access attempt by user_id=$user_id, role=" . ($user['role'] ?? 'none'));
+    if (!$teacher) {
+        error_log("No teacher found for user_id=$teacher_id");
         session_destroy();
         header("Location: /EXAMCENTER/login.php?error=Unauthorized");
         exit();
     }
-} catch (Exception $e) {
-    error_log("Dashboard error: " . $e->getMessage());
-    die("System error");
-}
 
-$conn = Database::getInstance()->getConnection();
+    // Initialize variables
+    $error = $success = '';
+    $current_password = $new_password = $confirm_password = '';
 
-// Initialize variables
-$error = $success = '';
-$current_password = $new_password = $confirm_password = '';
-$exam_date = date('Y-m-d'); // Default to today
-$selected_subjects = [];
-
-// Fetch available subjects (from add_question.php lists)
-$jss_subjects = [
-    'Mathematics', 'English', 'ICT', 'Agriculture', 'History', 
-    'Civic Education', 'Basic Science', 'Basic Technology', 
-    'Business studies', 'Agricultural sci', 'Physical Health Edu',
-    'Cultural and Creative Art', 'Social Studies', 'Security Edu', 
-    'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
-];
-$ss_subjects = [
-    'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-    'Government', 'Commerce', 'Accounting', 'Financial Accounting', 
-    'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology', 
-    'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
-    'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
-];
-$all_subjects = array_unique(array_merge($jss_subjects, $ss_subjects));
-
-// Fetch current settings
-$settings = [];
-$settings_query = "SELECT setting_name, setting_value FROM settings WHERE setting_name IN ('show_results_immediately')";
-$settings_result = $conn->query($settings_query);
-if ($settings_result) {
-    while ($row = $settings_result->fetch_assoc()) {
-        $settings[$row['setting_name']] = $row['setting_value'];
+    // Fetch current settings
+    $settings = [];
+    $settings_query = "SELECT setting_name, setting_value FROM settings WHERE setting_name = 'show_results_immediately'";
+    $settings_result = $conn->query($settings_query);
+    if ($settings_result) {
+        while ($row = $settings_result->fetch_assoc()) {
+            $settings[$row['setting_name']] = $row['setting_value'];
+        }
     }
-}
 
-// Handle password change
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
-    $current_password = $_POST['current_password'];
-    $new_password = $_POST['new_password'];
-    $confirm_password = $_POST['confirm_password'];
-    
-    // Validate inputs
-    if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
-        $error = "Please fill in all password fields";
-    } elseif ($new_password !== $confirm_password) {
-        $error = "New passwords do not match";
-    } elseif (strlen($new_password) < 8) {
-        $error = "Password must be at least 8 characters long";
-    } else {
-        try {
-            // Get current password hash
-            $stmt = $conn->prepare("SELECT password FROM admins WHERE id = ?");
-            $stmt->bind_param("i", $_SESSION['admin_id']);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $admin = $result->fetch_assoc();
-            
-            if ($admin && password_verify($current_password, $admin['password'])) {
-                // Update password
-                $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("UPDATE admins SET password = ? WHERE id = ?");
-                $stmt->bind_param("si", $hashed_password, $_SESSION['admin_id']);
-                if ($stmt->execute()) {
-                    $success = "Password changed successfully!";
-                    $current_password = $new_password = $confirm_password = '';
+    // Handle password change
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
+        $current_password = trim($_POST['current_password']);
+        $new_password = trim($_POST['new_password']);
+        $confirm_password = trim($_POST['confirm_password']);
+
+        // Validate inputs
+        if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
+            $error = "Please fill in all password fields.";
+        } elseif ($new_password !== $confirm_password) {
+            $error = "New passwords do not match.";
+        } elseif (strlen($new_password) < 8) {
+            $error = "New password must be at least 8 characters long.";
+        } elseif (!preg_match("/[A-Za-z].*[0-9]|[0-9].*[A-Za-z]/", $new_password)) {
+            $error = "New password must contain both letters and numbers.";
+        } else {
+            try {
+                // Verify current password
+                if (password_verify($current_password, $teacher['password'])) {
+                    // Update password
+                    $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                    $stmt = $conn->prepare("UPDATE teachers SET password = ? WHERE id = ?");
+                    $stmt->bind_param("si", $hashed_password, $teacher_id);
+                    if ($stmt->execute()) {
+                        // Log activity
+                        $ip_address = $_SERVER['REMOTE_ADDR'];
+                        $user_agent = $_SERVER['HTTP_USER_AGENT'];
+                        $activity = "Teacher {$teacher['username']} changed their password.";
+                        $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, teacher_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
+                        $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
+                        $stmt_log->execute();
+                        $stmt_log->close();
+
+                        $success = "Password changed successfully!";
+                        $current_password = $new_password = $confirm_password = '';
+                    } else {
+                        $error = "Error updating password: " . $conn->error;
+                    }
+                    $stmt->close();
                 } else {
-                    $error = "Error updating password: " . $conn->error;
+                    $error = "Current password is incorrect.";
                 }
+            } catch (Exception $e) {
+                error_log("Password change error: " . $e->getMessage());
+                $error = "Error changing password: " . $e->getMessage();
+            }
+        }
+    }
+
+    // Handle system settings update
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_settings'])) {
+        $show_results = isset($_POST['show_results']) ? 1 : 0;
+
+        try {
+            // Update or insert setting
+            $stmt = $conn->prepare("INSERT INTO settings (setting_name, setting_value) VALUES (?, ?) 
+                                    ON DUPLICATE KEY UPDATE setting_value = ?");
+            $setting_name = 'show_results_immediately';
+            $stmt->bind_param("sii", $setting_name, $show_results, $show_results);
+            if ($stmt->execute()) {
+                // Log activity
+                $ip_address = $_SERVER['REMOTE_ADDR'];
+                $user_agent = $_SERVER['HTTP_USER_AGENT'];
+                $activity = "Teacher {$teacher['username']} updated system setting 'show_results_immediately' to $show_results.";
+                $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, teacher_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
+                $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
+                $stmt_log->execute();
+                $stmt_log->close();
+
+                $success = "System settings updated successfully!";
             } else {
-                $error = "Current password is incorrect";
+                $error = "Error updating settings: " . $conn->error;
             }
             $stmt->close();
         } catch (Exception $e) {
-            $error = "Error changing password: " . $e->getMessage();
+            error_log("Settings update error: " . $e->getMessage());
+            $error = "Error updating settings: " . $e->getMessage();
         }
     }
+
+    // Determine active tab
+    $active_tab = isset($_GET['tab']) && in_array($_GET['tab'], ['password', 'system']) ? $_GET['tab'] : 'password';
+
+} catch (Exception $e) {
+    error_log("Settings error: " . $e->getMessage());
+    die("System error");
 }
-
-// Handle system settings update
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_settings'])) {
-    $show_results = isset($_POST['show_results']) ? 1 : 0;
-    
-    // Update or insert setting
-    $stmt = $conn->prepare("INSERT INTO settings (setting_name, setting_value) VALUES (?, ?) 
-                            ON DUPLICATE KEY UPDATE setting_value = ?");
-    $stmt->bind_param("sii", $setting_name, $show_results, $show_results);
-    $setting_name = 'show_results_immediately';
-    $stmt->execute();
-    $stmt->close();
-    
-    $success = "System settings updated successfully!";
-}
-
-
-
-// Fetch current active subjects
-$active_subjects_query = "SELECT subject, exam_date FROM active_exams WHERE is_active = 1 ORDER BY exam_date, subject";
-$active_subjects_result = $conn->query($active_subjects_query);
-$active_subjects = [];
-if ($active_subjects_result) {
-    while ($row = $active_subjects_result->fetch_assoc()) {
-        $active_subjects[$row['exam_date']][] = $row['subject'];
-    }
-}
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -158,236 +147,203 @@ if ($active_subjects_result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Settings | D-portal</title>
+    <title>Settings | D-Portal CBT</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="../css/animate.min.css">
+    <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <link rel="stylesheet" href="../css/settings.css">
     <style>
-        .gradient-header {
-            background: linear-gradient(135deg, #4361ee 0%, #3f37c9 100%);
-            color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
-            border-bottom-left-radius: 35px;
-            border-bottom-right-radius: 35px;
-        }
-        
-        .settings-card {
-            background-color: white;
-            border-radius: 8px;
-            border-left: 4px solid #4361ee;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.3s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        
-        .settings-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
-        .nav-pills .nav-link.active {
-            background-color: #4361ee;
-        }
-        
-        .nav-pills .nav-link {
-            color: #4361ee;
-        }
-        
-        .tab-content {
-            padding: 20px 0;
-        }
-        
-        .password-strength {
-            height: 5px;
-            margin-top: 5px;
-            border-radius: 2px;
-        }
-        
-        .strength-weak {
-            background-color: #dc3545;
-            width: 30%;
-        }
-        
-        .strength-medium {
-            background-color: #ffc107;
-            width: 60%;
-        }
-        
-        .strength-strong {
-            background-color: #28a745;
-            width: 100%;
-        }
-        
-        .form-group-spacing {
-            margin-bottom: 1rem;
-        }
+        .settings-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-group-spacing { margin-bottom: 1.5rem; }
+        .password-strength { height: 5px; margin-top: 5px; border-radius: 2px; }
+        .strength-weak { background-color: #dc3545; width: 30%; }
+        .strength-medium { background-color: #ffc107; width: 60%; }
+        .strength-strong { background-color: #28a745; width: 100%; }
+        .nav-pills .nav-link.active { background-color: #4361ee; }
+        .nav-pills .nav-link { color: #4361ee; }
     </style>
 </head>
 <body>
-    <!-- Gradient Header -->
-    <div class="gradient-header">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <h1 class="mb-0">Teacher Settings</h1>
-                <div class="d-flex gap-3">
-                     <a href="dashboard.php" class="btn btn-light">
-                        <i class="fas fa-arrow-left me-2"></i>Dashboard
-                    </a>
-                </div>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+            <div class="admin-info">
+                <small>Welcome back,</small>
+                <h6><?php echo htmlspecialchars($teacher['last_name']); ?></h6>
             </div>
+        </div>
+        <div class="sidebar-menu mt-4">
+            <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
+            <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
+            <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
+            <a href="manage_students.php" style="text-decoration: line-through"><i class="fas fa-users"></i>Manage Students</a>
+            <a href="settings.php" class="active"><i class="fas fa-cog"></i>Settings</a>
+            <a href="my-profile.php"><i class="fas fa-user"></i>My Profile</a>
+            <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>
     </div>
 
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <?php if ($error): ?>
-                    <div class="alert alert-danger animate__animated animate__fadeIn"><?php echo htmlspecialchars($error); ?></div>
-                <?php endif; ?>
-                <?php if ($success): ?>
-                    <div class="alert alert-success animate__animated animate__fadeIn"><?php echo htmlspecialchars($success); ?></div>
-                <?php endif; ?>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Settings</h2>
+            <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+        </div>
 
-                <div class="settings-card animate__animated animate__fadeIn">
-                    <ul class="nav nav-pills mb-4" id="settingsTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="password-tab" data-bs-toggle="pill" data-bs-target="#password" type="button" role="tab">
-                                <i class="fas fa-lock me-2"></i>Change Password
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="system-tab" data-bs-toggle="pill" data-bs-target="#system" type="button" role="tab">
-                                <i class="fas fa-cog me-2"></i>System Settings
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="daily-subjects-tab" data-bs-toggle="pill" data-bs-target="#daily-subjects" type="button" role="tab">
-                                <i class="fas fa-calendar-day me-2"></i>Daily Subjects
-                            </button>
-                        </li>
-                    </ul>
-                    
-                    <div class="tab-content" id="settingsTabsContent">
-                        <!-- Password Change Tab -->
-                        <div class="tab-pane fade show active" id="password" role="tabpanel">
-                            <h5 class="mb-4">Change Your Password</h5>
-                            <form method="POST" action="settings.php">
-                                <div class="row g-3">
-                                    <div class="col-12 form-group-spacing">
-                                        <label class="form-label fw-bold">Current Password</label>
-                                        <input type="password" class="form-control" name="current_password" required>
-                                    </div>
-                                    <div class="col-md-6 form-group-spacing">
-                                        <label class="form-label fw-bold">New Password</label>
-                                        <input type="password" class="form-control" name="new_password" required
-                                               oninput="checkPasswordStrength(this.value)">
-                                        <div id="password-strength" class="password-strength mt-1"></div>
-                                        <small class="text-muted">Minimum 8 characters</small>
-                                    </div>
-                                    <div class="col-md-6 form-group-spacing">
-                                        <label class="form-label fw-bold">Confirm New Password</label>
-                                        <input type="password" class="form-control" name="confirm_password" required>
-                                    </div>
-                                </div>
-                                
-                                <div class="d-flex justify-content-end gap-3 mt-4">
-                                    <button type="reset" class="btn btn-secondary">Clear</button>
-                                    <button type="submit" name="change_password" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i>Change Password
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                        
-                        <!-- System Settings Tab -->
-                        <div class="tab-pane fade" id="system" role="tabpanel">
-                            <h5 class="mb-4">System Configuration</h5>
-                            <form method="POST" action="settings.php">
-                                <div class="row g-3">
-                                    <div class="col-12 form-group-spacing">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" name="show_results" 
-                                                   id="showResults" <?php echo ($settings['show_results_immediately'] ?? 0) ? 'checked' : ''; ?>>
-                                            <label class="form-check-label fw-bold" for="showResults">Show Results Immediately</label>
+        <!-- Alerts -->
+        <?php if ($error): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <?php echo htmlspecialchars($error); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        <?php elseif ($success): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <?php echo htmlspecialchars($success); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        <?php endif; ?>
+
+        <div class="container-fluid">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="settings-card">
+                        <ul class="nav nav-pills mb-4" id="settingsTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <a class="nav-link <?php echo $active_tab === 'password' ? 'active' : ''; ?>" href="?tab=password">
+                                    <i class="fas fa-lock me-2"></i>Change Password
+                                </a>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <a class="nav-link <?php echo $active_tab === 'system' ? 'active' : ''; ?>" href="?tab=system">
+                                    <i class="fas fa-cog me-2"></i>System Settings
+                                </a>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="settingsTabsContent">
+                            <!-- Password Change Tab -->
+                            <div class="tab-pane fade <?php echo $active_tab === 'password' ? 'show active' : ''; ?>" id="password" role="tabpanel">
+                                <h5 class="mb-4">Change Your Password</h5>
+                                <form method="POST" action="settings.php">
+                                    <input type="hidden" name="tab" value="password">
+                                    <div class="row g-3">
+                                        <div class="col-12 form-group-spacing">
+                                            <label class="form-label fw-bold">Current Password</label>
+                                            <input type="password" class="form-control" name="current_password" required>
+                                        </div>
+                                        <div class="col-md-6 form-group-spacing">
+                                            <label class="form-label fw-bold">New Password</label>
+                                            <input type="password" class="form-control" name="new_password" id="newPassword" required oninput="checkPasswordStrength(this.value)">
+                                            <div id="password-strength" class="password-strength"></div>
+                                            <small class="text-muted">Minimum 8 characters, including letters and numbers</small>
+                                        </div>
+                                        <div class="col-md-6 form-group-spacing">
+                                            <label class="form-label fw-bold">Confirm New Password</label>
+                                            <input type="password" class="form-control" name="confirm_password" required>
                                         </div>
                                     </div>
-                                </div>
-                                
-                                <div class="d-flex justify-content-end gap-3 mt-4">
-                                    <button type="reset" class="btn btn-secondary">Reset Defaults</button>
-                                    <button type="submit" name="update_settings" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i>Save Settings
-                                    </button>
-                                </div>
-                            </form>
+                                    <div class="d-flex justify-content-end gap-3 mt-4">
+                                        <button type="reset" class="btn btn-secondary">Clear</button>
+                                        <button type="submit" name="change_password" class="btn btn-primary">
+                                            <i class="fas fa-save me-2"></i>Change Password
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- System Settings Tab -->
+                            <div class="tab-pane fade <?php echo $active_tab === 'system' ? 'show active' : ''; ?>" id="system" role="tabpanel">
+                                <h5 class="mb-4">System Configuration</h5>
+                                <form method="POST" action="settings.php">
+                                    <input type="hidden" name="tab" value="system">
+                                    <div class="row g-3">
+                                        <div class="col-12 form-group-spacing">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" name="show_results" id="showResults" <?php echo ($settings['show_results_immediately'] ?? 0) ? 'checked' : ''; ?>>
+                                                <label class="form-check-label fw-bold" for="showResults">Show Results Immediately</label>
+                                                <small class="form-text text-muted">Enable to display exam results to students immediately after submission.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-end gap-3 mt-4">
+                                        <button type="reset" class="btn btn-secondary">Reset</button>
+                                        <button type="submit" name="update_settings" class="btn btn-primary">
+                                            <i class="fas fa-save me-2"></i>Save Settings
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
-                        
-                        
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Scripts -->
+    <script src="../js/jquery-3.7.0.min.js"></script>
     <script src="../js/bootstrap.bundle.min.js"></script>
     <script>
-        // Check password strength
-        function checkPasswordStrength(password) {
-            const strengthIndicator = document.getElementById('password-strength');
-            
-            if (password.length === 0) {
-                strengthIndicator.className = 'password-strength mt-1';
-                return;
+        $(document).ready(function() {
+            // Sidebar toggle
+            $('#sidebarToggle').click(function() {
+                $('.sidebar').toggleClass('active');
+            });
+
+            // Check password strength
+            function checkPasswordStrength(password) {
+                const strengthIndicator = $('#password-strength');
+                const newPasswordInput = $('#newPassword');
+                let strength = 0;
+
+                if (password.length >= 8) strength += 1;
+                if (/[A-Za-z]/.test(password)) strength += 1;
+                if(/[0-9]/.test(password)) strength += 1;
+
+                strengthIndicator.removeClass('strength-weak strength-medium strength-strong');
+                if (password.length === 0) {
+                    strengthIndicator.hide();
+                } else if (strength <= 1) {
+                    strengthIndicator.addClass('strength-weak').show();
+                } else if (strength === 2) {
+                    strengthIndicator.addClass('strength-medium').show();
+                } else {
+                    strengthIndicator.addClass('strength-strong').show();
+                }
             }
-            
-            if (password.length < 5) {
-                strengthIndicator.className = 'password-strength mt-1 strength-weak';
-            } else if (password.length < 8) {
-                strengthIndicator.className = 'password-strength mt-1 strength-medium';
-            } else {
-                strengthIndicator.className = 'password-strength mt-1 strength-strong';
-            }
-        }
-        
-        // Form validation
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                if (e.submitter.name === 'change_password') {
-                    const newPassword = form.querySelector('input[name="new_password"]').value;
-                    const confirmPassword = form.querySelector('input[name="confirm_password"]').value;
-                    
+
+            // Form validation
+            $('form').on('submit', function(e) {
+                if ($(e.originalEvent.submitter).attr('name') === 'change_password') {
+                    const newPassword = $('#newPassword').val();
+                    const confirmPassword = $('input[name="confirm_password"]').val();
+
                     if (newPassword !== confirmPassword) {
                         e.preventDefault();
                         alert('New passwords do not match!');
                         return false;
                     }
-                    
                     if (newPassword.length < 8) {
                         e.preventDefault();
-                        alert('Password must be at least 8 characters long!');
+                        alert('New password must be at least 8 characters long!');
                         return false;
                     }
-                } else if (e.submitter.name === 'save_daily_subjects') {
-                    const subjects = form.querySelector('select[name="subjects[]"]');
-                    if (subjects.selectedOptions.length === 0) {
+                    if (!/[A-Za-z].*[0-9]|[0-9].*[A-Za-z]/.test(newPassword)) {
                         e.preventDefault();
-                        alert('Please select at least one subject!');
+                        alert('New password must contain both letters and numbers!');
                         return false;
                     }
                 }
             });
+
+            // Auto-hide alerts
+            setTimeout(() => {
+                $('.alert').alert('close');
+            }, 5000);
         });
-        
-        // Auto-hide alerts after 5 seconds
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                new bootstrap.Alert(alert).close();
-            });
-        }, 5000);
     </script>
 </body>
 </html>

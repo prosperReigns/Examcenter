@@ -2,11 +2,13 @@
 session_start();
 require_once '../db.php';
 
-// Check admin authentication
-if (!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'admin') {
+    error_log("Redirecting to login: No user_id or invalid role in session");
+    header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
 }
+
 
 $conn = Database::getInstance()->getConnection();
 

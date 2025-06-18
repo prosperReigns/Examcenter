@@ -169,14 +169,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['select_test'])) {
     $test_id = intval($_POST['test_id'] ?? 0);
     if ($test_id) {
-        $stmt = $conn->prepare("SELECT * FROM tests WHERE id = ? AND LOWER(subject) IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")");
+        $stmt = $conn->prepare("SELECT * FROM tests WHERE id = ? AND SUBJECT IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")");
         if ($stmt === false) {
             error_log("Prepare failed: " . $conn->error);
             $error = "Error preparing query: " . $conn->error;
         } else {
-            $lowercase_subjects = array_map('strtolower', $assigned_subjects);
-            $params = array_merge([$test_id], $lowercase_subjects);
-            $types = 'i' . str_repeat('s', count($lowercase_subjects));
+            $params = array_merge([$test_id], $assigned_subjects);
+
+            $types = 'i' . str_repeat('s', count($assigned_subjects));
+
             $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $test = $stmt->get_result()->fetch_assoc();
@@ -198,17 +199,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['select_test'])) {
     }
 }
 
-// Load current test and questions (only if not just created)
+// LOAD CURRENT TEST
 if (isset($_SESSION['current_test_id']) && !$current_test) {
     $test_id = $_SESSION['current_test_id'];
-    $stmt = $conn->prepare("SELECT * FROM tests WHERE id = ? AND LOWER(subject) IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")");
+    $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
+
+    $stmt = $conn->prepare("SELECT * FROM tests WHERE id = ? AND subject IN ($placeholders)");
     if ($stmt === false) {
         error_log("Prepare failed: " . $conn->error);
         $error = "Error preparing query: " . $conn->error;
     } else {
-        $lowercase_subjects = array_map('strtolower', $assigned_subjects);
-        $params = array_merge([$test_id], $lowercase_subjects);
-        $types = 'i' . str_repeat('s', count($lowercase_subjects));
+        $params = array_merge([$test_id], $assigned_subjects);
+        $types = 'i' . str_repeat('s', count($assigned_subjects));
+
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         $current_test = $stmt->get_result()->fetch_assoc();
@@ -232,11 +235,12 @@ if (isset($_SESSION['current_test_id']) && !$current_test) {
         }
     }
 }
-    // Handle clear test selection
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['clear_test'])) {
-        unset($_SESSION['current_test_id']);
-        $success = "Test selection cleared.";
-    }
+// Handle clear test selection
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['clear_test'])) {
+    unset($_SESSION['current_test_id']);
+    header("Location: " . $_SERVER['PHP_SELF']); // Refresh the page to reflect cleared session
+    exit;
+}
 
     // Handle question deletion
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_question'])) {
@@ -329,6 +333,8 @@ if (isset($_SESSION['current_test_id']) && !$current_test) {
         }
     }
 
+
+    // UPLOADING OF IMAGE
     function handleImageUpload($question_id) {
         global $conn;
 
@@ -511,29 +517,29 @@ if (isset($_SESSION['current_test_id']) && !$current_test) {
         }
     }
 
-    // Load current test and questions
-    if (isset($_SESSION['current_test_id'])) {
-        $test_id = $_SESSION['current_test_id'];
-        $stmt = $conn->prepare("SELECT * FROM tests WHERE id = ? AND subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")");
-        $params = array_merge([$test_id], $assigned_subjects);
-        $types = str_repeat('s', count($assigned_subjects)) . 'i';
-        $stmt->bind_param($types, ...array_reverse($params));
-        $stmt->execute();
-        $current_test = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+    // // Load current test and questions
+    // if (isset($_SESSION['current_test_id'])) {
+    //     $test_id = $_SESSION['current_test_id'];
+    //     $stmt = $conn->prepare("SELECT * FROM tests WHERE id = ? AND subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")");
+    //     $params = array_merge([$test_id], $assigned_subjects);
+    //     $types = str_repeat('s', count($assigned_subjects)) . 'i';
+    //     $stmt->bind_param($types, ...array_reverse($params));
+    //     $stmt->execute();
+    //     $current_test = $stmt->get_result()->fetch_assoc();
+    //     $stmt->close();
 
-        if ($current_test) {
-            $stmt = $conn->prepare("SELECT * FROM new_questions WHERE test_id = ? ORDER BY id ASC");
-            $stmt->bind_param("i", $test_id);
-            $stmt->execute();
-            $questions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-            $total_questions = count($questions);
-            $stmt->close();
-        } else {
-            unset($_SESSION['current_test_id']);
-            $error = "Selected test is invalid or unauthorized.";
-        }
-    }
+    //     if ($current_test) {
+    //         $stmt = $conn->prepare("SELECT * FROM new_questions WHERE test_id = ? ORDER BY id ASC");
+    //         $stmt->bind_param("i", $test_id);
+    //         $stmt->execute();
+    //         $questions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    //         $total_questions = count($questions);
+    //         $stmt->close();
+    //     } else {
+    //         unset($_SESSION['current_test_id']);
+    //         $error = "Selected test is invalid or unauthorized.";
+    //     }
+    // }
 
     $edit_data = [
         'options' => $edit_question['options'] ?? [],
@@ -687,8 +693,8 @@ $conn->close();
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Type</label>
                                 <select class="form-select form-select-lg" name="question_type" id="questionType" required>
-                                    <option value="multiple_choice_single" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_single') ? 'selected' : ''; ?>>Multiple Choice (Single)</option>
-                                    <option value="multiple_choice_multiple" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_multiple') ? 'selected' : ''; ?>>Multiple Choice (Multiple)</option>
+                                    <option value="multiple_choice_single" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_single') ? 'selected' : ''; ?>>Single Choice Question</option>
+                                    <option value="multiple_choice_multiple" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_multiple') ? 'selected' : ''; ?>>Multiple Choice Question</option>
                                     <option value="true_false" <?php echo ($edit_question && $edit_question['question_type'] == 'true_false') ? 'selected' : ''; ?>>True/False</option>
                                     <option value="fill_blanks" <?php echo ($edit_question && $edit_question['question_type'] == 'fill_blanks') ? 'selected' : ''; ?>>Fill in Blanks</option>
                                 </select>
