@@ -314,6 +314,14 @@ $conn->close();
             margin-top: 5px;
             border-radius: 2px;
         }
+         .admin-info small {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            color: white;
+        }
+        .admin-info h6{
+            color: white;
+        }
         .strength-weak {
             background-color: #dc3545;
             width: 30%;
@@ -409,7 +417,7 @@ $conn->close();
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab">
                         <i class="fas fa-lock me-2"></i>Change Password
-                </button>
+                    </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system-settings" type="button" role="tab">
@@ -460,7 +468,7 @@ $conn->close();
                 <!-- System Settings Tab -->
                 <div class="tab-pane fade" id="system-settings" role="tabpanel">
                     <h5 class="mb-4">System Configuration</h5>
-                    <form method="post" id="systemSettingsForm" action="POST">
+                    <form method="post" id="systemSettingsForm" action="">
                         <div class="row g-3">
                             <div class="col-12 form-group-spacing">
                                 <div class="form-check form-switch">
@@ -486,7 +494,7 @@ $conn->close();
                         <form method="POST" id="dailySubjectsForm" action="">
                             <div class="row g-3">
                                 <div class="col-md-6 form-group-spacing">
-                                    <label class="form-label fw-bold" for="exam-date">Date</form-label>
+                                    <label class="form-label fw-bold" for="exam-date">Date</label>
                                     <input type="date" class="form-control" id="exam-date" name="exam_date" 
                                         value="<?php echo htmlspecialchars($exam_date); ?>" required>
                                         <div class="invalid-feedback">Please select a valid date.</div>
@@ -516,39 +524,36 @@ $conn->close();
                             <!-- Display existing schedule -->
                             <h5 class="mt-5 mb-3">Current Schedule</h5>
                                 <?php if (!empty($active_subjects)): ?>
-                                    <div class="table table-striped">
-                                        <table>
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Subjects</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($active_subjects as $date => $subjects): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($date); ?></td>
-                                                <td>
-                                                    <?php foreach ($subjects as $subject): ?>
-                                                        <span class="subject-badge"><?php echo htmlspecialchars(ucwords ($subject)); ?></span>
-                                                    <?php endforeach; ?>
-                                                </td>
-                                            </tr>
-                                            <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    
-                                        <?php else: ?>
-                                            <div class="empty-state">
-                                                <i class="fas fa-calendar-minus fa-3x mb-3"></i>
-                                                <h5>No Active Subjects</h5>
-                                                <p>Schedule daily subjects to enable exams.</p>
-                                            </div>
+    <div class="table table-striped">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Subjects</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($active_subjects as $date => $subjects): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($date); ?></td>
+                    <td>
+                        <?php foreach ($subjects as $subject): ?>
+                            <span class="subject-badge"><?php echo htmlspecialchars(ucwords($subject)); ?></span>
+                        <?php endforeach; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php else: ?>
+    <div class="empty-state">
+        <i class="fas fa-calendar-minus fa-3x mb-3"></i>
+        <h5>No Active Subjects</h5>
+        <p>Schedule daily subjects to enable exams.</p>
+    </div>
+<?php endif; ?>
 
-                                        </div>
-                                    </div>
-                    </div>
-                                        </div>
             </div>
 
         </div>

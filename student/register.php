@@ -20,7 +20,7 @@ $stmt->execute();
 $result = $stmt->get_result();
 $active_subjects = [];
 while ($row = $result->fetch_assoc()) {
-    $active_subjects[] = $row['subject'];
+    $active_subjects[] = ucwords(strtolower($row['subject']));
 }
 $stmt->close();
 
