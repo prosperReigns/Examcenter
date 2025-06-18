@@ -25,7 +25,7 @@ try {
     }
 
     $user_id = (int)$_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT role FROM admins WHERE id = ?");
+    $stmt = $conn->prepare("SELECT username, role FROM admins WHERE id = ?");
     if (!$stmt) {
         error_log("Prepare failed for admin role check: " . $conn->error);
         die("Database error");
@@ -45,11 +45,6 @@ try {
 } catch (Exception $e) {
     error_log("Page error: " . $e->getMessage());
     die("System error");
-}
-$conn = Database::getInstance()->getConnection();
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    die("Database connection failed");
 }
 
 // Define available subjects
@@ -219,70 +214,86 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $is_edit_mode ? 'Edit' : 'Add'; ?> Teacher</title>
+    <title><?php echo $is_edit_mode ? 'Edit' : 'Add'; ?> Teacher | D-Portal CBT</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../css/all.min.css">
-    <link rel="stylesheet" href="../css/animate.min.css">
+    <link rel="stylesheet" href="../css/all.css">
+    <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/view_results.css">
     <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-            min-height: 80vh;
-            color: var(--dark);
-            overflow-x: hidden;
-        }
-        
-        .gradient-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        .sidebar {
+            background-color: #2c3e50;
             color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
-            border-bottom-left-radius: 35px;
-            border-bottom-right-radius: 35px;
+            width: 250px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding: 20px;
+            transition: transform 0.3s ease;
         }
-        
-        .teacher-card {
-            background-color: white;
-            border-radius: 8px;
-            border-left: 4px solid var(--primary);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.3s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        h6{
+            color: white !important; 
         }
-        
-        .teacher-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        .sidebar.active {
+            transform: translateX(-250px);
         }
-        
-        .subject-checkbox {
+        .sidebar-brand h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+         .admin-info small {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            color: white;
+        }
+        .admin-info h6{
+            color: white;
+        }
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            color: white;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background-color: #34495e;
+        }
+        .sidebar-menu a i {
             margin-right: 10px;
-            margin-bottom: 8px;
         }
-        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            min-height: 100vh;
+            background: #f8f9fa;
+        }
+        .header {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .filter-card {
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: white;
+        }
         .subjects-container {
             display: flex;
             flex-wrap: wrap;
             margin-top: 10px;
         }
-        
         .subject-item {
             flex: 0 0 25%;
             margin-bottom: 10px;
         }
-        
-        @media (max-width: 768px) {
-            .subject-item {
-                flex: 0 0 50%;
-            }
-        }
-        
         .username-preview {
             background-color: #f8f9fa;
             padding: 8px 12px;
@@ -291,201 +302,262 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-top: 5px;
             display: inline-block;
         }
-        
-        .alert {
-            margin-top: 20px;
-        }
-        
         .password-field {
             display: <?php echo $is_edit_mode ? 'none' : 'block'; ?>;
+        }
+        @media (max-width: 991px) {
+            .sidebar {
+                transform: translateX(-250px);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .subject-item {
+                flex: 0 0 50%;
+            }
+        }
+        @media (max-width: 576px) {
+            .subject-item {
+                flex: 0 0 100%;
+            }
         }
     </style>
 </head>
 <body>
-
-<div class="gradient-header">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <h1 class="mb-0"><?php echo $is_edit_mode ? 'Edit' : 'Add'; ?> Teacher</h1>
-                <div class="d-flex gap-3">
-                    <a href="manage_teachers.php" class="btn btn-light">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Teachers
-                    </a>
-                </div>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+            <div class="admin-info"><b>
+                <small>Welcome back,</small>
+                <h6><?php echo htmlspecialchars($user['username']); ?></h6></b>
             </div>
+        </div>
+        <div class="sidebar-menu mt-4">
+            <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
+            <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
+            <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
+            <a href="add_teacher.php" class="active"><i class="fas fa-user-plus"></i>Add Teachers</a>
+            <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
+            <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
+            <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>
     </div>
 
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="teacher-card animate__animated animate__fadeIn">
-                    <?php if ($error): ?>
-                        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
-                    <?php endif; ?>
-                    <?php if ($success): ?>
-                        <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-                    <?php endif; ?>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0"><?php echo $is_edit_mode ? 'Edit' : 'Add'; ?> Teacher</h2>
+            <div class="d-flex gap-3">
+                <a href="manage_teachers.php" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Back to Teachers</a>
+                <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+            </div>
+        </div>
 
-                    <h5 class="mb-3">Teacher Information</h5>
-                    <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?><?php echo $is_edit_mode ? '?edit_id=' . $teacher_id : ''; ?>">
-                        <?php if ($is_edit_mode): ?>
-                            <input type="hidden" name="teacher_id" value="<?php echo $teacher_id; ?>">
-                        <?php endif; ?>
+        <!-- Alerts -->
+        <?php if ($error): ?>
+            <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
+        <?php if ($success): ?>
+            <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+        <?php endif; ?>
+
+        <!-- Teacher Form Card -->
+        <div class="card bg-white border-0 shadow-sm filter-card mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="fas fa-user-plus me-2"></i>Teacher Information</h5>
+                <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?><?php echo $is_edit_mode ? '?edit_id=' . $teacher_id : ''; ?>" id="teacherForm">
+                    <?php if ($is_edit_mode): ?>
+                        <input type="hidden" name="teacher_id" value="<?php echo $teacher_id; ?>">
+                    <?php endif; ?>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">First Name</label>
+                            <input type="text" class="form-control" name="first_name" 
+                                   value="<?php echo htmlspecialchars($first_name); ?>" required
+                                   oninput="updateUsernamePreview()">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Last Name</label>
+                            <input type="text" class="form-control" name="last_name" 
+                                   value="<?php echo htmlspecialchars($last_name); ?>" required
+                                   oninput="updateUsernamePreview()">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Username</label>
+                            <div id="usernamePreview" class="username-preview">
+                                <?php echo !empty($username) ? htmlspecialchars($username) : 'username.will.generate.here'; ?>
+                            </div>
+                            <small class="text-muted">Automatically generated from first and last name</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Email</label>
+                            <input type="email" class="form-control" name="email" 
+                                   value="<?php echo htmlspecialchars($email); ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Phone Number</label>
+                            <input type="tel" class="form-control" name="phone" 
+                                   value="<?php echo htmlspecialchars($phone); ?>">
+                        </div>
                         
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">First Name</label>
-                                <input type="text" class="form-control" name="first_name" 
-                                       value="<?php echo htmlspecialchars($first_name); ?>" required
-                                       oninput="updateUsernamePreview()">
+                        <?php if (!$is_edit_mode): ?>
+                            <div class="col-md-6 password-field">
+                                <label class="form-label fw-bold">Password</label>
+                                <input type="password" class="form-control" name="password" required
+                                       oninput="checkPasswordStrength(this.value)">
+                                <div id="password-strength" class="mt-1 small"></div>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Last Name</label>
-                                <input type="text" class="form-control" name="last_name" 
-                                       value="<?php echo htmlspecialchars($last_name); ?>" required
-                                       oninput="updateUsernamePreview()">
+                            <div class="col-md-6 password-field">
+                                <label class="form-label fw-bold">Confirm Password</label>
+                                <input type="password" class="form-control" name="confirm_password" required>
                             </div>
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Username</label>
-                                <div id="usernamePreview" class="username-preview">
-                                    <?php echo !empty($username) ? htmlspecialchars($username) : 'username.will.generate.here'; ?>
-                                </div>
-                                <small class="text-muted">Automatically generated from first and last name</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Email</label>
-                                <input type="email" class="form-control" name="email" 
-                                       value="<?php echo htmlspecialchars($email); ?>" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Phone Number</label>
-                                <input type="tel" class="form-control" name="phone" 
-                                       value="<?php echo htmlspecialchars($phone); ?>">
-                            </div>
-                            
-                            <?php if (!$is_edit_mode): ?>
-                                <div class="col-md-6 password-field">
-                                    <label class="form-label fw-bold">Password</label>
-                                    <input type="password" class="form-control" name="password" required
-                                           oninput="checkPasswordStrength(this.value)">
-                                    <div id="password-strength" class="mt-1 small"></div>
-                                </div>
-                                <div class="col-md-6 password-field">
-                                    <label class="form-label fw-bold">Confirm Password</label>
-                                    <input type="password" class="form-control" name="confirm_password" required>
-                                </div>
-                            <?php endif; ?>
-                        </div>
+                        <?php endif; ?>
+                    </div>
 
-                        <div class="mt-4">
-                            <label class="form-label fw-bold">Subjects Taught</label>
-                            <div class="subjects-container">
-                                <?php foreach ($subjects as $subject): ?>
-                                    <div class="subject-item">
-                                        <div class="form-check">
-                                            <input class="form-check-input subject-checkbox" type="checkbox" 
-                                                   name="subjects[]" value="<?php echo htmlspecialchars($subject); ?>"
-                                                   id="subject-<?php echo preg_replace('/[^a-z0-9]/', '-', strtolower($subject)); ?>"
-                                                   <?php echo in_array($subject, $selected_subjects) ? 'checked' : ''; ?>>
-                                            <label class="form-check-label" for="subject-<?php echo preg_replace('/[^a-z0-9]/', '-', strtolower($subject)); ?>">
-                                                <?php echo htmlspecialchars($subject); ?>
-                                            </label>
-                                        </div>
+                    <div class="mt-4">
+                        <label class="form-label fw-bold">Subjects Taught</label>
+                        <div class="subjects-container">
+                            <?php foreach ($subjects as $subject): ?>
+                                <div class="subject-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input subject-checkbox" type="checkbox" 
+                                               name="subjects[]" value="<?php echo htmlspecialchars($subject); ?>"
+                                               id="subject-<?php echo preg_replace('/[^a-z0-9]/', '-', strtolower($subject)); ?>"
+                                               <?php echo in_array($subject, $selected_subjects) ? 'checked' : ''; ?>>
+                                        <label class="form-check-label" for="subject-<?php echo preg_replace('/[^a-z0-9]/', '-', strtolower($subject)); ?>">
+                                            <?php echo htmlspecialchars($subject); ?>
+                                        </label>
                                     </div>
-                                <?php endforeach; ?>
-                            </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
+                    </div>
 
-                        <div class="d-flex justify-content-end gap-3 mt-4">
-                            <button type="reset" class="btn btn-secondary" onclick="clearForm()">Clear</button>
-                            <button type="submit" name="<?php echo $is_edit_mode ? 'update_teacher' : 'add_teacher'; ?>" class="btn btn-primary">
-                                <i class="fas fa-<?php echo $is_edit_mode ? 'save' : 'plus'; ?> me-2"></i>
-                                <?php echo $is_edit_mode ? 'Update' : 'Add'; ?> Teacher
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    <div class="d-flex justify-content-end gap-3 mt-4">
+                        <button type="reset" class="btn btn-secondary" onclick="clearForm()">Clear</button>
+                        <button type="submit" name="<?php echo $is_edit_mode ? 'update_teacher' : 'add_teacher'; ?>" class="btn btn-primary">
+                            <i class="fas fa-<?php echo $is_edit_mode ? 'save' : 'plus'; ?> me-2"></i>
+                            <?php echo $is_edit_mode ? 'Update' : 'Add'; ?> Teacher
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
+    <!-- Scripts -->
+    <script src="../js/jquery-3.7.0.min.js"></script>
     <script src="../js/bootstrap.bundle.min.js"></script>
+    <script src="../js/dataTables.min.js"></script>
+    <script src="../js/dataTables.bootstrap5.min.js"></script>
+    <script src="../js/jquery.validate.min.js"></script>
     <script>
-        function updateUsernamePreview() {
-            const firstName = document.querySelector('input[name="first_name"]').value.trim().toLowerCase();
-            const lastName = document.querySelector('input[name="last_name"]').value.trim().toLowerCase();
-            
-            let username = '';
-            if (firstName && lastName) {
-                username = (firstName + '.' + lastName).replace(/[^a-z.]/g, '');
-            }
-            
-            document.getElementById('usernamePreview').textContent = username || 'username.will.generate.here';
-        }
-        
-        function checkPasswordStrength(password) {
-            const strengthIndicator = document.getElementById('password-strength');
-            
-            if (!strengthIndicator) return;
-            
-            if (password.length === 0) {
-                strengthIndicator.textContent = '';
-                return;
-            }
-            
-            let strengthText = '';
-            let strengthClass = '';
-            
-            if (password.length < 5) {
-                strengthText = 'Weak (min 8 characters)';
-                strengthClass = 'text-danger';
-            } else if (password.length < 8) {
-                strengthText = 'Medium';
-                strengthClass = 'text-warning';
-            } else {
-                strengthText = 'Strong';
-                strengthClass = 'text-success';
-            }
-            
-            strengthIndicator.textContent = strengthText;
-            strengthIndicator.className = 'mt-1 small ' + strengthClass;
-        }
-        
-        function clearForm() {
-            document.getElementById('usernamePreview').textContent = 'username.will.generate.here';
-            document.querySelectorAll('input[name="subjects[]"]').forEach(cb => cb.checked = false);
-            document.getElementById('password-strength').textContent = '';
-        }
-        
-        document.querySelector('form').addEventListener('submit', function(e) {
-            const isEditMode = <?php echo $is_edit_mode ? 'true' : 'false'; ?>;
-            const subjects = document.querySelectorAll('input[name="subjects[]"]:checked');
-            
-            if (!isEditMode) {
-                const password = document.querySelector('input[name="password"]').value;
-                const confirm = document.querySelector('input[name="confirm_password"]').value;
+        $(document).ready(function() {
+            // Sidebar toggle
+            $('#sidebarToggle').click(function() {
+                $('.sidebar').toggleClass('active');
+            });
+
+            // Form validation
+            $('#teacherForm').validate({
+                rules: {
+                    first_name: { required: true, maxlength: 50 },
+                    last_name: { required: true, maxlength: 50 },
+                    email: { required: true, email: true, maxlength: 100 },
+                    phone: { maxlength: 15 },
+                    password: { 
+                        required: <?php echo $is_edit_mode ? 'false' : 'true'; ?>,
+                        minlength: 8 
+                    },
+                    confirm_password: { 
+                        required: <?php echo $is_edit_mode ? 'false' : 'true'; ?>,
+                        equalTo: '[name="password"]' 
+                    },
+                    'subjects[]': { required: true }
+                },
+                messages: {
+                    first_name: "Please enter a first name (max 50 characters).",
+                    last_name: "Please enter a last name (max 50 characters).",
+                    email: "Please enter a valid email (max 100 characters).",
+                    phone: "Phone number is too long (max 15 characters).",
+                    password: "Password must be at least 8 characters long.",
+                    confirm_password: "Passwords do not match.",
+                    'subjects[]': "Please select at least one subject."
+                },
+                errorElement: 'div',
+                errorClass: 'invalid-feedback',
+                highlight: function(element) {
+                    $(element).addClass('is-invalid');
+                },
+                unhighlight: function(element) {
+                    $(element).removeClass('is-invalid');
+                },
+                errorPlacement: function(error, element) {
+                    if (element.attr('name') === 'subjects[]') {
+                        error.insertAfter(element.closest('.subjects-container'));
+                    } else {
+                        error.insertAfter(element);
+                    }
+                }
+            });
+
+            // Update username preview
+            function updateUsernamePreview() {
+                const firstName = $('input[name="first_name"]').val().trim().toLowerCase();
+                const lastName = $('input[name="last_name"]').val().trim().toLowerCase();
                 
-                if (password !== confirm) {
-                    e.preventDefault();
-                    alert('Passwords do not match!');
-                    return false;
+                let username = '';
+                if (firstName && lastName) {
+                    username = (firstName + '.' + lastName).replace(/[^a-z.]/g, '');
                 }
                 
-                if (password.length < 8) {
-                    e.preventDefault();
-                    alert('Password must be at least 8 characters long!');
-                    return false;
+                $('#usernamePreview').text(username || 'username.will.generate.here');
+            }
+
+            // Check password strength
+            function checkPasswordStrength(password) {
+                const strengthIndicator = $('#password-strength');
+                
+                if (!strengthIndicator.length) return;
+                
+                if (password.length === 0) {
+                    strengthIndicator.text('');
+                    return;
                 }
+                
+                let strengthText = '';
+                let strengthClass = '';
+                
+                if (password.length < 5) {
+                    strengthText = 'Weak (min 8 characters)';
+                    strengthClass = 'text-danger';
+                } else if (password.length < 8) {
+                    strengthText = 'Medium';
+                    strengthClass = 'text-warning';
+                } else {
+                    strengthText = 'Strong';
+                    strengthClass = 'text-success';
+                }
+                
+                strengthIndicator.text(strengthText);
+                strengthIndicator.removeClass('text-danger text-warning text-success').addClass(strengthClass);
             }
-            
-            if (subjects.length === 0) {
-                e.preventDefault();
-                alert('Please select at least one subject!');
-                return false;
+
+            // Clear form
+            function clearForm() {
+                $('#usernamePreview').text('username.will.generate.here');
+                $('input[name="subjects[]"]').prop('checked', false);
+                $('#password-strength').text('');
+                $('#teacherForm').validate().resetForm();
+                $('#teacherForm').find('.is-invalid').removeClass('is-invalid');
             }
-            
-            return true;
         });
     </script>
 </body>

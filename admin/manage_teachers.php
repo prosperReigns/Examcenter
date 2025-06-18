@@ -22,7 +22,7 @@ try {
     }
 
     $user_id = (int)$_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT role FROM admins WHERE id = ?");
+    $stmt = $conn->prepare("SELECT username, role FROM admins WHERE id = ?");
     if (!$stmt) {
         error_log("Prepare failed for admin role check: " . $conn->error);
         die("Database error");
@@ -44,21 +44,17 @@ try {
     die("System error");
 }
 
-$conn = Database::getInstance()->getConnection();
-
-
-
 // Initialize variables
 $error = $success = '';
 
 // Handle delete teacher
 if (isset($_GET['delete_id'])) {
-    $teacher_id = $_GET['delete_id'];
+    $teacher_id = (int)$_GET['delete_id'];
     
     try {
         $conn->begin_transaction();
         
-        // Get email to delete from staff table
+        // Get email to verify teacher exists
         $stmt = $conn->prepare("SELECT email FROM teachers WHERE id = ?");
         $stmt->bind_param("i", $teacher_id);
         $stmt->execute();
@@ -66,8 +62,6 @@ if (isset($_GET['delete_id'])) {
         $teacher = $result->fetch_assoc();
         
         if ($teacher) {
-          
-            
             // Delete from teacher_subjects
             $stmt = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?");
             $stmt->bind_param("i", $teacher_id);
@@ -80,6 +74,14 @@ if (isset($_GET['delete_id'])) {
             
             $conn->commit();
             $success = "Teacher deleted successfully!";
+            
+            // Log deletion
+            $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
+            $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+            $activity = "Admin {$user['username']} deleted teacher ID: $teacher_id";
+            $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
+            $stmt->bind_param("siss", $activity, $user_id, $ip_address, $user_agent);
+            $stmt->execute();
         } else {
             $error = "Teacher not found!";
         }
@@ -102,6 +104,8 @@ $stmt = $conn->prepare("
 $stmt->execute();
 $result = $stmt->get_result();
 $teachers = $result->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -109,48 +113,73 @@ $teachers = $result->fetch_all(MYSQLI_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Teachers</title>
+    <title>Manage Teachers | D-Portal CBT</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../css/all.min.css">
-    <link rel="stylesheet" href="../css/animate.min.css">
+    <link rel="stylesheet" href="../css/all.css">
+    <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
     <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-            min-height: 80vh;
-            color: var(--dark);
-            overflow-x: hidden;
-        }
-        
-        .gradient-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        .sidebar {
+            background-color: #2c3e50;
             color: white;
-            padding: 2rem 0;
-            margin-bottom: 2rem;
-            border-bottom-left-radius: 35px;
-            border-bottom-right-radius: 35px;
+            width: 250px;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding: 20px;
+            transition: transform 0.3s ease;
         }
-        
-        .teacher-card {
-            background-color: white;
+        .sidebar.active {
+            transform: translateX(-250px);
+        }
+        .sidebar-brand h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+       .admin-info small {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            color: white;
+        }
+        .admin-info h6{
+            color: white;
+        }
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            color: white;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .sidebar-menu a:hover, .sidebar-menu a.active {
+            background-color: #34495e;
+        }
+        .sidebar-menu a i {
+            margin-right: 10px;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            min-height: 100vh;
+            background: #f8f9fa;
+        }
+        .header {
+            background: white;
+            padding: 15px 20px;
             border-radius: 8px;
-            border-left: 4px solid var(--primary);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            transition: all 0.3s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
-        .teacher-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        .filter-card {
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: white;
         }
-        
         .subject-badge {
             background-color: #e9ecef;
             color: #495057;
@@ -161,79 +190,103 @@ $teachers = $result->fetch_all(MYSQLI_ASSOC);
             margin-bottom: 5px;
             display: inline-block;
         }
-        
-        .action-buttons .btn {
-            margin-right: 5px;
-            margin-bottom: 5px;
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
         }
-        
-        .table-responsive {
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        
-        .table th {
-            background-color: var(--primary);
-            color: white;
-        }
-        
-        .table td {
-            vertical-align: middle;
-        }
-        
         .search-box {
             position: relative;
             margin-bottom: 20px;
         }
-        
         .search-box i {
             position: absolute;
             left: 10px;
-            top: 10px;
+            top: 50%;
+            transform: translateY(-50%);
             color: #6c757d;
         }
-        
         .search-box input {
             padding-left: 35px;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #4361ee;
+            color: white !important;
+            border-color: #4361ee;
+        }
+        @media (max-width: 991px) {
+            .sidebar {
+                transform: translateX(-250px);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Gradient Header -->
-    <div class="gradient-header">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <h1 class="mb-0">Manage Teachers</h1>
-                <div class="d-flex gap-3">
-                    <a href="add_teacher.php" class="btn btn-light">
-                        <i class="fas fa-plus me-2"></i>Add Teacher
-                    </a>
-                    <a href="dashboard.php" class="btn btn-light">
-                        <i class="fas fa-arrow-left me-2"></i>Dashboard
-                    </a>
-                </div>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+            <div class="admin-info">
+                <b><small>Welcome back,</small>
+                <h6><?php echo htmlspecialchars($user['username']); ?></h6></b>
             </div>
+        </div>
+        <div class="sidebar-menu mt-4">
+            <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
+            <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
+            <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
+            <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
+            <a href="manage_teachers.php" class="active"><i class="fas fa-users"></i>Manage Teachers</a>
+            <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
+            <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>
     </div>
 
-    <div class="container">
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Manage Teachers</h2>
+            <div class="d-flex gap-3">
+                <a href="add_teacher.php" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Teacher</a>
+                <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+            </div>
+        </div>
+
+        <!-- Alerts -->
         <?php if ($error): ?>
-            <div class="alert alert-danger animate__animated animate__fadeIn"><?php echo htmlspecialchars($error); ?></div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <?php echo htmlspecialchars($error); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         <?php endif; ?>
         <?php if ($success): ?>
-            <div class="alert alert-success animate__animated animate__fadeIn"><?php echo htmlspecialchars($success); ?></div>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <?php echo htmlspecialchars($success); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         <?php endif; ?>
 
-        <div class="row">
-            <div class="col-12">
+        <!-- Teachers Table -->
+        <div class="card bg-white border-0 shadow-sm">
+            <div class="card-header bg-white border-0">
+                <h5 class="mb-0"><i class="fas fa-users me-2"></i>Teachers List (<?php echo count($teachers); ?> total)</h5>
+            </div>
+            <div class="card-body">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" class="form-control" placeholder="Search teachers...">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search teachers..." form="searchForm">
                 </div>
-                
-                <div class="table-responsive">
-                    <table class="table table-hover">
+                <form id="searchForm"></form>
+                <?php if (!empty($teachers)): ?>
+                    <table id="teachersTable" class="table table-striped table-hover" style="width:100%">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -247,7 +300,7 @@ $teachers = $result->fetch_all(MYSQLI_ASSOC);
                         <tbody>
                             <?php foreach ($teachers as $teacher): ?>
                                 <tr class="teacher-row">
-                                  <td><?php echo htmlspecialchars($teacher['first_name'] . ' ' . $teacher['last_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($teacher['first_name'] . ' ' . $teacher['last_name']); ?></td>
                                     <td><?php echo htmlspecialchars($teacher['username']); ?></td>
                                     <td><?php echo htmlspecialchars($teacher['email']); ?></td>
                                     <td><?php echo htmlspecialchars($teacher['phone']); ?></td>
@@ -261,24 +314,26 @@ $teachers = $result->fetch_all(MYSQLI_ASSOC);
                                             <span class="text-muted">No subjects assigned</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="action-buttons">
-                                       <a href="add_teacher.php?edit_id=<?php echo $teacher['id']; ?>" class="btn btn-sm btn-primary">
+                                    <td>
+                                        <a href="add_teacher.php?edit_id=<?php echo $teacher['id']; ?>" class="btn btn-sm btn-outline-primary me-1">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
-                                        <button class="btn btn-sm btn-danger delete-btn" data-id="<?php echo $teacher['id']; ?>">
+                                        <button class="btn btn-sm btn-outline-danger delete-btn" data-id="<?php echo $teacher['id']; ?>">
                                             <i class="fas fa-trash"></i> Delete
                                         </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($teachers)): ?>
-                                <tr>
-                                    <td colspan="6" class="text-center py-4">No teachers found. <a href="add_teacher.php">Add a teacher</a></td>
-                                </tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
-                </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-users fa-3x mb-3"></i>
+                        <h4>No Teachers Found</h4>
+                        <p>Add a new teacher to get started.</p>
+                        <a href="add_teacher.php" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Teacher</a>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -302,45 +357,94 @@ $teachers = $result->fetch_all(MYSQLI_ASSOC);
         </div>
     </div>
 
+    <!-- Scripts -->
+    <script src="../js/jquery-3.7.0.min.js"></script>
     <script src="../js/bootstrap.bundle.min.js"></script>
+    <script src="../js/jquery.dataTables.min.js"></script>
+    <script src="../js/dataTables.bootstrap5.min.js"></script>
+    <script src="../js/jquery.validate.min.js"></script>
     <script>
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const rows = document.querySelectorAll('.teacher-row');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchTerm) ? '' : 'none';
+        $(document).ready(function() {
+            // Sidebar toggle
+            $('#sidebarToggle').click(function() {
+                $('.sidebar').toggleClass('active');
             });
-        });
-        
-        // Delete confirmation
-        document.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const teacherId = this.getAttribute('data-id');
-                const confirmDelete = document.getElementById('confirmDelete');
-                confirmDelete.href = `manage_teachers.php?delete_id=${teacherId}`;
+
+            // Form validation for search
+            $('#searchForm').validate({
+                rules: {
+                    searchInput: {
+                        maxlength: 100,
+                        regex: /^[a-zA-Z0-9\s\-\.\,\?\!]*$/ // Allow common characters
+                    }
+                },
+                messages: {
+                    searchInput: {
+                        maxlength: 'Search term cannot exceed 100 characters',
+                        regex: 'Search term contains invalid characters'
+                    }
+                },
+                errorElement: 'div',
+                errorClass: 'invalid-feedback',
+                highlight: function(element) {
+                    $(element).addClass('is-invalid');
+                },
+                unhighlight: function(element) {
+                    $(element).removeClass('is-invalid');
+                },
+                submitHandler: function(form) {
+                    // Search is handled client-side, so no submission needed
+                    return false;
+                }
+            });
+
+            // Initialize DataTables
+            $('#teachersTable').DataTable({
+                pageLength: 10,
+                searching: false, // Disable DataTables search since we use custom search
+                lengthChange: false,
+                columnDefs: [
+                    { orderable: false, targets: [4, 5] } // Disable sorting on Subjects and Actions
+                ],
+                language: {
+                    paginate: {
+                        previous: '« Previous',
+                        next: 'Next »'
+                    },
+                    emptyTable: '<div class="text-center py-4 empty-state"><i class="fas fa-users fa-3x mb-3"></i><h4>No Teachers Found</h4><p>Add a new teacher to get started.</p><a href="add_teacher.php" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Teacher</a></div>'
+                }
+            });
+
+            // Search functionality
+            $('#searchInput').on('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const rows = $('.teacher-row');
                 
-                const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                rows.each(function() {
+                    const text = $(this).text().toLowerCase();
+                    $(this).toggle(text.includes(searchTerm));
+                });
+                
+                // Update DataTable to reflect visible rows
+                $('#teachersTable').DataTable().draw();
+            });
+
+            // Delete confirmation
+            $('.delete-btn').on('click', function() {
+                const teacherId = $(this).data('id');
+                $('#confirmDelete').attr('href', `manage_teachers.php?delete_id=${teacherId}`);
+                
+                const modal = new bootstrap.Modal($('#deleteModal')[0]);
                 modal.show();
             });
+
+            // Auto-hide alerts after 5 seconds
+            setTimeout(() => {
+                $('.alert').each(function() {
+                    new bootstrap.Alert(this).close();
+                });
+            }, 5000);
         });
-        
-        // Auto-hide alerts after 5 seconds
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                new bootstrap.Alert(alert).close();
-            });
-        }, 5000);
-        document.querySelectorAll('.delete-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        if (confirm("Are you sure you want to delete this teacher?")) {
-            window.location.href = `manage_teachers.php?delete_id=${this.dataset.id}`;
-        }
-    });
-});
     </script>
 </body>
 </html>
