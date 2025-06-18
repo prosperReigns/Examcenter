@@ -88,10 +88,10 @@ while ($row = $questions_result->fetch_assoc()) {
 
     $detail_query = null;
     switch ($type) {
-        case 'single_choice':
+        case 'multiple_choice_sing':
             $detail_query = "SELECT option1, option2, option3, option4, image_path FROM single_choice_questions WHERE question_id = ?";
             break;
-        case 'multiple_choice':
+        case 'multiple_choice_mult':
             $detail_query = "SELECT option1, option2, option3, option4 FROM multiple_choice_questions WHERE question_id = ?";
             break;
         case 'true_false':
@@ -116,7 +116,7 @@ while ($row = $questions_result->fetch_assoc()) {
         $detail_stmt->close();
 
         // Handle image for single_choice
-        if ($type === 'single_choice' && !empty($detail['image_path'])) {
+        if ($type === 'multiple_choice_sing' && !empty($detail['image_path'])) {
             $image_path = $base_url . '/' . ltrim($detail['image_path'], '/');
             if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($detail['image_path'], '/'))) {
                 $image_html = "<div class='question-image mb-3'><img src='$image_path' class='img-fluid' alt='Question Image' onerror='this.src=\"/images/fallback.jpg\"; this.alt=\"Image not found\"'></div>";
@@ -468,7 +468,7 @@ $stmt->close();
                                         <?php echo $question['image_html']; ?>
                                         <p class="card-text"><?php echo htmlspecialchars($question['question_text']); ?></p>
 
-                                        <?php if ($question['question_type'] === 'single_choice'): ?>
+                                        <?php if ($question['question_type'] === 'multiple_choice_sing'): ?>
                                             <div class="options-container">
                                                 <?php for ($i = 1; $i <= 4; $i++): ?>
                                                     <?php if (!empty($question["option$i"])): ?>
