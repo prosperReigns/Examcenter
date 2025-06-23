@@ -1,8 +1,9 @@
+
 <?php
 session_start();
 require_once '../db.php';
 
-// Enable error reporting
+// Enable error reporting for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
@@ -78,7 +79,7 @@ $stmt->execute();
 $questions_result = $stmt->get_result();
 
 $questions = [];
-$base_url = 'http://localhost/Examcenter'; // Adjust to your server URL
+$base_url = 'http://localhost/EXAMCENTER'; // Adjusted to match case, ensure directory is 'EXAMCENTER'
 while ($row = $questions_result->fetch_assoc()) {
     $question_id = $row['id'];
     $type = $row['question_type'];
@@ -89,10 +90,10 @@ while ($row = $questions_result->fetch_assoc()) {
     $detail_query = null;
     switch ($type) {
         case 'multiple_choice_sing':
-            $detail_query = "SELECT option1, option2, option3, option4, image_path FROM single_choice_questions WHERE question_id = ?";
+            $detail_query = "SELECT option1, option2, option3, option4, image_path, correct_answer FROM single_choice_questions WHERE question_id = ?";
             break;
         case 'multiple_choice_mult':
-            $detail_query = "SELECT option1, option2, option3, option4 FROM multiple_choice_questions WHERE question_id = ?";
+            $detail_query = "SELECT option1, option2, option3, option4, correct_answer FROM multiple_choice_questions WHERE question_id = ?";
             break;
         case 'true_false':
             $detail_query = "SELECT correct_answer FROM true_false_questions WHERE question_id = ?";
@@ -117,11 +118,13 @@ while ($row = $questions_result->fetch_assoc()) {
 
         // Handle image for single_choice
         if ($type === 'multiple_choice_sing' && !empty($detail['image_path'])) {
-            $image_path = $base_url . '/' . ltrim($detail['image_path'], '/');
-            if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/' . ltrim($detail['image_path'], '/'))) {
+            $image_path = $base_url . '/' . $detail['image_path']; // Removed '../', corrected path
+            $file_path = $_SERVER['DOCUMENT_ROOT'] . '/EXAMCENTER/' . $detail['image_path']; // Ensure case matches directory
+            if (file_exists($file_path)) {
+                error_log("Image found at: $file_path");
                 $image_html = "<div class='question-image mb-3'><img src='$image_path' class='img-fluid' alt='Question Image' onerror='this.src=\"/images/fallback.jpg\"; this.alt=\"Image not found\"'></div>";
             } else {
-                error_log("Image not found: " . $detail['image_path']);
+                error_log("Image not found at: $file_path for path: " . $detail['image_path']);
                 $image_html = "<div class='question-image mb-3'><img src='/images/fallback.jpg' class='img-fluid' alt='Image not found'></div>";
             }
         }
@@ -161,227 +164,13 @@ $stmt->close();
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../css/all.min.css">
-    <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-            --warning: #ffc107;
-            --danger: #dc3545;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f8f9fa;
-            color: #212529;
-        }
-
-        .exam-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            padding: 1rem 0;
-            margin-bottom: 1.5rem;
-            border-bottom-left-radius: 20px;
-            border-bottom-right-radius: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .exam-container {
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.05);
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .question-card {
-            border-left: 4px solid var(--primary);
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            transition: all 0.3s;
-        }
-
-        .question-card:hover {
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .question-image img {
-            max-height: 300px;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-        }
-
-        .question-nav {
-            position: sticky;
-            top: 20px;
-        }
-
-        .question-boxes {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-            gap: 10px;
-            margin-top: 1rem;
-        }
-
-        .question-box {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 5px;
-            background-color: #e9ecef;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-        }
-
-        .question-box:hover {
-            background-color: #dee2e6;
-        }
-
-        .question-box.current {
-            background-color: var(--primary);
-            color: white;
-        }
-
-        .question-box.answered {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .question-box.flagged {
-            background-color: var(--warning);
-            color: #212529;
-        }
-
-        .timer-container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 1rem;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-            margin-bottom: 1.5rem;
-        }
-
-        .timer {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary);
-        }
-
-        .timer.warning {
-            color: var(--warning);
-        }
-
-        .timer.danger {
-            color: var(--danger);
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .calculator-btn {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .calculator-btn:hover {
-            background-color: var(--secondary);
-        }
-
-        .calculator-modal .btn {
-            min-width: 50px;
-            height: 50px;
-            font-size: 1.2rem;
-            margin: 0.2rem;
-        }
-
-        .option-label {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1.25rem;
-            border-radius: 5px;
-            transition: all 0.2s;
-            cursor: pointer;
-            border: 1px solid #dee2e6;
-            margin-bottom: 0.5rem;
-        }
-
-        .option-label:hover {
-            background-color: #f8f9fa;
-        }
-
-        .option-input {
-            margin-right: 10px;
-        }
-
-        .navigation-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 2rem;
-        }
-
-        .btn-submit {
-            background-color: #28a745;
-            border-color: #28a745;
-        }
-
-        .btn-submit:hover {
-            background-color: #218838;
-            border-color: #1e7e34;
-        }
-
-        .full-screen-warning {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.9);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            display: none;
-        }
-
-        .question-container {
-            display: none;
-        }
-
-        .question-container.active {
-            display: block;
-        }
-
-        @media (max-width: 768px) {
-            .exam-header {
-                border-radius: 0;
-            }
-            .question-nav {
-                position: static;
-                margin-bottom: 1.5rem;
-            }
-            .question-boxes {
-                grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
-            }
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@10.6.4/lib/browser/math.js"></script>
+    <link rel="stylesheet" href="../css/take_exam.css">
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@10.6.4/lib/browser/math.js"></script>
+    
 </head>
 <body>
-    <!-- Full screen warning -->
+   <!-- Full screen warning -->
     <div class="full-screen-warning" id="fullscreenWarning">
         <h2><i class="bi bi-exclamation-triangle-fill"></i> Warning!</h2>
         <p>You have exited full screen mode. Please return to full screen to continue your exam.</p>
@@ -563,33 +352,63 @@ $stmt->close();
                 </div>
                 <div class="modal-body">
                     <input type="text" id="calcDisplay" readonly class="form-control mb-3" value="0">
-                    <div class="d-flex flex-wrap justify-content-center">
-                        <button class="btn btn-secondary" onclick="calcClear()">C</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('(')">(</button>
-                        <button class="btn btn-secondary" onclick="calcAppend(')')">)</button>
-                        <button class="btn btn-secondary" onclick="calcFunction('sqrt')">√</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('/')">÷</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('7')">7</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('8')">8</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('9')">9</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('*')">×</button>
-                        <button class="btn btn-secondary" onclick="calcFunction('sin')">sin</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('4')">4</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('5')">5</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('6')">6</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('-')">-</button>
-                        <button class="btn btn-secondary" onclick="calcFunction('cos')">cos</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('1')">1</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('2')">2</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('3')">3</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('+')">+</button>
-                        <button class="btn btn-secondary" onclick="calcFunction('tan')">tan</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('0')">0</button>
-                        <button class="btn btn-secondary" onclick="calcAppend('.')">.</button>
-                        <button class="btn btn-secondary" onclick="calcBackspace()">←</button>
-                        <button class="btn btn-primary" onclick="calcEvaluate()">=</button>
-                        <button class="btn btn-secondary" onclick="calcFunction('log')">log</button>
-                    </div>
+                    <div class="container" style="max-width: 320px;">
+<div class="container" style="max-width: 320px;">
+  <div class="row g-2">
+    <!-- Row 1: Clear, Backspace, Parentheses, Divide -->
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcClear()">C</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcBackspace()">←</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('(')">(</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend(')')">)</button></div>
+
+    <!-- Row 2: Square Root, Power, Factorial, Divide -->
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('sqrt')">√</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('pow')">x²</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('fact')">x!</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('/')">÷</button></div>
+
+    <!-- Row 3: sin, cos, tan, multiply -->
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('sin')">sin</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('cos')">cos</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('tan')">tan</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('*')">×</button></div>
+
+    <!-- Row 4: log, π, minus -->
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('log')">log</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('pi')">π</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('-')">-</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('+')">+</button></div>
+
+    <!-- Row 5: Numbers -->
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('7')">7</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('8')">8</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('9')">9</button></div>
+    <div class="col-3"></div> <!-- Empty column for alignment -->
+
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('4')">4</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('5')">5</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('6')">6</button></div>
+    <div class="col-3"></div>
+
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('1')">1</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('2')">2</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('3')">3</button></div>
+    <div class="col-3"></div>
+
+    <!-- Row 6: Zero, Dot -->
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('0')">0</button></div>
+    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('.')">.</button></div>
+    <div class="col-6"></div>
+
+    <!-- Row 7: Equal Button Full Width -->
+    <div class="col-12">
+      <button class="btn btn-primary w-100" onclick="calcEvaluate()">=</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
                 </div>
             </div>
         </div>
@@ -681,70 +500,103 @@ $stmt->close();
             questionBoxes[index].classList.add('flagged');
         }
 
-        // Calculator
-        let calcExpression = '';
-        function calcAppend(char) {
-            try {
-                calcExpression += char;
-                document.getElementById('calcDisplay').value = calcExpression;
-                console.log('Appended:', char);
-            } catch (e) {
-                console.error('Calc append error:', e);
-            }
-        }
+        // math-calc.js
+// math-calc.js
+let calcExpression = '';
 
-        function calcClear() {
-            try {
-                calcExpression = '';
-                document.getElementById('calcDisplay').value = '0';
-                console.log('Calculator cleared');
-            } catch (e) {
-                console.error('Calc clear error:', e);
-            }
-        }
+function calcAppend(char) {
+  try {
+    // Handle special values
+    if (char === 'pi') char = 'π';
+    // Prevent multiple decimals or invalid operators
+    if (char === '.' && calcExpression.slice(-1) === '.') return false;
+    calcExpression += char;
+    updateDisplay();
+  } catch (e) {
+    console.error('calcAppend error:', e);
+    updateDisplay('Error');
+  }
+}
 
-        function calcBackspace() {
-            try {
-                calcExpression = calcExpression.slice(0, -1);
-                document.getElementById('calcDisplay').value = calcExpression || '0';
-                console.log('Backspace');
-            } catch (e) {
-                console.error('Calc backspace error:', e);
-            }
-        }
+function calcClear() {
+  try {
+    calcExpression = '';
+    updateDisplay('0');
+  } catch (e) {
+    console.error('calcClear error:', e);
+  }
+}
 
-        function calcFunction(func) {
-            try {
-                let value = parseFloat(calcExpression) || 0;
-                switch (func) {
-                    case 'sin': value = Math.sin(value * Math.PI / 180); break;
-                    case 'cos': value = Math.cos(value * Math.PI / 180); break;
-                    case 'tan': value = Math.tan(value * Math.PI / 180); break;
-                    case 'sqrt': value = Math.sqrt(value); break;
-                    case 'log': value = Math.log10(value); break;
-                }
-                calcExpression = value.toString();
-                document.getElementById('calcDisplay').value = calcExpression;
-                console.log('Function applied:', func, value);
-            } catch (e) {
-                calcExpression = '';
-                document.getElementById('calcDisplay').value = 'Error';
-                console.error('Calc function error:', e);
-            }
-        }
+function calcBackspace() {
+  try {
+    calcExpression = calcExpression.slice(0, -1);
+    updateDisplay(calcExpression || '0');
+  } catch (e) {
+    console.error('calcBackspace error:', e);
+  }
+}
 
-        function calcEvaluate() {
-            try {
-                const result = eval(calcExpression.replace(/[^-()\d/*+.\s]/g, ''));
-                calcExpression = result.toString();
-                document.getElementById('calcDisplay').value = calcExpression;
-                console.log('Evaluated:', result);
-            } catch (e) {
-                calcExpression = '';
-                document.getElementById('calcDisplay').value = 'Error';
-                console.error('Calc evaluate error:', e);
-            }
-        }
+function calcFunction(func) {
+  try {
+    // Ensure a valid base expression for pow and fact
+    const lastChar = calcExpression.slice(-1);
+    const isNumberOrClose = /[0-9)]/.test(lastChar);
+
+    // Add function syntax
+    if (['sin', 'cos', 'tan'].includes(func)) {
+      calcExpression += `${func}(`;
+    } else if (func === 'sqrt') {
+      calcExpression += 'sqrt(';
+    } else if (func === 'log') {
+      calcExpression += 'log10(';
+    } else if (func === 'pow' && isNumberOrClose) {
+      calcExpression += '^2';
+    } else if (func === 'fact' && isNumberOrClose) {
+      calcExpression += '!';
+    } else {
+      return; // Ignore invalid operations
+    }
+    updateDisplay();
+  } catch (e) {
+    console.error('calcFunction error:', e);
+    updateDisplay('Error');
+  }
+}
+
+function calcEvaluate() {
+  try {
+    let expr = calcExpression
+      .replace(/π/g, `${Math.PI}`)
+      // Handle factorial
+      .replace(/([0-9.]+)!/g, 'factorial($1)')
+      // Handle trigonometric functions with degree inputs
+      .replace(/(sin|cos|tan)\(([^)]+)\)/g, (match, func, arg) => {
+        return `${func}(${arg} * pi / 180)`;
+      });
+
+    // Evaluate using math.js
+    const result = math.evaluate(expr);
+    if (isNaN(result) || result === Infinity || result === -Infinity) {
+      throw new Error('Invalid result');
+    }
+    calcExpression = result.toString();
+    updateDisplay();
+  } catch (e) {
+    console.error('calcEvaluate error:', e);
+    calcExpression = '';
+    updateDisplay('Error');
+  }
+}
+
+function updateDisplay(val = null) {
+  try {
+    document.getElementById('calcDisplay').value = val === null ? calcExpression : val;
+  } catch (e) {
+    console.error('updateDisplay error:', e);
+  }
+}
+
+ 
 
         // Full Screen Control
         function requestFullscreen() {
@@ -786,7 +638,6 @@ $stmt->close();
                 requestFullscreen();
                 startTimer();
                 showQuestion(0);
-                console.log('Exam initialized');
             } catch (e) {
                 console.error('Initialization error:', e);
             }
