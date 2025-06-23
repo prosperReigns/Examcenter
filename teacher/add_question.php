@@ -256,14 +256,14 @@ try {
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_question'])) {
         $question_id = (int)($_POST['question_id'] ?? 0);
         $question_type = $_POST['question_type'] ?? '';
-        $valid_types = ['multiple_choice_sing', 'multiple_choice_mult', 'true_false', 'fill_blanks'];
+        $valid_types = ['multiple_choice_single', 'multiple_choice_multiple', 'true_false', 'fill_blanks'];
 
         if ($question_id <= 0 || !in_array($question_type, $valid_types)) {
             $error = "Invalid question ID or type.";
         } else {
             $table_map = [
-                'multiple_choice_sing' => 'single_choice_questions',
-                'multiple_choice_mult' => 'multiple_choice_questions',
+                'multiple_choice_single' => 'single_choice_questions',
+                'multiple_choice_multiple' => 'multiple_choice_questions',
                 'true_false' => 'true_false_questions',
                 'fill_blanks' => 'fill_blank_questions',
             ];
@@ -344,10 +344,10 @@ try {
                 if ($edit_question) {
                     $sql = '';
                     switch ($edit_question['question_type']) {
-                        case 'multiple_choice_sing':
+                        case 'multiple_choice_single':
                             $sql = "SELECT option1, option2, option3, option4, correct_answer, image_path FROM single_choice_questions WHERE question_id = ?";
                             break;
-                        case 'multiple_choice_mult':
+                        case 'multiple_choice_multiple':
                             $sql = "SELECT option1, option2, option3, option4, correct_answers, image_path FROM multiple_choice_questions WHERE question_id = ?";
                             break;
                         case 'true_false':
@@ -417,7 +417,7 @@ try {
             $question_text = trim($_POST['question'] ?? '');
             $question_type = trim($_POST['question_type'] ?? '');
 
-            if (empty($question_text) || empty($question_type) || !in_array($question_type, ['multiple_choice_sing', 'multiple_choice_mult', 'true_false', 'fill_blanks'])) {
+            if (empty($question_text) || empty($question_type) || !in_array($question_type, ['multiple_choice_single', 'multiple_choice_multiple', 'true_false', 'fill_blanks'])) {
                 $error = "Question text and valid type are required.";
             } else {
                 $stmt = $conn->prepare("SELECT class, subject FROM tests WHERE id = ?");
@@ -440,7 +440,7 @@ try {
                         // Handle image
                         $image_path = null;
                         if (isset($_POST['remove_image']) && $_POST['remove_image'] === 'on' && $question_id) {
-                            $table = $question_type === 'multiple_choice_sing' ? 'single_choice_questions' : 'multiple_choice_questions';
+                            $table = $question_type === 'multiple_choice_single' ? 'single_choice_questions' : 'multiple_choice_questions';
                             $stmt = $conn->prepare("SELECT image_path FROM $table WHERE question_id = ?");
                             if ($stmt) {
                                 $stmt->bind_param("i", $question_id);
@@ -476,8 +476,8 @@ try {
 
                                 // Delete existing options
                                 $table_map = [
-                                    'multiple_choice_sing' => 'single_choice_questions',
-                                    'multiple_choice_mult' => 'multiple_choice_questions',
+                                    'multiple_choice_single' => 'single_choice_questions',
+                                    'multiple_choice_multiple' => 'multiple_choice_questions',
                                     'true_false' => 'true_false_questions',
                                     'fill_blanks' => 'fill_blank_questions',
                                 ];
@@ -492,7 +492,7 @@ try {
                                 }
 
                                 switch ($question_type) {
-                                    case 'multiple_choice_sing':
+                                    case 'multiple_choice_single':
                                         $option1 = trim($_POST['option1'] ?? '');
                                         $option2 = trim($_POST['option2'] ?? '');
                                         $option3 = trim($_POST['option3'] ?? '');
@@ -510,7 +510,7 @@ try {
                                         }
                                         break;
 
-                                    case 'multiple_choice_mult':
+                                    case 'multiple_choice_multiple':
                                         $option1 = trim($_POST['option1'] ?? '');
                                         $option2 = trim($_POST['option2'] ?? '');
                                         $option3 = trim($_POST['option3'] ?? '');
@@ -733,8 +733,8 @@ $conn->close();
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Type</label>
                                 <select class="form-select form-select-lg" name="question_type" id="questionType" required>
-                                    <option value="multiple_choice_sing" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_sing') ? 'selected' : ''; ?>>Single Choice Question</option>
-                                    <option value="multiple_choice_mult" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_mult') ? 'selected' : ''; ?>>Multiple Choice Question</option>
+                                    <option value="multiple_choice_single" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_single') ? 'selected' : ''; ?>>Single Choice Question</option>
+                                    <option value="multiple_choice_multiple" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_multiple') ? 'selected' : ''; ?>>Multiple Choice Question</option>
                                     <option value="true_false" <?php echo ($edit_question && $edit_question['question_type'] == 'true_false') ? 'selected' : ''; ?>>True/False</option>
                                     <option value="fill_blanks" <?php echo ($edit_question && $edit_question['question_type'] == 'fill_blanks') ? 'selected' : ''; ?>>Fill in Blanks</option>
                                 </select>
@@ -815,7 +815,7 @@ $conn->close();
                                 <div class="mt-2">
                                     <?php
                                     switch ($question['question_type']) {
-                                        case 'multiple_choice_sing':
+                                        case 'multiple_choice_single':
                                             $stmt = $conn->prepare("SELECT option1, option2, option3, option4, correct_answer, image_path FROM single_choice_questions WHERE question_id = ?");
                                             $stmt->bind_param("i", $question['id']);
                                             $stmt->execute();
@@ -831,7 +831,7 @@ $conn->close();
                                                      htmlspecialchars($options[$opt] ?? '') . "</div>";
                                             }
                                             break;
-                                        case 'multiple_choice_mult':
+                                        case 'multiple_choice_multiple':
                                             $stmt = $conn->prepare("SELECT option1, option2, option3, option4, correct_answers, image_path FROM multiple_choice_questions WHERE question_id = ?");
                                             $stmt->bind_param("i", $question['id']);
                                             $stmt->execute();
@@ -887,7 +887,7 @@ $conn->close();
     <script>
         const editData = <?php echo json_encode($edit_data); ?>;
         const questionTemplates = {
-            multiple_choice_sing: `
+            multiple_choice_single: `
                 <div class="mb-3">
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
                         <i class="fas fa-image"></i> Add Image to Question
@@ -926,7 +926,7 @@ $conn->close();
                     </div>
                 </div>
             `,
-            multiple_choice_mult: `
+            multiple_choice_multiple: `
                 <div class="mb-3">
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleImageBtn">
                         <i class="fas fa-image"></i> Add Image to Question
@@ -1061,7 +1061,7 @@ $conn->close();
                     option3: { required: { depends: () => $('#questionType').val().startsWith('multiple_choice') } },
                     option4: { required: { depends: () => $('#questionType').val().startsWith('multiple_choice') } },
                     correct_answer: { required: true },
-                    'correct_answers[]': { required: { depends: () => $('#questionType').val() === 'multiple_choice_mult' } }
+                    'correct_answers[]': { required: { depends: () => $('#questionType').val() === 'multiple_choice_multiple' } }
                 },
                 messages: {
                     'correct_answers[]': "At least one correct answer is required."

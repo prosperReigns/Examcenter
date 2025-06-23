@@ -112,10 +112,10 @@ while ($row = $questions_result->fetch_assoc()) {
 
     $detail_query = null;
     switch ($type) {
-        case 'multiple_choice_sing':
+        case 'multiple_choice_single':
             $detail_query = "SELECT option1, option2, option3, option4, image_path, correct_answer FROM single_choice_questions WHERE question_id = ?";
             break;
-        case 'multiple_choice_mult':
+        case 'multiple_choice_multiple':
             $detail_query = "SELECT option1, option2, option3, option4, correct_answer FROM multiple_choice_questions WHERE question_id = ?";
             break;
         case 'true_false':
@@ -140,7 +140,7 @@ while ($row = $questions_result->fetch_assoc()) {
         $detail_stmt->close();
 
         // Handle image for single_choice
-        if ($type === 'multiple_choice_sing' && !empty($detail['image_path'])) {
+        if ($type === 'multiple_choice_single' && !empty($detail['image_path'])) {
             $image_path = $base_url . '/' . $detail['image_path'];
             $file_path = $_SERVER['DOCUMENT_ROOT'] . '/EXAMCENTER/' . $detail['image_path'];
             if (file_exists($file_path)) {
@@ -540,7 +540,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                                         <?php echo $question['image_html']; ?>
                                         <p class="card-text"><?php echo htmlspecialchars($question['question_text']); ?></p>
 
-                                        <?php if ($question['question_type'] === 'multiple_choice_sing'): ?>
+                                        <?php if ($question['question_type'] === 'multiple_choice_single'): ?>
                                             <div class="options-container">
                                                 <?php for ($i = 1; $i <= 4; $i++): ?>
                                                     <?php if (!empty($question["option$i"])): ?>
@@ -556,7 +556,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                                                     <?php endif; ?>
                                                 <?php endfor; ?>
                                             </div>
-                                        <?php elseif ($question['question_type'] === 'multiple_choice_mult'): ?>
+                                        <?php elseif ($question['question_type'] === 'multiple_choice_multiple'): ?>
                                             <div class="options-container">
                                                 <?php for ($i = 1; $i <= 4; $i++): ?>
                                                     <?php if (!empty($question["option$i"])): ?>
@@ -794,7 +794,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             markAnswered(index);
             const data = new FormData();
             data.append('question_id', questionId);
-            data.append('answer', questionType === 'multiple_choice_mult' ? `[${answer}]` : answer);
+            data.append('answer', questionType === 'multiple_choice_multiple' ? `[${answer}]` : answer);
             data.append('user_id', <?php echo $user_id; ?>);
             data.append('test_id', <?php echo $test_id; ?>);
             data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
