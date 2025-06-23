@@ -149,3 +149,19 @@ CREATE TABLE true_false_questions (
     question_id INT,
     correct_answer BOOLEAN
 );
+
+16. CREATE TABLE exam_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    test_id INT NOT NULL,
+    question_id INT NOT NULL,
+    answer TEXT, -- JSON or comma-separated for multiple-choice multi
+    is_flagged TINYINT(1) DEFAULT 0,
+    time_left INT NOT NULL,
+    current_index INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_attempt (user_id, test_id, question_id)
+);
+
+UPDATE settings SET setting_value = '1' WHERE setting_name = 'show_results_immediately';

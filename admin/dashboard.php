@@ -341,6 +341,15 @@ function time_ago($datetime) {
                 margin-left: 0;
             }
         }
+        .badge-passed {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-failed {
+    background-color: #dc3545;
+    color: white;
+}
     </style>
 </head>
 <body>
@@ -486,14 +495,15 @@ function time_ago($datetime) {
                                 <td><?php echo date('M j, Y', strtotime($result['created_at'])); ?></td>
                                 <td><?php echo round($result['score'], 1); ?>%</td>
                                 <td><?php echo htmlspecialchars($result['class']); ?></td>
-                                <td>
-                                    <span class="badge <?php 
-                                        echo $result['status'] === 'Passed' ? 'badge-passed' : 
-                                            ($result['status'] === 'Failed' ? 'badge-failed' : 'badge-pending');
-                                    ?>">
-                                        <?php echo htmlspecialchars($result['status']); ?>
-                                    </span>
-                                </td>
+                       <td>
+    <span class="badge <?php 
+        echo $result['score'] >= 50 ? 'badge-passed' : 'badge-failed';
+    ?>">
+        <?php echo $result['score'] >= 50 ? 'Passed' : 'Failed'; ?>
+    </span>
+</td>
+
+
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

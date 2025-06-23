@@ -9,6 +9,11 @@ ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 ini_set('error_log', '../logs/errors.log');
 
+// DISABLE CAHING
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 // Check if student is logged in
 if (!isset($_SESSION['student_id'], $_SESSION['student_class'], $_SESSION['student_subject'], $_SESSION['test_title'], $_SESSION['student_name'])) {
     error_log("Session missing: Redirecting to register.php");
@@ -68,6 +73,24 @@ if ($attempt && !$attempt['reattempt_approved']) {
     die("You have already taken this exam. Contact your administrator to retake it.");
 }
 
+// Initialize exam attempt
+$stmt = $conn->prepare("SELECT time_left, current_index FROM exam_attempts WHERE user_id = ? AND test_id = ? LIMIT 1");
+$stmt->bind_param("ii", $user_id, $test_id);
+$stmt->execute();
+$attempt_result = $stmt->get_result();
+$exam_state = $attempt_result->fetch_assoc();
+$stmt->close();
+
+$time_left = $exam_state ? $exam_state['time_left'] : $exam_duration;
+$current_index = $exam_state ? (int)$exam_state['current_index'] : 0;
+
+if (!$exam_state) {
+    $stmt = $conn->prepare("INSERT INTO exam_attempts (user_id, test_id, time_left, current_index) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("iiii", $user_id, $test_id, $exam_duration, $current_index);
+    $stmt->execute();
+    $stmt->close();
+}
+
 // Get questions for the test
 $stmt = $conn->prepare("SELECT * FROM new_questions WHERE test_id = ? ORDER BY RAND()");
 if ($stmt === false) {
@@ -79,7 +102,7 @@ $stmt->execute();
 $questions_result = $stmt->get_result();
 
 $questions = [];
-$base_url = 'http://localhost/EXAMCENTER'; // Adjusted to match case, ensure directory is 'EXAMCENTER'
+$base_url = 'http://localhost/EXAMCENTER';
 while ($row = $questions_result->fetch_assoc()) {
     $question_id = $row['id'];
     $type = $row['question_type'];
@@ -118,11 +141,11 @@ while ($row = $questions_result->fetch_assoc()) {
 
         // Handle image for single_choice
         if ($type === 'multiple_choice_sing' && !empty($detail['image_path'])) {
-            $image_path = $base_url . '/' . $detail['image_path']; // Removed '../', corrected path
-            $file_path = $_SERVER['DOCUMENT_ROOT'] . '/EXAMCENTER/' . $detail['image_path']; // Ensure case matches directory
+            $image_path = $base_url . '/' . $detail['image_path'];
+            $file_path = $_SERVER['DOCUMENT_ROOT'] . '/EXAMCENTER/' . $detail['image_path'];
             if (file_exists($file_path)) {
                 error_log("Image found at: $file_path");
-                $image_html = "<div class='question-image mb-3'><img src='$image_path' class='img-fluid' alt='Question Image' onerror='this.src=\"/images/fallback.jpg\"; this.alt=\"Image not found\"'></div>";
+                $image_html = "<div class='question-image mb-3'><img src='$image_path' class='img-fluid zoomable' alt='Question Image' onclick='openImageModal(this.src)' onerror='this.src=\"/images/fallback.jpg\"; this.alt=\"Image not found\"'></div>";
             } else {
                 error_log("Image not found at: $file_path for path: " . $detail['image_path']);
                 $image_html = "<div class='question-image mb-3'><img src='/images/fallback.jpg' class='img-fluid' alt='Image not found'></div>";
@@ -130,9 +153,22 @@ while ($row = $questions_result->fetch_assoc()) {
         }
     }
 
-    $questions[] = array_merge($row, $detail ?? [], ['image_html' => $image_html]);
+    // Load saved answer and flagged status
+$answer_stmt = $conn->prepare("SELECT answer, is_flagged FROM exam_attempts WHERE user_id = ? AND test_id = ? AND question_id = ?");
+$answer_stmt->bind_param("iii", $user_id, $test_id, $question_id);
+$answer_stmt->execute();
+$answer_result = $answer_stmt->get_result();
+$saved_answer = $answer_result->fetch_assoc();
+$answer_stmt->close();
+
+
+    $questions[] = array_merge($row, $detail ?? [], [
+        'image_html' => $image_html,
+        'saved_answer' => $saved_answer['answer'] ?? null,
+        'is_flagged' => $saved_answer['is_flagged'] ?? 0
+    ]);
 }
-$stmt->close();
+
 
 if (empty($questions)) {
     error_log("No questions found for test_id=$test_id");
@@ -153,6 +189,9 @@ $stmt->execute();
 $result = $stmt->get_result();
 $show_results = $result->fetch_assoc()['setting_value'] ?? 0;
 $stmt->close();
+
+// Generate CSRF token
+$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 ?>
 
 <!DOCTYPE html>
@@ -165,16 +204,257 @@ $stmt->close();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/mathjs@10.6.4/lib/browser/math.js"></script>
-    <link rel="stylesheet" href="../css/take_exam.css">
-    <script src="https://cdn.jsdelivr.net/npm/mathjs@10.6.4/lib/browser/math.js"></script>
-    
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --warning: #ffc107;
+            --danger: #dc3545;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+
+        .exam-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 1rem 0;
+            margin-bottom: 1.5rem;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .exam-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .question-card {
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .question-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .question-image img {
+            max-width: 100%;
+            width: auto;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+        }
+
+        .question-nav {
+            position: sticky;
+            top: 20px;
+        }
+
+        .question-boxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            gap: 10px;
+            margin-top: 1rem;
+        }
+
+        .question-box {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            background-color: #e9ecef;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .question-box:hover {
+            background-color: #dee2e6;
+        }
+
+        .question-box.current {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .question-box.answered {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .question-box.flagged {
+            background-color: var(--warning);
+            color: #212529;
+        }
+
+        .timer-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+        }
+
+        .timer {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .timer.warning {
+            color: var(--warning);
+        }
+
+        .timer.danger {
+            color: var(--danger);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .calculator-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .calculator-btn:hover {
+            background-color: var(--secondary);
+        }
+
+        .calculator-modal .btn {
+            min-width: 50px;
+            height: 50px;
+            font-size: 1.2rem;
+            margin: 0.2rem;
+        }
+
+        .option-label {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1.25rem;
+            border-radius: 5px;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            margin-bottom: 0.5rem;
+        }
+
+        .option-label:hover {
+            background-color: #f8f9fa;
+        }
+
+        .option-input {
+            margin-right: 10px;
+        }
+
+        .navigation-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+        }
+
+        .btn-submit {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+
+        .btn-submit:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+
+        .full-screen-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            display: none;
+        }
+
+        .question-container {
+            display: none;
+        }
+
+        .question-container.active {
+            display: block;
+        }
+
+        #imageModal img {
+            max-width: 90%;
+            max-height: 90vh;
+            margin: auto;
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .exam-header {
+                border-radius: 0;
+            }
+            .question-nav {
+                position: static;
+                margin-bottom: 1.5rem;
+            }
+            .question-boxes {
+                grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
+            }
+        }
+    </style>
 </head>
 <body>
-   <!-- Full screen warning -->
+    <!-- Full screen warning -->
     <div class="full-screen-warning" id="fullscreenWarning">
         <h2><i class="bi bi-exclamation-triangle-fill"></i> Warning!</h2>
         <p>You have exited full screen mode. Please return to full screen to continue your exam.</p>
         <button class="btn btn-primary mt-3" onclick="requestFullscreen()">Return to Full Screen</button>
+    </div>
+
+    CHECK HELP.TXT FILE!!!!!!!!
+
+    <!-- Image Zoom Modal -->
+    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel">Image Zoom</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <img id="zoomedImage" src="" alt="Zoomed Image">
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Exam Header -->
@@ -196,7 +476,7 @@ $stmt->close();
             </div>
         </div>
     </div>
-
+        CHECK HELP.TXT FILE A NEW TABLE WAS CREATED!!!
     <div class="container">
         <div class="row">
             <!-- Question Navigation -->
@@ -209,7 +489,7 @@ $stmt->close();
                         <div class="card-body">
                             <div class="question-boxes" id="questionBoxes">
                                 <?php foreach ($questions as $index => $question): ?>
-                                    <div class="question-box <?php echo $index === 0 ? 'current' : ''; ?>" 
+                                    <div class="question-box <?php echo $index === $current_index ? 'current' : ''; ?> <?php echo $question['saved_answer'] ? 'answered' : ''; ?> <?php echo $question['is_flagged'] ? 'flagged' : ''; ?>" 
                                          data-index="<?php echo $index; ?>" 
                                          onclick="goToQuestion(<?php echo $index; ?>)">
                                         <?php echo $index + 1; ?>
@@ -248,8 +528,11 @@ $stmt->close();
                     <div class="alert alert-warning">No questions available for this test.</div>
                 <?php else: ?>
                     <form method="POST" action="submit_exam.php" id="examForm">
+                        <input type="hidden" name="test_id" value="<?php echo $test_id; ?>">
+                        <input type="hidden" name="user_id" value="<?php echo $user_id; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <?php foreach ($questions as $index => $question): ?>
-                            <div class="question-container <?php echo $index === 0 ? 'active' : ''; ?>" 
+                            <div class="question-container <?php echo $index === $current_index ? 'active' : ''; ?>" 
                                  data-index="<?php echo $index; ?>" id="question-<?php echo $index; ?>">
                                 <div class="question-card card mb-4">
                                     <div class="card-body">
@@ -266,13 +549,14 @@ $stmt->close();
                                                                    name="answers[<?php echo $question['id']; ?>]"
                                                                    id="q<?php echo $question['id']; ?>_opt<?php echo $i; ?>"
                                                                    value="<?php echo $i; ?>"
-                                                                   onchange="markAnswered(<?php echo $index; ?>)">
+                                                                   <?php echo $question['saved_answer'] == $i ? 'checked' : ''; ?>
+                                                                   onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                             <?php echo htmlspecialchars($question["option$i"]); ?>
                                                         </label>
                                                     <?php endif; ?>
                                                 <?php endfor; ?>
                                             </div>
-                                        <?php elseif ($question['question_type'] === 'multiple_choice'): ?>
+                                        <?php elseif ($question['question_type'] === 'multiple_choice_mult'): ?>
                                             <div class="options-container">
                                                 <?php for ($i = 1; $i <= 4; $i++): ?>
                                                     <?php if (!empty($question["option$i"])): ?>
@@ -281,7 +565,8 @@ $stmt->close();
                                                                    name="answers[<?php echo $question['id']; ?>][]"
                                                                    id="q<?php echo $question['id']; ?>_opt<?php echo $i; ?>"
                                                                    value="<?php echo $i; ?>"
-                                                                   onchange="markAnswered(<?php echo $index; ?>)">
+                                                                   <?php echo in_array($i, json_decode($question['saved_answer'] ?? '[]', true)) ? 'checked' : ''; ?>
+                                                                   onchange="saveAnswer(<?php echo $question['id']; ?>, getCheckboxValues(<?php echo $question['id']; ?>), '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                             <?php echo htmlspecialchars($question["option$i"]); ?>
                                                         </label>
                                                     <?php endif; ?>
@@ -294,7 +579,8 @@ $stmt->close();
                                                            name="answers[<?php echo $question['id']; ?>]"
                                                            id="q<?php echo $question['id']; ?>_true"
                                                            value="True"
-                                                           onchange="markAnswered(<?php echo $index; ?>)">
+                                                           <?php echo $question['saved_answer'] === 'True' ? 'checked' : ''; ?>
+                                                           onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                     True
                                                 </label>
                                                 <label class="option-label">
@@ -302,7 +588,8 @@ $stmt->close();
                                                            name="answers[<?php echo $question['id']; ?>]"
                                                            id="q<?php echo $question['id']; ?>_false"
                                                            value="False"
-                                                           onchange="markAnswered(<?php echo $index; ?>)">
+                                                           <?php echo $question['saved_answer'] === 'False' ? 'checked' : ''; ?>
+                                                           onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                     False
                                                 </label>
                                             </div>
@@ -312,13 +599,14 @@ $stmt->close();
                                                        name="answers[<?php echo $question['id']; ?>]"
                                                        id="q<?php echo $question['id']; ?>_answer"
                                                        placeholder="Type your answer here"
-                                                       oninput="markAnswered(<?php echo $index; ?>)">
+                                                       value="<?php echo htmlspecialchars($question['saved_answer'] ?? ''); ?>"
+                                                       oninput="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                             </div>
                                         <?php endif; ?>
 
                                         <button type="button" class="btn btn-warning btn-sm mt-2"
-                                                onclick="flagQuestion(<?php echo $index; ?>)">
-                                            <i class="bi bi-flag-fill"></i> Flag for Review
+                                                onclick="flagQuestion(<?php echo $question['id']; ?>, <?php echo $index; ?>, <?php echo $question['is_flagged'] ? 0 : 1; ?>)">
+                                            <i class="bi bi-flag-fill"></i> <?php echo $question['is_flagged'] ? 'Unflag' : 'Flag for Review'; ?>
                                         </button>
                                     </div>
                                 </div>
@@ -353,62 +641,41 @@ $stmt->close();
                 <div class="modal-body">
                     <input type="text" id="calcDisplay" readonly class="form-control mb-3" value="0">
                     <div class="container" style="max-width: 320px;">
-<div class="container" style="max-width: 320px;">
-  <div class="row g-2">
-    <!-- Row 1: Clear, Backspace, Parentheses, Divide -->
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcClear()">C</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcBackspace()">←</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('(')">(</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend(')')">)</button></div>
-
-    <!-- Row 2: Square Root, Power, Factorial, Divide -->
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('sqrt')">√</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('pow')">x²</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('fact')">x!</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('/')">÷</button></div>
-
-    <!-- Row 3: sin, cos, tan, multiply -->
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('sin')">sin</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('cos')">cos</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('tan')">tan</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('*')">×</button></div>
-
-    <!-- Row 4: log, π, minus -->
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('log')">log</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('pi')">π</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('-')">-</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('+')">+</button></div>
-
-    <!-- Row 5: Numbers -->
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('7')">7</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('8')">8</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('9')">9</button></div>
-    <div class="col-3"></div> <!-- Empty column for alignment -->
-
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('4')">4</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('5')">5</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('6')">6</button></div>
-    <div class="col-3"></div>
-
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('1')">1</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('2')">2</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('3')">3</button></div>
-    <div class="col-3"></div>
-
-    <!-- Row 6: Zero, Dot -->
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('0')">0</button></div>
-    <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('.')">.</button></div>
-    <div class="col-6"></div>
-
-    <!-- Row 7: Equal Button Full Width -->
-    <div class="col-12">
-      <button class="btn btn-primary w-100" onclick="calcEvaluate()">=</button>
-    </div>
-  </div>
-</div>
-
-</div>
-
+                        <div class="row g-2">
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcClear()">C</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcBackspace()">←</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('(')">(</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend(')')">)</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('sqrt')">√</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('pow')">x²</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('fact')">x!</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('/')">÷</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('sin')">sin</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('cos')">cos</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('tan')">tan</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('*')">×</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcFunction('log')">log</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('pi')">π</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('-')">-</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('+')">+</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('7')">7</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('8')">8</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('9')">9</button></div>
+                            <div class="col-3"></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('4')">4</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('5')">5</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('6')">6</button></div>
+                            <div class="col-3"></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('1')">1</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('2')">2</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('3')">3</button></div>
+                            <div class="col-3"></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('0')">0</button></div>
+                            <div class="col-3"><button class="btn btn-secondary w-100" onclick="calcAppend('.')">.</button></div>
+                            <div class="col-6"></div>
+                            <div class="col-12"><button class="btn btn-primary w-100" onclick="calcEvaluate()">=</button></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -416,7 +683,7 @@ $stmt->close();
 
     <script src="../js/bootstrap.bundle.min.js"></script>
     <script>
-        let currentIndex = 0;
+        let currentIndex = <?php echo $current_index; ?>;
         const totalQuestions = <?php echo count($questions); ?>;
         const containers = document.querySelectorAll('.question-container');
         const questionBoxes = document.querySelectorAll('.question-box');
@@ -425,16 +692,17 @@ $stmt->close();
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
         const submitBtn = document.getElementById('submitBtn');
-        let timeLeft = <?php echo $exam_duration; ?>;
+        let timeLeft = <?php echo $time_left; ?>;
         let timerWarning = false;
         let timerDanger = false;
+        let tabSwitchCount = 0;
 
         // Timer
         function startTimer() {
             const interval = setInterval(() => {
                 if (timeLeft <= 0) {
                     clearInterval(interval);
-                    formEl.submit();
+                    submitExam('timeout');
                     return;
                 }
                 timeLeft--;
@@ -452,6 +720,11 @@ $stmt->close();
                     timerEl.classList.add('danger');
                     timerDanger = true;
                 }
+
+                // Save time periodically (every 10 seconds)
+                if (timeLeft % 10 === 0) {
+                    saveState();
+                }
             }, 1000);
         }
 
@@ -467,6 +740,7 @@ $stmt->close();
             submitBtn.style.display = index === totalQuestions - 1 ? 'inline-block' : 'none';
             
             currentIndex = index;
+            saveState();
             window.scrollTo({ top: document.getElementById(`question-${index}`).offsetTop - 100, behavior: 'smooth' });
         }
 
@@ -495,114 +769,183 @@ $stmt->close();
             }
         }
 
-        function flagQuestion(index) {
+        function flagQuestion(questionId, index, flag) {
             questionBoxes[index].classList.remove('unanswered', 'answered');
-            questionBoxes[index].classList.add('flagged');
+            if (flag) {
+                questionBoxes[index].classList.add('flagged');
+            } else {
+                questionBoxes[index].classList.remove('flagged');
+                if (document.querySelector(`input[name="answers[${questionId}]"]:checked`) || 
+                    document.querySelector(`input[name="answers[${questionId}][]"]:checked`) || 
+                    document.querySelector(`#q${questionId}_answer`)?.value) {
+                    questionBoxes[index].classList.add('answered');
+                }
+            }
+            document.querySelector(`button[onclick="flagQuestion(${questionId}, ${index}, ${flag ? 0 : 1})"]`).innerHTML = `<i class="bi bi-flag-fill"></i> ${flag ? 'Unflag' : 'Flag for Review'}`;
+            saveFlag(questionId, flag);
         }
 
-        // math-calc.js
-// math-calc.js
-let calcExpression = '';
+        function getCheckboxValues(questionId) {
+            const checkboxes = document.querySelectorAll(`input[name="answers[${questionId}][]"]:checked`);
+            return Array.from(checkboxes).map(cb => cb.value).join(',');
+        }
 
-function calcAppend(char) {
-  try {
-    // Handle special values
-    if (char === 'pi') char = 'π';
-    // Prevent multiple decimals or invalid operators
-    if (char === '.' && calcExpression.slice(-1) === '.') return false;
-    calcExpression += char;
-    updateDisplay();
-  } catch (e) {
-    console.error('calcAppend error:', e);
-    updateDisplay('Error');
-  }
-}
+        function saveAnswer(questionId, answer, questionType, index) {
+            markAnswered(index);
+            const data = new FormData();
+            data.append('question_id', questionId);
+            data.append('answer', questionType === 'multiple_choice_mult' ? `[${answer}]` : answer);
+            data.append('user_id', <?php echo $user_id; ?>);
+            data.append('test_id', <?php echo $test_id; ?>);
+            data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
 
-function calcClear() {
-  try {
-    calcExpression = '';
-    updateDisplay('0');
-  } catch (e) {
-    console.error('calcClear error:', e);
-  }
-}
+            fetch('save_answer.php', {
+                method: 'POST',
+                body: data
+            }).then(response => response.json())
+              .then(result => {
+                  if (!result.success) {
+                      console.error('Save answer failed:', result.message);
+                  }
+              }).catch(error => console.error('Save answer error:', error));
+        }
 
-function calcBackspace() {
-  try {
-    calcExpression = calcExpression.slice(0, -1);
-    updateDisplay(calcExpression || '0');
-  } catch (e) {
-    console.error('calcBackspace error:', e);
-  }
-}
+        function saveFlag(questionId, flag) {
+            const data = new FormData();
+            data.append('question_id', questionId);
+            data.append('is_flagged', flag);
+            data.append('user_id', <?php echo $user_id; ?>);
+            data.append('test_id', <?php echo $test_id; ?>);
+            data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
 
-function calcFunction(func) {
-  try {
-    // Ensure a valid base expression for pow and fact
-    const lastChar = calcExpression.slice(-1);
-    const isNumberOrClose = /[0-9)]/.test(lastChar);
+            fetch('save_flag.php', {
+                method: 'POST',
+                body: data
+            }).then(response => response.json())
+              .then(result => {
+                  if (!result.success) {
+                      console.error('Save flag failed:', result.message);
+                  }
+              }).catch(error => console.error('Save flag error:', error));
+        }
 
-    // Add function syntax
-    if (['sin', 'cos', 'tan'].includes(func)) {
-      calcExpression += `${func}(`;
-    } else if (func === 'sqrt') {
-      calcExpression += 'sqrt(';
-    } else if (func === 'log') {
-      calcExpression += 'log10(';
-    } else if (func === 'pow' && isNumberOrClose) {
-      calcExpression += '^2';
-    } else if (func === 'fact' && isNumberOrClose) {
-      calcExpression += '!';
-    } else {
-      return; // Ignore invalid operations
-    }
-    updateDisplay();
-  } catch (e) {
-    console.error('calcFunction error:', e);
-    updateDisplay('Error');
-  }
-}
+        function saveState() {
+            const data = new FormData();
+            data.append('user_id', <?php echo $user_id; ?>);
+            data.append('test_id', <?php echo $test_id; ?>);
+            data.append('time_left', timeLeft);
+            data.append('current_index', currentIndex);
+            data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
 
-function calcEvaluate() {
-  try {
-    let expr = calcExpression
-      .replace(/π/g, `${Math.PI}`)
-      // Handle factorial
-      .replace(/([0-9.]+)!/g, 'factorial($1)')
-      // Handle trigonometric functions with degree inputs
-      .replace(/(sin|cos|tan)\(([^)]+)\)/g, (match, func, arg) => {
-        return `${func}(${arg} * pi / 180)`;
-      });
+            fetch('save_state.php', {
+                method: 'POST',
+                body: data
+            }).catch(error => console.error('Save state error:', error));
+        }
 
-    // Evaluate using math.js
-    const result = math.evaluate(expr);
-    if (isNaN(result) || result === Infinity || result === -Infinity) {
-      throw new Error('Invalid result');
-    }
-    calcExpression = result.toString();
-    updateDisplay();
-  } catch (e) {
-    console.error('calcEvaluate error:', e);
-    calcExpression = '';
-    updateDisplay('Error');
-  }
-}
+        function submitExam(reason = 'manual') {
+            formEl.querySelector('input[name="submit_reason"]').value = reason;
+            formEl.submit();
+        }
 
-function updateDisplay(val = null) {
-  try {
-    document.getElementById('calcDisplay').value = val === null ? calcExpression : val;
-  } catch (e) {
-    console.error('updateDisplay error:', e);
-  }
-}
+        // Calculator Functions
+        let calcExpression = '';
+        function calcAppend(char) {
+            try {
+                if (char === 'pi') char = 'π';
+                if (char === '.' && calcExpression.slice(-1) === '.') return false;
+                calcExpression += char;
+                updateDisplay();
+            } catch (e) {
+                console.error('calcAppend error:', e);
+                updateDisplay('Error');
+            }
+        }
 
- 
+        function calcClear() {
+            try {
+                calcExpression = '';
+                updateDisplay('0');
+            } catch (e) {
+                console.error('calcClear error:', e);
+            }
+        }
+
+        function calcBackspace() {
+            try {
+                calcExpression = calcExpression.slice(0, -1);
+                updateDisplay(calcExpression || '0');
+            } catch (e) {
+                console.error('calcBackspace error:', e);
+            }
+        }
+
+        function calcFunction(func) {
+            try {
+                const lastChar = calcExpression.slice(-1);
+                const isNumberOrClose = /[0-9)]/.test(lastChar);
+                if (['sin', 'cos', 'tan'].includes(func)) {
+                    calcExpression += `${func}(`;
+                } else if (func === 'sqrt') {
+                    calcExpression += 'sqrt(';
+                } else if (func === 'log') {
+                    calcExpression += 'log10(';
+                } else if (func === 'pow' && isNumberOrClose) {
+                    calcExpression += '^2';
+                } else if (func === 'fact' && isNumberOrClose) {
+                    calcExpression += '!';
+                } else {
+                    return;
+                }
+                updateDisplay();
+            } catch (e) {
+                console.error('calcFunction error:', e);
+                updateDisplay('Error');
+            }
+        }
+
+        function calcEvaluate() {
+            try {
+                let expr = calcExpression
+                    .replace(/π/g, `${Math.PI}`)
+                    .replace(/([0-9.]+)!/g, 'factorial($1)')
+                    .replace(/(sin|cos|tan)\(([^)]+)\)/g, (match, func, arg) => `${func}(${arg} * pi / 180)`);
+                const result = math.evaluate(expr);
+                if (isNaN(result) || result === Infinity || result === -Infinity) {
+                    throw new Error('Invalid result');
+                }
+                calcExpression = result.toString();
+                updateDisplay();
+            } catch (e) {
+                console.error('calcEvaluate error:', e);
+                calcExpression = '';
+                updateDisplay('Error');
+            }
+        }
+
+        function updateDisplay(val = null) {
+            try {
+                document.getElementById('calcDisplay').value = val === null ? calcExpression : val;
+            } catch (e) {
+                console.error('updateDisplay error:', e);
+            }
+        }
+
+        // Image Zoom
+        function openImageModal(src) {
+            document.getElementById('zoomedImage').src = src;
+            const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+            modal.show();
+        }
 
         // Full Screen Control
         function requestFullscreen() {
             const elem = document.documentElement;
             if (elem.requestFullscreen) {
-                elem.requestFullscreen().catch(e => console.error('Fullscreen error:', e));
+                elem.requestFullscreen().catch(e => {
+                    console.error('Fullscreen error:', e);
+                    alert('Please enable full screen to continue the exam.');
+                });
             } else if (elem.webkitRequestFullscreen) {
                 elem.webkitRequestFullscreen();
             } else if (elem.msRequestFullscreen) {
@@ -622,14 +965,22 @@ function updateDisplay(val = null) {
         document.addEventListener('copy', e => e.preventDefault());
         document.addEventListener('paste', e => e.preventDefault());
 
-        let tabSwitchCount = 0;
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 tabSwitchCount++;
-                if (tabSwitchCount > 2) {
-                    alert('Warning: Multiple tab switches detected. Exam may be terminated.');
+                if (tabSwitchCount >= 2) {
+                    alert('Exam terminated due to multiple tab switches.');
+                    submitExam('tab_switch');
+                } else {
+                    alert(`Warning: Tab switch detected (${tabSwitchCount}/2). Exam will terminate after one more switch.`);
                 }
             }
+        });
+
+        // Prevent Back Navigation
+        window.history.pushState(null, null, window.location.href);
+        window.addEventListener('popstate', () => {
+            window.history.pushState(null, null, window.location.href);
         });
 
         // Initialize
@@ -637,7 +988,8 @@ function updateDisplay(val = null) {
             try {
                 requestFullscreen();
                 startTimer();
-                showQuestion(0);
+                showQuestion(currentIndex);
+                formEl.insertAdjacentHTML('beforeend', '<input type="hidden" name="submit_reason" value="manual">');
             } catch (e) {
                 console.error('Initialization error:', e);
             }
