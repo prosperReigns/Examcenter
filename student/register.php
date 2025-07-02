@@ -21,8 +21,8 @@ $classes = ['JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'];
 
 // Define subject categories (lowercase to match database)
 $common_subjects = ['mathematics', 'english', 'civic education', 'agric science'];
-$jss_specific_subjects = ['ict', 'agriculture', 'history', 'basic science', 'basic technology', 'security', 'cultural and creative art'];
-$ss_specific_subjects = ['data processing', 'economics', 'government', 'accounting', 'physics', 'chemistry', 'biology'];
+$jss_specific_subjects = ['ict', 'agriculture', 'history', 'basic science', 'basic technology', 'security', 'cultural and creative art', 'coding and robotics'];
+$ss_specific_subjects = ['data processing', 'economics', 'government', 'accounting', 'physics', 'chemistry', 'biology', 'coding and robotics'];
 
 // Fetch active subjects for today
 $today = date('Y-m-d');
