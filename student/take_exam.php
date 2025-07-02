@@ -679,6 +679,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     </div>
 
     <script src="../js/bootstrap.bundle.min.js"></script>
+    <script src="../js/lock_exam_window.js"></script>
     <script>
         let currentIndex = <?php echo $current_index; ?>;
         const totalQuestions = <?php echo count($questions); ?>;
