@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 require_once '../db.php';
@@ -440,8 +439,6 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         <button class="btn btn-primary mt-3" onclick="requestFullscreen()">Return to Full Screen</button>
     </div>
 
-    CHECK HELP.TXT FILE!!!!!!!!
-
     <!-- Image Zoom Modal -->
     <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered">
@@ -476,7 +473,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             </div>
         </div>
     </div>
-        CHECK HELP.TXT FILE A NEW TABLE WAS CREATED!!!
+
     <div class="container">
         <div class="row">
             <!-- Question Navigation -->
