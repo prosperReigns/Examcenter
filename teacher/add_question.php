@@ -101,117 +101,8 @@ try {
         }
     }
 
-    // Update is_valid_subject function
-    function is_valid_subject($class, $subject, $assigned_subjects) {
-        global $jss_subjects, $ss_subjects;
-        $subject = strtolower(trim($subject));
-        $class = strtolower(trim($class));
-        $valid_subjects = [];
-
-        if (strpos($class, 'jss') === 0) {
-            $valid_subjects = array_map('strtolower', $jss_subjects);
-        } elseif (strpos($class, 'ss') === 0) {
-            $valid_subjects = array_map('strtolower', $ss_subjects);
-        }
-
-        return in_array($subject, $valid_subjects) && in_array($subject, array_map('strtolower', $assigned_subjects));
-    }
-
-    // Handle test creation
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
-        $title = trim($_POST['test_title'] ?? '');
-        $class = trim($_POST['class'] ?? '');
-        $subject = trim($_POST['subject'] ?? '');
-        $duration = (int)($_POST['duration'] ?? 0);
-
-        if (empty($title) || empty($class) || empty($subject) || $duration <= 0) {
-            $error = "Please fill in all test details, including a valid duration.";
-        } elseif (!is_valid_subject($class, $subject, $assigned_subjects)) {
-            $error = "Invalid or unauthorized subject for selected class!";
-            error_log("Invalid subject attempt: {$subject} for {$class} by teacher_id=$teacher_id");
-        } else {
-            $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ?");
-            if (!$stmt) {
-                error_log("Prepare failed for test check: " . $conn->error);
-                $error = "Database error.";
-            } else {
-                $stmt->bind_param("sss", $title, $class, $subject);
-                $stmt->execute();
-                $existing_test = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
-
-                if ($existing_test) {
-                    $error = "A test with the same title, class, and subject already exists!";
-                } else {
-                    $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration, created_at) VALUES (?, ?, ?, ?, NOW())");
-                    if (!$stmt) {
-                        error_log("Prepare failed for test creation: " . $conn->error);
-                        $error = "Database error.";
-                    } else {
-                        $stmt->bind_param("sssi", $title, $class, $subject, $duration);
-                        if ($stmt->execute()) {
-                            $_SESSION['current_test_id'] = $stmt->insert_id;
-                            $success = "Test created successfully!";
-                            // Log activity
-                            $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
-                            $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-                            $activity = "Teacher {$teacher['username']} created test: $title ($class, $subject)";
-                            $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-                            if ($stmt_log) {
-                                $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
-                                $stmt_log->execute();
-                                $stmt_log->close();
-                            }
-                            $current_test = [
-                                'id' => $_SESSION['current_test_id'],
-                                'title' => $title,
-                                'class' => $class,
-                                'subject' => $subject,
-                                'duration' => $duration
-                            ];
-                        } else {
-                            error_log("Execute failed for test creation: " . $stmt->error);
-                            $error = "Error creating test.";
-                        }
-                        $stmt->close();
-                    }
-                }
-            }
-        }
-    }
-
-    // Handle test selection
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['select_test'])) {
-        $test_id = (int)($_POST['test_id'] ?? 0);
-        if ($test_id <= 0) {
-            $error = "Please select a valid test.";
-        } else {
-            $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-            $stmt = $conn->prepare("SELECT id, title, class, subject, duration FROM tests WHERE id = ? AND subject IN ($placeholders)");
-            if (!$stmt) {
-                error_log("Prepare failed for test selection: " . $conn->error);
-                $error = "Database error.";
-            } else {
-                $params = array_merge([$test_id], $assigned_subjects);
-                $types = 'i' . str_repeat('s', count($assigned_subjects));
-                $stmt->bind_param($types, ...$params);
-                $stmt->execute();
-                $test = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
-
-                if ($test) {
-                    $_SESSION['current_test_id'] = $test_id;
-                    $success = "Test selected successfully!";
-                    $current_test = $test;
-                } else {
-                    $error = "Unauthorized or invalid test selected.";
-                }
-            }
-        }
-    }
-
     // Load current test
-    if (isset($_SESSION['current_test_id']) && !$current_test) {
+    if (isset($_SESSION['current_test_id'])) {
         $test_id = (int)$_SESSION['current_test_id'];
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
         $stmt = $conn->prepare("SELECT id, title, class, subject, duration FROM tests WHERE id = ? AND subject IN ($placeholders)");
@@ -245,337 +136,22 @@ try {
         }
     }
 
-    // Handle clear test selection
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['clear_test'])) {
-        unset($_SESSION['current_test_id']);
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit;
+    // Load messages from session
+    if (isset($_SESSION['error'])) {
+        $error = $_SESSION['error'];
+        unset($_SESSION['error']);
+    }
+    if (isset($_SESSION['success'])) {
+        $success = $_SESSION['success'];
+        unset($_SESSION['success']);
     }
 
-    // Handle question deletion
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_question'])) {
-        $question_id = (int)($_POST['question_id'] ?? 0);
-        $question_type = $_POST['question_type'] ?? '';
-        $valid_types = ['multiple_choice_single', 'multiple_choice_multiple', 'true_false', 'fill_blanks'];
-
-        if ($question_id <= 0 || !in_array($question_type, $valid_types)) {
-            $error = "Invalid question ID or type.";
-        } else {
-            $table_map = [
-                'multiple_choice_single' => 'single_choice_questions',
-                'multiple_choice_multiple' => 'multiple_choice_questions',
-                'true_false' => 'true_false_questions',
-                'fill_blanks' => 'fill_blank_questions',
-            ];
-            $table = $table_map[$question_type];
-
-            // Delete associated image
-            $stmt = $conn->prepare("SELECT image_path FROM $table WHERE question_id = ?");
-            if ($stmt) {
-                $stmt->bind_param("i", $question_id);
-                $stmt->execute();
-                $image = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
-                if ($image['image_path'] && file_exists("../{$image['image_path']}")) {
-                    if (!unlink("../{$image['image_path']}")) {
-                        error_log("Failed to delete image: ../{$image['image_path']}");
-                    }
-                }
-            }
-
-            // Delete from specific table
-            $stmt = $conn->prepare("DELETE FROM $table WHERE question_id = ?");
-            if ($stmt) {
-                $stmt->bind_param("i", $question_id);
-                $stmt->execute();
-                $stmt->close();
-            }
-
-            // Delete from new_questions
-            $stmt = $conn->prepare("SELECT test_id, question_text FROM new_questions WHERE id = ?");
-            if ($stmt) {
-                $stmt->bind_param("i", $question_id);
-                $stmt->execute();
-                $question = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
-
-                $stmt = $conn->prepare("DELETE FROM new_questions WHERE id = ?");
-                if ($stmt) {
-                    $stmt->bind_param("i", $question_id);
-                    if ($stmt->execute()) {
-                        $success = "Question deleted successfully!";
-                        // Log activity
-                        $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
-                        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-                        $activity = "Teacher {$teacher['username']} deleted question ID $question_id: " . substr($question['question_text'] ?? '', 0, 50);
-                        $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-                        if ($stmt_log) {
-                            $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
-                            $stmt_log->execute();
-                            $stmt_log->close();
-                        }
-                    } else {
-                        error_log("Execute failed for question deletion: " . $stmt->error);
-                        $error = "Error deleting question.";
-                    }
-                    $stmt->close();
-                }
-            }
-        }
-    }
-
-    // Handle question editing (load question into form)
+    // Load edit question data if set
     $edit_question = null;
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['edit_question'])) {
-        $question_id = (int)($_POST['question_id'] ?? 0);
-        if ($question_id <= 0) {
-            $error = "Invalid question ID.";
-        } else {
-            $stmt = $conn->prepare("SELECT id, question_text, question_type FROM new_questions WHERE id = ?");
-            if (!$stmt) {
-                error_log("Prepare failed for edit question: " . $conn->error);
-                $error = "Database error.";
-            } else {
-                $stmt->bind_param("i", $question_id);
-                $stmt->execute();
-                $edit_question = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
-
-                if ($edit_question) {
-                    $sql = '';
-                    switch ($edit_question['question_type']) {
-                        case 'multiple_choice_single':
-                            $sql = "SELECT option1, option2, option3, option4, correct_answer, image_path FROM single_choice_questions WHERE question_id = ?";
-                            break;
-                        case 'multiple_choice_multiple':
-                            $sql = "SELECT option1, option2, option3, option4, correct_answers, image_path FROM multiple_choice_questions WHERE question_id = ?";
-                            break;
-                        case 'true_false':
-                            $sql = "SELECT correct_answer FROM true_false_questions WHERE question_id = ?";
-                            break;
-                        case 'fill_blanks':
-                            $sql = "SELECT correct_answer FROM fill_blank_questions WHERE question_id = ?";
-                            break;
-                    }
-
-                    if ($sql) {
-                        $stmt = $conn->prepare($sql);
-                        if ($stmt) {
-                            $stmt->bind_param("i", $question_id);
-                            $stmt->execute();
-                            $edit_question['options'] = $stmt->get_result()->fetch_assoc();
-                            $stmt->close();
-                        }
-                    }
-                } else {
-                    $error = "Question not found.";
-                }
-            }
-        }
+    if (isset($_SESSION['edit_question'])) {
+        $edit_question = $_SESSION['edit_question'];
+        unset($_SESSION['edit_question']);
     }
-
-    // Handle image upload
-    function handleImageUpload($question_id) {
-        global $conn;
-        if (!isset($_FILES['question_image']) || $_FILES['question_image']['error'] === UPLOAD_ERR_NO_FILE) {
-            return null;
-        }
-
-        $max_size = 2 * 1024 * 1024; // 2MB
-        if ($_FILES['question_image']['size'] > $max_size) {
-            return false;
-        }
-
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        if (!in_array($_FILES['question_image']['type'], $allowed_types)) {
-            return false;
-        }
-
-        $upload_dir = '../Uploads/questions/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
-
-        $ext = pathinfo($_FILES['question_image']['name'], PATHINFO_EXTENSION);
-        $filename = 'question_' . $question_id . '_' . time() . '.' . $ext;
-        $full_path = $upload_dir . $filename;
-
-        if (move_uploaded_file($_FILES['question_image']['tmp_name'], $full_path)) {
-            return 'Uploads/questions/' . $filename;
-        }
-
-        return false;
-    }
-
-    // Handle question submission
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
-        if (!isset($_SESSION['current_test_id'])) {
-            $error = "Please create or select a test first.";
-        } else {
-            $test_id = (int)$_SESSION['current_test_id'];
-            $question_id = (int)($_POST['question_id'] ?? 0);
-            $question_text = trim($_POST['question'] ?? '');
-            $question_type = trim($_POST['question_type'] ?? '');
-
-            if (empty($question_text) || empty($question_type) || !in_array($question_type, ['multiple_choice_single', 'multiple_choice_multiple', 'true_false', 'fill_blanks'])) {
-                $error = "Question text and valid type are required.";
-            } else {
-                $stmt = $conn->prepare("SELECT class, subject FROM tests WHERE id = ?");
-                if (!$stmt) {
-                    error_log("Prepare failed for test data: " . $conn->error);
-                    $error = "Database error.";
-                } else {
-                    $stmt->bind_param("i", $test_id);
-                    $stmt->execute();
-                    $test_data = $stmt->get_result()->fetch_assoc();
-                    $stmt->close();
-
-                    if (!$test_data) {
-                        unset($_SESSION['current_test_id']);
-                        $error = "Invalid test.";
-                    } else {
-                        $class = $test_data['class'];
-                        $subject = $test_data['subject'];
-
-                        // Handle image
-                        $image_path = null;
-                        if (isset($_POST['remove_image']) && $_POST['remove_image'] === 'on' && $question_id) {
-                            $table = $question_type === 'multiple_choice_single' ? 'single_choice_questions' : 'multiple_choice_questions';
-                            $stmt = $conn->prepare("SELECT image_path FROM $table WHERE question_id = ?");
-                            if ($stmt) {
-                                $stmt->bind_param("i", $question_id);
-                                $stmt->execute();
-                                $image = $stmt->get_result()->fetch_assoc();
-                                $stmt->close();
-                                if ($image['image_path'] && file_exists("../{$image['image_path']}")) {
-                                    unlink("../{$image['image_path']}");
-                                }
-                            }
-                        } else {
-                            $image_path = handleImageUpload($question_id ?: time());
-                            if ($image_path === false) {
-                                $error = "Image upload failed: Invalid file or size.";
-                            }
-                        }
-
-                        if (!$error) {
-                            $conn->begin_transaction();
-                            try {
-                                if ($question_id) {
-                                    $stmt = $conn->prepare("UPDATE new_questions SET question_text = ?, question_type = ? WHERE id = ?");
-                                    $stmt->bind_param("ssi", $question_text, $question_type, $question_id);
-                                } else {
-                                    $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, class, subject, question_type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-                                    $stmt->bind_param("sisss", $question_text, $test_id, $class, $subject, $question_type);
-                                }
-                                if (!$stmt->execute()) {
-                                    throw new Exception("Error saving question: " . $stmt->error);
-                                }
-                                $question_id = $question_id ?: $stmt->insert_id;
-                                $stmt->close();
-
-                                // Delete existing options
-                                $table_map = [
-                                    'multiple_choice_single' => 'single_choice_questions',
-                                    'multiple_choice_multiple' => 'multiple_choice_questions',
-                                    'true_false' => 'true_false_questions',
-                                    'fill_blanks' => 'fill_blank_questions',
-                                ];
-                                if (isset($table_map[$question_type])) {
-                                    $table = $table_map[$question_type];
-                                    $stmt = $conn->prepare("DELETE FROM $table WHERE question_id = ?");
-                                    if ($stmt) {
-                                        $stmt->bind_param("i", $question_id);
-                                        $stmt->execute();
-                                        $stmt->close();
-                                    }
-                                }
-
-                                switch ($question_type) {
-                                    case 'multiple_choice_single':
-                                        $option1 = trim($_POST['option1'] ?? '');
-                                        $option2 = trim($_POST['option2'] ?? '');
-                                        $option3 = trim($_POST['option3'] ?? '');
-                                        $option4 = trim($_POST['option4'] ?? '');
-                                        $correct_answer = trim($_POST['correct_answer'] ?? '');
-                                        $options = [$option1, $option2, $option3, $option4];
-                                        if ($option1 && $option2 && $option3 && $option4 && $correct_answer && in_array($correct_answer, ['1', '2', '3', '4'])) {
-                                            $correct_text = $options[(int)$correct_answer - 1];
-                                            $stmt = $conn->prepare("INSERT INTO single_choice_questions (question_id, option1, option2, option3, option4, correct_answer, image_path) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                                            $stmt->bind_param("issssss", $question_id, $option1, $option2, $option3, $option4, $correct_text, $image_path);
-                                            $stmt->execute();
-                                            $stmt->close();
-                                        } else {
-                                            throw new Exception("All options and a valid correct answer are required.");
-                                        }
-                                        break;
-
-                                    case 'multiple_choice_multiple':
-                                        $option1 = trim($_POST['option1'] ?? '');
-                                        $option2 = trim($_POST['option2'] ?? '');
-                                        $option3 = trim($_POST['option3'] ?? '');
-                                        $option4 = trim($_POST['option4'] ?? '');
-                                        $correct_answers = isset($_POST['correct_answers']) ? array_map('intval', $_POST['correct_answers']) : [];
-                                        $correct_text = implode(',', array_map(fn($i) => [$option1, $option2, $option3, $option4][$i - 1], $correct_answers));
-                                        if ($option1 && $option2 && $option3 && $option4 && $correct_answers) {
-                                            $stmt = $conn->prepare("INSERT INTO multiple_choice_questions (question_id, option1, option2, option3, option4, correct_answers, image_path) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                                            $stmt->bind_param("issssss", $question_id, $option1, $option2, $option3, $option4, $correct_text, $image_path);
-                                            $stmt->execute();
-                                            $stmt->close();
-                                        } else {
-                                            throw new Exception("All options and at least one correct answer are required.");
-                                        }
-                                        break;
-
-                                    case 'true_false':
-                                        $correct_answer = trim($_POST['correct_answer'] ?? '');
-                                        if (in_array($correct_answer, ['True', 'False'])) {
-                                            $stmt = $conn->prepare("INSERT INTO true_false_questions (question_id, correct_answer) VALUES (?, ?)");
-                                            $stmt->bind_param("is", $question_id, $correct_answer);
-                                            $stmt->execute();
-                                            $stmt->close();
-                                        } else {
-                                            throw new Exception("A valid correct answer is required.");
-                                        }
-                                        break;
-
-                                    case 'fill_blanks':
-                                        $correct_answer = trim($_POST['correct_answer'] ?? '');
-                                        if ($correct_answer) {
-                                            $stmt = $conn->prepare("INSERT INTO fill_blank_questions (question_id, correct_answer) VALUES (?, ?)");
-                                            $stmt->bind_param("is", $question_id, $correct_answer);
-                                            $stmt->execute();
-                                            $stmt->close();
-                                        } else {
-                                            throw new Exception("A correct answer is required.");
-                                        }
-                                        break;
-                                }
-
-                                $conn->commit();
-                                $success = "Question " . ($edit_question ? 'updated' : 'added') . " successfully!";
-                                // Log activity
-                                $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
-                                $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-                                $activity = "Teacher {$teacher['username']} " . ($edit_question ? 'updated' : 'added') . " question ID $question_id: " . substr($question_text, 0, 50);
-                                $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-                                if ($stmt_log) {
-                                    $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
-                                    $stmt_log->execute();
-                                    $stmt_log->close();
-                                }
-                            } catch (Exception $e) {
-                                $conn->rollback();
-                                error_log("Question save error: " . $e->getMessage());
-                                $error = "Error saving question: " . $e->getMessage();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     $edit_data = [
         'options' => $edit_question['options'] ?? [],
         'question_type' => $edit_question['question_type'] ?? ''
@@ -638,6 +214,7 @@ $conn->close();
         <div class="header d-flex justify-content-between align-items-center mb-4">
             <h2 class="mb-0">Add Questions</h2>
             <div class="header-actions">
+                <a href="list_test.php" class="btn btn-primary" >download</a>
                 <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
                 <button class="btn btn-primary <?php echo !$current_test ? 'preview-disabled' : ''; ?>" 
                         <?php echo !$current_test ? 'disabled' : ''; ?>
@@ -667,7 +244,7 @@ $conn->close();
                 <div class="question-card">
                     <?php if (!$current_test): ?>
                         <h5 class="mb-3">Test Setup</h5>
-                        <form method="POST" id="testForm">
+                        <form method="POST" id="testForm" action="handle_test.php">
                             <div class="row g-3">
                                 <div class="col-md-3 form-group-spacing">
                                     <label class="form-label fw-bold">Test Title</label>
@@ -707,14 +284,21 @@ $conn->close();
                             </div>
                             <button type="submit" name="create_test" class="btn btn-primary mt-3"><i class="fas fa-plus me-2"></i>Create Test</button>
                         </form>
+                        <div class="mb-4">
+                            <form method="POST" id="uploadForm" enctype="multipart/form-data" action="upload.php">
+                                <label>Select Test JSON File:</label>
+                                <input type="file" class="form-control" name="json_file" accept=".json" required>
+                                <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-upload me-2"></i>Upload Test</button>
+                            </form>
+                        </div>
 
                         <?php if (!empty($tests)): ?>
                             <hr>
                             <h6>Select Existing Test</h6>
-                            <form method="POST">
+                            <form method="POST" id="selectTestForm" action="handle_test.php">
                                 <div class="form-group-spacing">
                                     <label class="form-label fw-bold">Available Tests</label>
-                                    <select class="form-select" name="test_id" required>
+                                    <select class="form-select" name="test_id" id="testIdSelect" required>
                                         <option value="">Select a Test</option>
                                         <?php foreach ($tests as $test): ?>
                                             <option value="<?php echo (int)$test['id']; ?>">
@@ -728,7 +312,7 @@ $conn->close();
                         <?php endif; ?>
                     <?php else: ?>
                         <h5 class="mb-3"><?php echo $edit_question ? 'Edit Question' : 'Add Question'; ?></h5>
-                        <form method="POST" id="questionForm" enctype="multipart/form-data">
+                        <form method="POST" id="questionForm" enctype="multipart/form-data" action="handle_question.php">
                             <input type="hidden" name="question_id" value="<?php echo (int)($edit_question['id'] ?? ''); ?>">
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Type</label>
@@ -767,7 +351,7 @@ $conn->close();
                             <span>Total Questions:</span>
                             <strong><?php echo $total_questions; ?></strong>
                         </div>
-                        <form method="POST">
+                        <form method="POST" action="handle_test.php">
                             <button type="submit" name="clear_test" class="btn btn-outline-danger w-100"><i class="fas fa-times me-2"></i>Clear Test Selection</button>
                         </form>
                     <?php else: ?>
@@ -798,12 +382,12 @@ $conn->close();
                                 <div class="d-flex justify-content-between align-items-center">
                                     <strong>Question <?php echo $index + 1; ?>: <?php echo htmlspecialchars($question['question_text']); ?></strong>
                                     <div class="action-buttons">
-                                        <form method="POST" style="display: inline;">
+                                        <form method="POST" style="display: inline;" action="handle_question.php">
                                             <input type="hidden" name="question_id" value="<?php echo (int)$question['id']; ?>">
                                             <input type="hidden" name="edit_question" value="1">
                                             <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i> Edit</button>
                                         </form>
-                                        <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this question?');">
+                                        <form method="POST" style="display: inline;" action="handle_question.php" onsubmit="return confirm('Are you sure you want to delete this question?');">
                                             <input type="hidden" name="question_id" value="<?php echo (int)$question['id']; ?>">
                                             <input type="hidden" name="question_type" value="<?php echo htmlspecialchars($question['question_type']); ?>">
                                             <input type="hidden" name="delete_question" value="1">
@@ -884,6 +468,7 @@ $conn->close();
     <script src="../js/jquery-3.7.0.min.js"></script>
     <script src="../js/bootstrap.bundle.min.js"></script>
     <script src="../js/jquery.validate.min.js"></script>
+    <!-- <script src="../js/questionType.js"></script> -->
     <script>
         const editData = <?php echo json_encode($edit_data); ?>;
         const questionTemplates = {
@@ -986,9 +571,10 @@ $conn->close();
         };
 
         function updateOptionsContainer() {
-            const questionType = document.getElementById('questionType')?.value;
+            const questionTypeSelect = document.getElementById('questionType');
             const optionsContainer = document.getElementById('optionsContainer');
-            if (questionType && optionsContainer) {
+            if (questionTypeSelect && optionsContainer) {
+                const questionType = questionTypeSelect.value || 'multiple_choice_single';
                 optionsContainer.innerHTML = questionTemplates[questionType] || '';
             }
         }
@@ -999,8 +585,15 @@ $conn->close();
                 $('.sidebar').toggleClass('active');
             });
 
-            // Initialize question form
-            updateOptionsContainer();
+            // Initialize question form with default question type
+            $(document).ready(function() {
+    const questionTypeSelect = document.getElementById('questionType');
+    if (questionTypeSelect) {
+        updateOptionsContainer();
+    }
+});
+
+            // Update options when question type changes
             $('#questionType').on('change', updateOptionsContainer);
 
             // Image toggle
@@ -1039,7 +632,7 @@ $conn->close();
                 }
             });
 
-            // Form validation
+            // Form validation for Test Creation Form
             $('#testForm').validate({
                 rules: {
                     test_title: { required: true },
@@ -1049,9 +642,39 @@ $conn->close();
                 },
                 messages: {
                     duration: { min: "Duration must be at least 1 minute." }
+                },
+                errorPlacement: function(error, element) {
+                    error.appendTo(element.closest('.form-group-spacing'));
                 }
             });
 
+            // Form validation for File Upload Form
+            $('#uploadForm').validate({
+                rules: {
+                    json_file: { required: true, accept: "application/json,.json" }
+                },
+                messages: {
+                    json_file: { required: "Please select a file.", accept: "Please upload a valid JSON file." }
+                },
+                errorPlacement: function(error, element) {
+                    error.appendTo(element.closest('.mb-4'));
+                }
+            });
+
+            // Form validation for Select Test Form
+            $('#selectTestForm').validate({
+                rules: {
+                    test_id: { required: true }
+                },
+                messages: {
+                    test_id: "Please select a test."
+                },
+                errorPlacement: function(error, element) {
+                    error.appendTo(element.closest('.form-group-spacing'));
+                }
+            });
+
+            // Form validation for Question Form
             $('#questionForm').validate({
                 rules: {
                     question_type: { required: true },
@@ -1065,6 +688,9 @@ $conn->close();
                 },
                 messages: {
                     'correct_answers[]': "At least one correct answer is required."
+                },
+                errorPlacement: function(error, element) {
+                    error.appendTo(element.closest('.form-group-spacing'));
                 }
             });
 
