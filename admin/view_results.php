@@ -364,7 +364,7 @@ $conn->close();
             <h2 class="mb-0">Exam Results</h2>
             <div class="d-flex gap-3">
                 <?php if ($total_results > 0): ?>
-                    <a href="../export_results_word.php?<?php echo http_build_query([
+                    <a href="../admin/export_results_word.php?<?php echo http_build_query([
                         'selected_title' => $test_title_filter,
                         'selected_class' => $class_filter,
                         'selected_subject' => $subject_filter,

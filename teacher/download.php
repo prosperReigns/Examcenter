@@ -1,67 +1,79 @@
 <?php
 require '../db.php';
-
-$conn = Database::getInstance()->getConnection(); // ✅ Use MySQLi-style variable
+$conn = Database::getInstance()->getConnection();
 
 $class = $_GET['class'];
 $subject = $_GET['subject'];
 $title = $_GET['title'];
 
-// Use MySQLi prepared statements
+// Fetch test
 $stmt = $conn->prepare("SELECT * FROM tests WHERE class=? AND subject=? AND title=?");
 $stmt->bind_param("sss", $class, $subject, $title);
 $stmt->execute();
-$result = $stmt->get_result();
-$test = $result->fetch_assoc();
+$test = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-if (!$test) {
-    die("Test not found");
-}
+if (!$test) die("Test not found");
 
 $test_id = $test['id'];
 
-function fetchQuestions($conn, $table, $type, $test_id) {
-    $sql = "
-    SELECT q.*, n.question_text as question
-    FROM $table q
-    JOIN new_questions n ON q.question_id = n.id
-    WHERE n.test_id = ?
-";
-
+// Fetch questions helper function
+function fetchQuestions($conn, $table, $columns, $test_id) {
+    $sql = "SELECT " . implode(", ", $columns) . " FROM $table t
+            JOIN new_questions n ON t.question_id = n.id
+            WHERE n.test_id = ?
+            ORDER BY n.id ASC";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $test_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    $data = [];
-    while ($row = $result->fetch_assoc()) {
-        unset($row['question_id']);
-        unset($row['id']);  // remove id from the exported JSON
-        $row['type'] = $type;
-        $data[] = $row;
-    }
+    $data = $result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return $data;
 }
 
-$questions = array_merge(
-    fetchQuestions($conn, 'single_choice_questions', 'multiple_choice_single', $test_id),
-    fetchQuestions($conn, 'multiple_choice_questions', 'multiple_choice_multiple', $test_id),
-    fetchQuestions($conn, 'fill_blank_questions', 'fill_blank', $test_id),
-    fetchQuestions($conn, 'true_false_questions', 'true_false', $test_id)
-);
+// Single choice
+$single = fetchQuestions($conn, 'single_choice_questions', ['n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answer'], $test_id);
 
-$output = [
-    "test" => [
-        "title" => $test['title'],
-        "class" => $test['class'],
-        "subject" => $test['subject'],
-        "duration" => $test['duration']
-    ],
-    "questions" => $questions
-];
+// Multiple choice (multiple answers)
+$multiple = fetchQuestions($conn, 'multiple_choice_questions', ['n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answers'], $test_id);
 
-header('Content-Type: application/json');
-header("Content-Disposition: attachment; filename={$title}_{$subject}.json");
-echo json_encode($output, JSON_PRETTY_PRINT);
+// True/False
+$tf = fetchQuestions($conn, 'true_false_questions', ['n.question_text', 't.correct_answer'], $test_id);
+
+// Fill in the blank
+$fill = fetchQuestions($conn, 'fill_blank_questions', ['n.question_text', 't.correct_answer'], $test_id);
+
+// Merge all questions in order: single -> multiple -> true/false -> fill
+$questions = array_merge($single, $multiple, $tf, $fill);
+
+// Headers for Word download
+header("Content-Type: application/vnd.ms-word");
+header("Content-Disposition: attachment; filename={$title}_{$subject}.doc");
+
+// Output test info
+echo "{$test['title']}\n";
+echo "Class: {$test['class']}\n";
+echo "Subject: {$test['subject']}\n";
+echo "Duration: {$test['duration']} mins\n\n";
+
+// Output questions
+foreach ($questions as $index => $q) {
+    $num = $index + 1;
+    echo "{$num}. {$q['question_text']}";
+
+    // Options
+    if (isset($q['option1'])) {
+        echo " A) {$q['option1']} B) {$q['option2']} C) {$q['option3']} D) {$q['option4']}";
+    }
+
+    echo "\n";
+
+    // Correct answer
+    if (isset($q['correct_answer'])) {
+        echo "correct answer: {$q['correct_answer']}\n\n";
+    } elseif (isset($q['correct_answers'])) {
+        echo "correct answer: " . implode(", ", array_map('trim', explode(',', $q['correct_answers']))) . "\n\n";
+    }
+}
 ?>

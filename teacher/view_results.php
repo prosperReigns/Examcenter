@@ -396,7 +396,7 @@ $conn->close();
                     </div>
                 </form>
                 <?php if ($total_results > 0): ?>
-                    <form method="POST" action="" class="mt-3">
+                    <form method="POST" action="../teacher/export_results_word.php" class="mt-3">
                         <input type="hidden" name="selected_title" value="<?php echo htmlspecialchars($test_title_filter); ?>">
                         <input type="hidden" name="selected_class" value="<?php echo htmlspecialchars($class_filter); ?>">
                         <input type="hidden" name="selected_subject" value="<?php echo htmlspecialchars($subject_filter); ?>">
