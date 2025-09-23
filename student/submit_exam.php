@@ -13,6 +13,44 @@ $test_id = $_SESSION['current_test_id'];
 $questions = $_SESSION['exam_questions'];
 $submitted_answers = $_POST['answers'];
 
+// Check if exam time is still valid
+$stmt = $conn->prepare("SELECT started_at FROM exam_attempts WHERE user_id = ? AND test_id = ?");
+$stmt->bind_param("ii", $student_id, $test_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$attempt = $result->fetch_assoc();
+$stmt->close();
+
+if (!$attempt) {
+    die("No valid attempt found. Cannot grade this exam.");
+}
+
+$started_at = strtotime($attempt['started_at']);
+
+// Fetch the test duration to calculate expiry
+$stmt = $conn->prepare("SELECT duration FROM tests WHERE id = ?");
+$stmt->bind_param("i", $test_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$test = $result->fetch_assoc();
+$stmt->close();
+
+if (!$test) {
+    die("Test information not found. Cannot validate exam time.");
+}
+
+$duration_seconds = (int)$test['duration'] * 60;
+$now = time();
+$elapsed = $now - $started_at;
+
+if ($elapsed > $duration_seconds) {
+    // session cleanup
+    unset($_SESSION['exam_questions']);
+    unset($_SESSION['current_test_id']);
+    header("Location: register.php");
+    exit();
+}
+
 $score = 0;
 $total_questions = count($questions);
 

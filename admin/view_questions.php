@@ -190,7 +190,6 @@ $stmt = $conn->prepare("SELECT DISTINCT subject FROM tests ORDER BY subject");
 $stmt->execute();
 $subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
-$conn->close();
 ?>
 
 <!DOCTYPE html>

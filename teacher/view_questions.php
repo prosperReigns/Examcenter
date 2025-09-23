@@ -250,7 +250,6 @@ try {
     error_log("View questions error: " . $e->getMessage());
     die("System error");
 }
-$conn->close();
 ?>
 
 <!DOCTYPE html>

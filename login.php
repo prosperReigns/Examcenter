@@ -345,6 +345,36 @@ ob_end_flush();
             </button>
         </form>
     </div>
+    <!-- Add this just below your password input in the form -->
+<div class="mb-3 text-end">
+    <a href="#" class="small" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal">Forgot Password?</a>
+</div>
+
+<!-- Forgot Password Modal -->
+<div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-labelledby="forgotPasswordLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="forgotPasswordLabel">Reset Password</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="forgotPasswordForm" method="POST" action="forgot_password.php">
+        <div class="modal-body">
+          <p>Enter your email address below. We will send you a link to reset your password.</p>
+          <div class="mb-3">
+            <label for="resetEmail" class="form-label">Email Address</label>
+            <input type="email" class="form-control" id="resetEmail" name="email" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Send Reset Link</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script src="js/bootstrap.bundle.min.js"></script>

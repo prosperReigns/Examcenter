@@ -84,8 +84,9 @@ $time_left = $exam_state ? $exam_state['time_left'] : $exam_duration;
 $current_index = $exam_state ? (int)$exam_state['current_index'] : 0;
 
 if (!$exam_state) {
-    $stmt = $conn->prepare("INSERT INTO exam_attempts (user_id, test_id, time_left, current_index) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("iiii", $user_id, $test_id, $exam_duration, $current_index);
+    $now = date('Y-m-d H:i:s');
+    $stmt = $conn->prepare("INSERT INTO exam_attempts (user_id, test_id, time_left, current_index, started_at) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("iiiss", $user_id, $test_id, $exam_duration, $current_index, $now);
     $stmt->execute();
     $stmt->close();
 }
@@ -700,7 +701,9 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             const interval = setInterval(() => {
                 if (timeLeft <= 0) {
                     clearInterval(interval);
-                    submitExam('timeout');
+                    submitExam('timeout', () => {
+                        window.location.href = 'register.php';
+                    });
                     return;
                 }
                 timeLeft--;
@@ -841,9 +844,14 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             }).catch(error => console.error('Save state error:', error));
         }
 
-        function submitExam(reason = 'manual') {
+        function submitExam(reason = 'manual', callback = null) {
             formEl.querySelector('input[name="submit_reason"]').value = reason;
             formEl.submit();
+
+            // optionally, after submitting, do a timed redirect:
+            if (callback) {
+                setTimeout(callback, 3000); // allow 3s for form to post before redirect
+            }
         }
 
         // Calculator Functions
@@ -992,6 +1000,12 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 console.error('Initialization error:', e);
             }
         });
+    </script>
+    <script>
+        history.pushState(null, null, location.href);
+        window.onpopstate = function () {
+        history.go(1);
+    };
     </script>
 </body>
 </html>

@@ -286,11 +286,14 @@ $conn->close();
                         </form>
                         <div class="mb-4">
                             <form method="POST" id="uploadForm" enctype="multipart/form-data" action="upload.php">
-                                <label>Select Test JSON File:</label>
-                                <input type="file" class="form-control" name="json_file" accept=".json" required>
-                                <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-upload me-2"></i>Upload Test</button>
+                                <label>Select Test File (.docx):</label>
+                                <input type="file" class="form-control" name="test_file" accept=".docx" required>
+                                <button type="submit" class="btn btn-primary mt-3">
+                                    <i class="fas fa-upload me-2"></i>Upload Test
+                                </button>
                             </form>
                         </div>
+
 
                         <?php if (!empty($tests)): ?>
                             <hr>
