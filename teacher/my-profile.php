@@ -229,6 +229,10 @@ $conn->close();
                 <i class="fas fa-list"></i>
                 View Questions
             </a>
+            <a href="manage_test.php">
+                <i class="fas fa-list"></i>
+                Manage Test
+            </a>
             <a href="view_results.php">
                 <i class="fas fa-chart-bar"></i>
                 Exam Results

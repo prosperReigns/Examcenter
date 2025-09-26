@@ -65,16 +65,16 @@ try {
     $jss_subjects = [
         'Mathematics', 'English', 'ICT', 'Agriculture', 'History',
         'Civic Education', 'Basic Science', 'Basic Technology',
-        'Business studies', 'Agricultural sci', 'Physical Health Edu',
+        'Business studies', 'Physical Health Edu',
         'Cultural and Creative Art', 'Social Studies', 'Security Edu',
-        'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
+        'Yoruba', 'French', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
     ];
     $ss_subjects = [
         'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-        'Government', 'Commerce', 'Accounting', 'Financial Accounting',
+        'Government', 'Commerce', 'Accounting',
         'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology',
-        'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
-        'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
+        'Agriculture', 'Geography', 'Technical Drawing', 'Yoruba',
+        'French', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
     ];
 
     // Pagination settings
@@ -87,6 +87,8 @@ try {
     $class_filter = trim($_GET['selected_class'] ?? '');
     $subject_filter = trim($_GET['selected_subject'] ?? '');
     $test_title_filter = trim($_GET['selected_title'] ?? '');
+    $year_filter = trim($_GET['selected_year'] ?? '');
+    $student_name_filter = trim($_GET['student_name'] ?? '');
 
     // Initialize error/success messages
     $error = $success = '';
@@ -95,7 +97,7 @@ try {
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
         try {
             $export_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
-                            t.subject, t.title AS test_title, t.class AS test_class 
+                            t.subject, t.title AS test_title, t.class AS test_class, t.year 
                             FROM results r
                             JOIN students s ON r.user_id = s.id
                             JOIN tests t ON r.test_id = t.id
@@ -116,6 +118,16 @@ try {
             if (!empty($subject_filter)) {
                 $export_query .= " AND t.subject = ?";
                 $export_params[] = $subject_filter;
+                $export_types .= 's';
+            }
+            if (!empty($year_filter)) {
+                $export_query .= " AND t.year = ?";
+                $export_params[] = $year_filter;
+                $export_types .= 's';
+            }
+            if (!empty($student_name_filter)) {
+                $export_query .= " AND s.name LIKE ?";
+                $export_params[] = "%$student_name_filter%";
                 $export_types .= 's';
             }
 
@@ -139,6 +151,8 @@ try {
             if ($test_title_filter) $section->addText('Test: ' . $test_title_filter);
             if ($class_filter) $section->addText('Class: ' . $class_filter);
             if ($subject_filter) $section->addText('Subject: ' . $subject_filter);
+            if ($year_filter) $section->addText('Year: ' . $year_filter);
+            if ($student_name_filter) $section->addText('Student: ' . $student_name_filter);
 
             $table = $section->addTable(['borderSize' => 1, 'borderColor' => '999999', 'cellMargin' => 80]);
             $table->addRow();
@@ -149,6 +163,7 @@ try {
             $table->addCell(1000)->addText('Score', ['bold' => true]);
             $table->addCell(1000)->addText('Percentage', ['bold' => true]);
             $table->addCell(1500)->addText('Date', ['bold' => true]);
+            $table->addCell(1000)->addText('Year', ['bold' => true]);
 
             foreach ($export_results as $result) {
                 $percentage = round(($result['score'] / $result['total_questions']) * 100, 2);
@@ -160,6 +175,7 @@ try {
                 $table->addCell(1000)->addText($result['score'] . '/' . $result['total_questions']);
                 $table->addCell(1000)->addText($percentage . '%');
                 $table->addCell(1500)->addText(date('M j, Y g:i A', strtotime($result['created_at'])));
+                $table->addCell(1000)->addText(htmlspecialchars($result['year']));
             }
 
             // Save and download
@@ -171,7 +187,7 @@ try {
             // Log activity
             $ip_address = $_SERVER['REMOTE_ADDR'];
             $user_agent = $_SERVER['HTTP_USER_AGENT'];
-            $activity = "Teacher {$teacher['username']} exported results for " . ($test_title_filter ?: 'all tests') . ($class_filter ? " in $class_filter" : '') . ($subject_filter ? " ($subject_filter)" : '');
+            $activity = "Teacher {$teacher['username']} exported results for " . ($test_title_filter ?: 'all tests') . ($class_filter ? " in $class_filter" : '') . ($subject_filter ? " ($subject_filter)" : '') . ($year_filter ? " ($year_filter)" : '') . ($student_name_filter ? " for $student_name_filter" : '');
             $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, teacher_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
             $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
             $stmt_log->execute();
@@ -197,7 +213,7 @@ try {
                     JOIN tests t ON r.test_id = t.id
                     WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
     $select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
-                            t.subject, t.title AS test_title, t.class AS test_class 
+                            t.subject, t.title AS test_title, t.class AS test_class, t.year 
                      FROM results r
                      JOIN students s ON r.user_id = s.id
                      JOIN tests t ON r.test_id = t.id
@@ -223,6 +239,18 @@ try {
         $count_query .= " AND t.subject = ?";
         $select_query .= " AND t.subject = ?";
         $params[] = $subject_filter;
+        $types .= 's';
+    }
+    if (!empty($year_filter)) {
+        $count_query .= " AND t.year = ?";
+        $select_query .= " AND t.year = ?";
+        $params[] = $year_filter;
+        $types .= 's';
+    }
+    if (!empty($student_name_filter)) {
+        $count_query .= " AND s.name LIKE ?";
+        $select_query .= " AND s.name LIKE ?";
+        $params[] = "%$student_name_filter%";
         $types .= 's';
     }
 
@@ -263,12 +291,18 @@ try {
     $results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    // Get unique classes and test titles for filters (restricted to assigned subjects)
+    // Get unique classes, years, and test titles for filters (restricted to assigned subjects)
     $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
     $stmt = $conn->prepare("SELECT DISTINCT s.class FROM students s JOIN results r ON s.id = r.user_id JOIN tests t ON r.test_id = t.id WHERE t.subject IN ($placeholders) ORDER BY s.class");
     $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
     $stmt->execute();
     $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id WHERE t.subject IN ($placeholders) ORDER BY t.year DESC");
+    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
+    $stmt->execute();
+    $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
     $stmt = $conn->prepare("SELECT DISTINCT t.title FROM tests t JOIN results r ON t.id = r.test_id WHERE t.subject IN ($placeholders) ORDER BY t.title");
@@ -320,6 +354,7 @@ $conn->close();
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
             <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
+            <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
             <a href="view_results.php" class="active"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="manage_students.php" style="text-decoration: line-through"><i class="fas fa-users"></i>Manage Students</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
@@ -390,16 +425,33 @@ $conn->close();
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <div class="col-md-3 form-group-spacing">
+                            <label class="form-label fw-bold">Year</label>
+                            <select class="form-select" name="selected_year">
+                                <option value="">All Years</option>
+                                <?php foreach ($years as $year): ?>
+                                    <option value="<?php echo htmlspecialchars($year['year']); ?>" <?php echo $year_filter == $year['year'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($year['year']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3 form-group-spacing">
+                            <label class="form-label fw-bold">Student Name</label>
+                            <input type="text" class="form-control" name="student_name" value="<?php echo htmlspecialchars($student_name_filter); ?>" placeholder="Enter student name">
+                        </div>
                         <div class="col-md-3 d-flex align-items-end form-group-spacing">
                             <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-2"></i>Apply</button>
                         </div>
                     </div>
                 </form>
                 <?php if ($total_results > 0): ?>
-                    <form method="POST" action="../teacher/export_results_word.php" class="mt-3">
+                    <form method="POST" action="" class="mt-3">
                         <input type="hidden" name="selected_title" value="<?php echo htmlspecialchars($test_title_filter); ?>">
                         <input type="hidden" name="selected_class" value="<?php echo htmlspecialchars($class_filter); ?>">
                         <input type="hidden" name="selected_subject" value="<?php echo htmlspecialchars($subject_filter); ?>">
+                        <input type="hidden" name="selected_year" value="<?php echo htmlspecialchars($year_filter); ?>">
+                        <input type="hidden" name="student_name" value="<?php echo htmlspecialchars($student_name_filter); ?>">
                         <input type="hidden" name="export_results" value="1">
                         <button type="submit" class="btn btn-success"><i class="fas fa-file-word me-2"></i>Export to Word</button>
                     </form>
@@ -421,11 +473,17 @@ $conn->close();
                         <?php if (!empty($subject_filter)): ?>
                             - <?php echo htmlspecialchars($subject_filter); ?>
                         <?php endif; ?>
+                        <?php if (!empty($year_filter)): ?>
+                            - Year <?php echo htmlspecialchars($year_filter); ?>
+                        <?php endif; ?>
+                        <?php if (!empty($student_name_filter)): ?>
+                            - Student <?php echo htmlspecialchars($student_name_filter); ?>
+                        <?php endif; ?>
                     <?php else: ?>
                         No results found
                     <?php endif; ?>
                 </h5>
-                <?php if (!empty($test_title_filter) || !empty($class_filter) || !empty($subject_filter)): ?>
+                <?php if (!empty($test_title_filter) || !empty($class_filter) || !empty($subject_filter) || !empty($year_filter) || !empty($student_name_filter)): ?>
                     <a href="view_results.php" class="btn btn-outline-secondary"><i class="fas fa-times me-2"></i>Clear Filters</a>
                 <?php endif; ?>
             </div>
@@ -443,6 +501,7 @@ $conn->close();
                                 <th>Score</th>
                                 <th>Percentage</th>
                                 <th>Date</th>
+                                <th>Year</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -460,6 +519,7 @@ $conn->close();
                                         <?php echo $percentage; ?>%
                                     </td>
                                     <td><?php echo date('M j, Y g:i A', strtotime($result['created_at'])); ?></td>
+                                    <td><?php echo htmlspecialchars($result['year']); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -471,7 +531,7 @@ $conn->close();
                     <nav aria-label="Page navigation">
                         <ul class="pagination justify-content-center">
                             <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
-                                <a class="page-link" href="?page=<?php echo $current_page - 1; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>" aria-label="Previous">
+                                <a class="page-link" href="?page=<?php echo $current_page - 1; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>" aria-label="Previous">
                                     <span aria-hidden="true">« Previous</span>
                                 </a>
                             </li>
@@ -479,24 +539,24 @@ $conn->close();
                             $start_page = max(1, $current_page - 2);
                             $end_page = min($total_pages, $current_page + 2);
                             if ($start_page > 1): ?>
-                                <li class="page-item"><a class="page-link" href="?page=1&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>">1</a></li>
+                                <li class="page-item"><a class="page-link" href="?page=1&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>">1</a></li>
                                 <?php if ($start_page > 2): ?>
                                     <li class="page-item disabled"><span class="page-link">...</span></li>
                                 <?php endif; ?>
                             <?php endif; ?>
                             <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
                                 <li class="page-item <?php echo $i == $current_page ? 'active' : ''; ?>">
-                                    <a class="page-link" href="?page=<?php echo $i; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>"><?php echo $i; ?></a>
+                                    <a class="page-link" href="?page=<?php echo $i; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>"><?php echo $i; ?></a>
                                 </li>
                             <?php endfor; ?>
                             <?php if ($end_page < $total_pages): ?>
                                 <?php if ($end_page < $total_pages - 1): ?>
                                     <li class="page-item disabled"><span class="page-link">...</span></li>
                                 <?php endif; ?>
-                                <li class="page-item"><a class="page-link" href="?page=<?php echo $total_pages; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>"><?php echo $total_pages; ?></a></li>
+                                <li class="page-item"><a class="page-link" href="?page=<?php echo $total_pages; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>"><?php echo $total_pages; ?></a></li>
                             <?php endif; ?>
                             <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
-                                <a class="page-link" href="?page=<?php echo $current_page + 1; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>" aria-label="Next">
+                                <a class="page-link" href="?page=<?php echo $current_page + 1; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>" aria-label="Next">
                                     <span aria-hidden="true">Next »</span>
                                 </a>
                             </li>

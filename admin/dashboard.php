@@ -300,7 +300,7 @@ function time_ago($datetime) {
         </div>
         <div class="sidebar-menu mt-4">
             <a href="dashboard.php" class="active"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-            <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="add_question.php" style="text-decoration: line-through"><i class="fas fa-plus-circle"></i>Add Questions</a>
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
@@ -316,7 +316,7 @@ function time_ago($datetime) {
         <div class="header d-flex justify-content-between align-items-center mb-4">
             <h2 class="mb-0">Admin Dashboard</h2>
             <div class="d-flex gap-3">
-                <a href="view_results.php" class="btn btn-secondary"><i class="fas fa-chart-bar me-2"></i>View Results</a>
+                <a href="../admin/view_results.php" class="btn btn-secondary"><i class="fas fa-chart-bar me-2"></i>View Results</a>
                 <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
             </div>
         </div>

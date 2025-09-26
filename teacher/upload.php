@@ -67,9 +67,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_file'])) {
         die("Missing required test header information.");
     }
 
+    // --- Get academic year from form ---
+if (empty($_POST['year'])) {
+    die("Academic year is required.");
+}
+$test_year = $_POST['year'];
+
     // --- Check if test already exists before inserting ---
-    $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ? LIMIT 1");
-    $stmt->bind_param("sss", $test_title, $test_class, $test_subject);
+    $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ? AND year = ? LIMIT 1");
+    $stmt->bind_param("ssss", $test_title, $test_class, $test_subject, $test_year);
     $stmt->execute();
     $stmt->bind_result($existing_test_id);
     if ($stmt->fetch()) {
@@ -77,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_file'])) {
         $stmt->close();
     } else {
         $stmt->close();
-        $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("sssi", $test_title, $test_class, $test_subject, $test_duration);
+        $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration, year) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssis", $test_title, $test_class, $test_subject, $test_duration, $test_year);
         $stmt->execute();
         $test_id = $stmt->insert_id;
         $stmt->close();
@@ -192,7 +198,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_file'])) {
     }
 
     echo "✅ Test and questions uploaded successfully.";
+    echo '<br><br><a href="add_question.php" style="text-decoration:none;font-size:18px;">⬅ Back</a>';
 
 } else {
     echo "❌ No file uploaded.";
+    echo '<br><br><a href="add_question.php" style="text-decoration:none;font-size:18px;">⬅ Back</a>';
 }

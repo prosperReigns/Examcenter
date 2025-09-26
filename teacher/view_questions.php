@@ -83,6 +83,8 @@ try {
     $class_filter = trim($_GET['class'] ?? '');
     $subject_filter = trim($_GET['subject'] ?? '');
     $search_term = trim($_GET['search'] ?? '');
+    $year_filter = trim($_GET['year'] ?? '');
+    $test_title_filter = trim($_GET['test_title'] ?? '');
 
     // Initialize error/success messages
     $error = $success = '';
@@ -164,7 +166,7 @@ try {
                     FROM new_questions q
                     JOIN tests t ON q.test_id = t.id
                     WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
-    $select_query = "SELECT q.*, t.title as test_title, t.class, t.subject 
+    $select_query = "SELECT q.*, t.title as test_title, t.class, t.subject, t.year 
                      FROM new_questions q
                      JOIN tests t ON q.test_id = t.id
                      WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
@@ -193,6 +195,20 @@ try {
         $params[] = "%$search_term%";
         $params[] = "%$search_term%";
         $types .= 'ss';
+    }
+
+    if (!empty($year_filter)) {
+        $count_query .= " AND t.year = ?";
+        $select_query .= " AND t.year = ?";
+        $params[] = $year_filter;
+        $types .= 's';
+    }
+
+    if (!empty($test_title_filter)) {
+        $count_query .= " AND t.title = ?";
+        $select_query .= " AND t.title = ?";
+        $params[] = $test_title_filter;
+        $types .= 's';
     }
 
     // Get total questions
@@ -232,7 +248,7 @@ try {
     $questions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    // Get unique classes and subjects for filters (restricted to assigned subjects)
+    // Get unique classes, years, and test titles for filters (restricted to assigned subjects)
     $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
     $stmt = $conn->prepare("SELECT DISTINCT class FROM tests WHERE subject IN ($placeholders) ORDER BY class");
     $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
@@ -240,10 +256,16 @@ try {
     $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT DISTINCT subject FROM tests WHERE subject IN ($placeholders) ORDER BY subject");
+    $stmt = $conn->prepare("SELECT DISTINCT year FROM tests WHERE subject IN ($placeholders) ORDER BY year DESC");
     $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
     $stmt->execute();
-    $subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT DISTINCT title FROM tests WHERE subject IN ($placeholders) ORDER BY title");
+    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
+    $stmt->execute();
+    $test_titles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
 } catch (Exception $e) {
@@ -287,6 +309,7 @@ try {
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
             <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
             <a href="view_questions.php" class="active"><i class="fas fa-list"></i>View Questions</a>
+            <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="manage_students.php" style="text-decoration: line-through"><i class="fas fa-users"></i>Manage Students</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
@@ -322,7 +345,7 @@ try {
                 <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Questions</h5>
                 <form method="GET" action="">
                     <div class="row g-3">
-                        <div class="col-md-3 form-group-spacing">
+                        <div class="col-md-2 form-group-spacing">
                             <label class="form-label fw-bold">Class</label>
                             <select class="form-select" name="class" id="classSelect">
                                 <option value="">All Classes</option>
@@ -333,7 +356,7 @@ try {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3 form-group-spacing">
+                        <div class="col-md-2 form-group-spacing">
                             <label class="form-label fw-bold">Subject</label>
                             <select class="form-select" name="subject" id="subjectSelect">
                                 <option value="">All Subjects</option>
@@ -344,14 +367,36 @@ try {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-4 form-group-spacing">
+                        <div class="col-md-2 form-group-spacing">
+                            <label class="form-label fw-bold">Year</label>
+                            <select class="form-select" name="year">
+                                <option value="">All Years</option>
+                                <?php foreach ($years as $year): ?>
+                                    <option value="<?php echo htmlspecialchars($year['year']); ?>" <?php echo $year_filter == $year['year'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($year['year']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2 form-group-spacing">
+                            <label class="form-label fw-bold">Test Title</label>
+                            <select class="form-select" name="test_title">
+                                <option value="">All Test Titles</option>
+                                <?php foreach ($test_titles as $title): ?>
+                                    <option value="<?php echo htmlspecialchars($title['title']); ?>" <?php echo $test_title_filter == $title['title'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($title['title']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3 form-group-spacing">
                             <label class="form-label fw-bold">Search</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" name="search" placeholder="Search questions or tests..." value="<?php echo htmlspecialchars($search_term); ?>">
                                 <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i></button>
                             </div>
                         </div>
-                        <div class="col-md-2 d-flex align-items-end form-group-spacing">
+                        <div class="col-md-1 d-flex align-items-end form-group-spacing">
                             <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-2"></i>Apply</button>
                         </div>
                     </div>
@@ -370,11 +415,17 @@ try {
                         <?php if (!empty($subject_filter)): ?>
                             in <?php echo htmlspecialchars($subject_filter); ?>
                         <?php endif; ?>
+                        <?php if (!empty($year_filter)): ?>
+                            - Year <?php echo htmlspecialchars($year_filter); ?>
+                        <?php endif; ?>
+                        <?php if (!empty($test_title_filter)): ?>
+                            - Test <?php echo htmlspecialchars($test_title_filter); ?>
+                        <?php endif; ?>
                     <?php else: ?>
                         No questions found
                     <?php endif; ?>
                 </h5>
-                <?php if (!empty($class_filter) || !empty($subject_filter) || !empty($search_term)): ?>
+                <?php if (!empty($class_filter) || !empty($subject_filter) || !empty($search_term) || !empty($year_filter) || !empty($test_title_filter)): ?>
                     <a href="view_questions.php" class="btn btn-outline-secondary"><i class="fas fa-times me-2"></i>Clear Filters</a>
                 <?php endif; ?>
             </div>
@@ -389,7 +440,7 @@ try {
                                 <span class="badge bg-secondary text-white me-2"><?php echo htmlspecialchars($question['subject']); ?></span>
                                 <span class="badge bg-info text-white"><?php echo ucwords(str_replace('_', ' ', $question['question_type'])); ?></span>
                             </div>
-                            <small class="text-muted">Test: <?php echo htmlspecialchars($question['test_title']); ?></small>
+                            <small class="text-muted">Test: <?php echo htmlspecialchars($question['test_title']); ?> (Year: <?php echo htmlspecialchars($question['year']); ?>)</small>
                         </div>
                         <div class="question-text mb-3">
                             <?php echo nl2br(htmlspecialchars($question['question_text'])); ?>
@@ -471,7 +522,7 @@ try {
                     <nav aria-label="Page navigation">
                         <ul class="pagination justify-content-center">
                             <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
-                                <a class="page-link" href="?page=<?php echo $current_page - 1; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>" aria-label="Previous">
+                                <a class="page-link" href="?page=<?php echo $current_page - 1; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>&year=<?php echo urlencode($year_filter); ?>&test_title=<?php echo urlencode($test_title_filter); ?>" aria-label="Previous">
                                     <span aria-hidden="true">« Previous</span>
                                 </a>
                             </li>
@@ -479,24 +530,24 @@ try {
                             $start_page = max(1, $current_page - 2);
                             $end_page = min($total_pages, $current_page + 2);
                             if ($start_page > 1): ?>
-                                <li class="page-item"><a class="page-link" href="?page=1&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>">1</a></li>
+                                <li class="page-item"><a class="page-link" href="?page=1&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>&year=<?php echo urlencode($year_filter); ?>&test_title=<?php echo urlencode($test_title_filter); ?>">1</a></li>
                                 <?php if ($start_page > 2): ?>
                                     <li class="page-item disabled"><span class="page-link">...</span></li>
                                 <?php endif; ?>
                             <?php endif; ?>
                             <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
                                 <li class="page-item <?php echo $i == $current_page ? 'active' : ''; ?>">
-                                    <a class="page-link" href="?page=<?php echo $i; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>"><?php echo $i; ?></a>
+                                    <a class="page-link" href="?page=<?php echo $i; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>&year=<?php echo urlencode($year_filter); ?>&test_title=<?php echo urlencode($test_title_filter); ?>"><?php echo $i; ?></a>
                                 </li>
                             <?php endfor; ?>
                             <?php if ($end_page < $total_pages): ?>
                                 <?php if ($end_page < $total_pages - 1): ?>
                                     <li class="page-item disabled"><span class="page-link">...</span></li>
                                 <?php endif; ?>
-                                <li class="page-item"><a class="page-link" href="?page=<?php echo $total_pages; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>"><?php echo $total_pages; ?></a></li>
+                                <li class="page-item"><a class="page-link" href="?page=<?php echo $total_pages; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>&year=<?php echo urlencode($year_filter); ?>&test_title=<?php echo urlencode($test_title_filter); ?>"><?php echo $total_pages; ?></a></li>
                             <?php endif; ?>
                             <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
-                                <a class="page-link" href="?page=<?php echo $current_page + 1; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>" aria-label="Next">
+                                <a class="page-link" href="?page=<?php echo $current_page + 1; ?>&class=<?php echo urlencode($class_filter); ?>&subject=<?php echo urlencode($subject_filter); ?>&search=<?php echo urlencode($search_term); ?>&year=<?php echo urlencode($year_filter); ?>&test_title=<?php echo urlencode($test_title_filter); ?>" aria-label="Next">
                                     <span aria-hidden="true">Next »</span>
                                 </a>
                             </li>

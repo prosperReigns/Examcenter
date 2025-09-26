@@ -1,25 +1,21 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../vendor/autoload.php'; // Adjust path if PHPWord is elsewhere
 
-// Enable error reporting
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-ini_set('log_errors', 1);
-ini_set('error_log', '../logs/errors.log');
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\IOFactory;
 
-// Check if user is logged in
+// Check if user is logged in and is admin
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'admin') {
-    error_log("Redirecting to login: No user_id or invalid role in session");
     header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
 }
 
-// Initialize database connection
 try {
     $database = Database::getInstance();
     $conn = $database->getConnection();
+
     if ($conn->connect_error) {
         error_log("Database connection failed: " . $conn->connect_error);
         die("Connection failed: " . $conn->connect_error);
@@ -44,152 +40,235 @@ try {
         exit();
     }
 
-    // Log page access
-    $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
-    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-    $activity = "Admin {$admin['username']} accessed view results page.";
-    $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-    $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
-    $stmt->execute();
-    $stmt->close();
-} catch (Exception $e) {
-    error_log("Page error: " . $e->getMessage());
-    die("System error");
-}
+    // Define subjects (added to match teacher version)
+    $jss_subjects = [
+        'Mathematics', 'English', 'ICT', 'Agriculture', 'History',
+        'Civic Education', 'Basic Science', 'Basic Technology',
+        'Business studies', 'Agricultural sci', 'Physical Health Edu',
+        'Cultural and Creative Art', 'Social Studies', 'Security Edu',
+        'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
+    ];
+    $ss_subjects = [
+        'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
+        'Government', 'Commerce', 'Accounting', 'Financial Accounting',
+        'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology',
+        'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
+        'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
+    ];
 
-// Define all possible classes and subjects
-$all_classes = ['JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'];
-$jss_subjects = [
-    'mathematics', 'english', 'ict', 'agriculture', 'history', 
-    'civic education', 'basic science', 'basic technology', 
-    'business studies', 'agricultural sci', 'physical health edu',
-    'cultural and creative art', 'social studies', 'security edu', 
-    'yoruba', 'french', 'coding and robotics', 'c.r.s', 'i.r.s', 'chess'
-];
-$ss_subjects = [
-    'mathematics', 'english', 'civic edu', 'data processing', 'economics',
-    'government', 'commerce', 'accounting', 'financial accounting', 
-    'dyeing and bleaching', 'physics', 'chemistry', 'biology', 
-    'agricultural sci', 'geography', 'technical drawing', 'yoruba lang',
-    'french lang', 'further maths', 'literature in english', 'c.r.s', 'i.r.s'
-];
+    // Pagination settings
+    $results_per_page = 10;
+    $current_page = isset($_GET['page']) && is_numeric($_GET['page']) ? intval($_GET['page']) : 1;
+    if ($current_page < 1) $current_page = 1;
+    $offset = ($current_page - 1) * $results_per_page;
 
-// Pagination settings
-$results_per_page = 10;
-$current_page = isset($_GET['page']) && is_numeric($_GET['page']) ? intval($_GET['page']) : 1;
-$current_page = max(1, $current_page);
-$offset = ($current_page - 1) * $results_per_page;
+    // Filters
+    $class_filter = trim($_GET['selected_class'] ?? '');
+    $subject_filter = trim($_GET['selected_subject'] ?? '');
+    $test_title_filter = trim($_GET['selected_title'] ?? '');
+    $year_filter = trim($_GET['selected_year'] ?? '');
+    $student_name_filter = trim($_GET['student_name'] ?? '');
 
-// Initialize filter variables and messages
-$test_title_filter = trim($_GET['selected_title'] ?? '');
-$class_filter = trim($_GET['selected_class'] ?? '');
-$subject_filter = trim($_GET['selected_subject'] ?? '');
-$error = '';
-$success = '';
+    // Export to Word
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
+        $export_query = "SELECT r.*, s.name AS student_name, s.class AS student_class,
+                         t.subject, t.title AS test_title, t.class AS test_class, t.year
+                         FROM results r
+                         JOIN students s ON r.user_id = s.id
+                         JOIN tests t ON r.test_id = t.id
+                         WHERE 1=1";
 
-// Validate filter inputs
-if ($class_filter && !in_array($class_filter, $all_classes)) {
-    $error = "Invalid class selected.";
-    $class_filter = '';
-}
-if ($subject_filter && !in_array(strtolower($subject_filter), array_merge($jss_subjects, $ss_subjects))) {
-    $error = "Invalid subject selected.";
-    $subject_filter = '';
-}
+        $export_params = [];
+        $export_types = '';
 
-// Fetch test titles
-try {
-    $stmt = $conn->prepare("SELECT DISTINCT title FROM tests ORDER BY title ASC");
-    $stmt->execute();
-    $test_titles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-} catch (Exception $e) {
-    error_log("Error fetching test titles: " . $e->getMessage());
-    $error = "Failed to load test titles.";
-}
+        if (!empty($test_title_filter)) {
+            $export_query .= " AND t.title = ?";
+            $export_params[] = $test_title_filter;
+            $export_types .= 's';
+        }
+        if (!empty($class_filter)) {
+            $export_query .= " AND s.class = ?";
+            $export_params[] = $class_filter;
+            $export_types .= 's';
+        }
+        if (!empty($subject_filter)) {
+            $export_query .= " AND t.subject = ?";
+            $export_params[] = $subject_filter;
+            $export_types .= 's';
+        }
+        if (!empty($year_filter)) {
+            $export_query .= " AND t.year = ?";
+            $export_params[] = $year_filter;
+            $export_types .= 's';
+        }
+        if (!empty($student_name_filter)) {
+            $export_query .= " AND s.name LIKE ?";
+            $export_params[] = "%$student_name_filter%";
+            $export_types .= 's';
+        }
 
-// Build queries
-$count_query = "SELECT COUNT(*) as total 
-                FROM results r
-                JOIN students s ON r.user_id = s.id
-                JOIN tests t ON r.test_id = t.id
-                WHERE 1=1";
-$select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
-                        t.subject, t.title AS test_title, t.class AS test_class 
-                 FROM results r
-                 JOIN students s ON r.user_id = s.id
-                 JOIN tests t ON r.test_id = t.id
-                 WHERE 1=1";
-$params = [];
-$types = '';
+        $stmt = $conn->prepare($export_query);
+        if (!$stmt) die("Database error: " . $conn->error);
+        if (!empty($export_params)) $stmt->bind_param($export_types, ...$export_params);
+        $stmt->execute();
+        $export_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
 
-if ($test_title_filter) {
-    $count_query .= " AND t.title = ?";
-    $select_query .= " AND t.title = ?";
-    $params[] = $test_title_filter;
-    $types .= 's';
-}
-if ($class_filter) {
-    $count_query .= " AND s.class = ?";
-    $select_query .= " AND s.class = ?";
-    $params[] = $class_filter;
-    $types .= 's';
-}
-if ($subject_filter) {
-    $count_query .= " AND LOWER(t.subject) = ?";
-    $select_query .= " AND LOWER(t.subject) = ?";
-    $params[] = strtolower($subject_filter);
-    $types .= 's';
-}
+        // Create Word document
+        $phpWord = new PhpWord();
+        $section = $phpWord->addSection();
+        $section->addTitle('Exam Results Report', 1);
+        $section->addText('Generated on: ' . date('F j, Y g:i A'));
+        if ($test_title_filter) $section->addText('Test: ' . $test_title_filter);
+        if ($class_filter) $section->addText('Class: ' . $class_filter);
+        if ($subject_filter) $section->addText('Subject: ' . $subject_filter);
+        if ($year_filter) $section->addText('Year: ' . $year_filter);
+        if ($student_name_filter) $section->addText('Student: ' . $student_name_filter);
 
-// Get total results
-try {
+        $table = $section->addTable(['borderSize' => 1, 'borderColor' => '999999', 'cellMargin' => 80]);
+        $table->addRow();
+        $table->addCell(2000)->addText('Student', ['bold' => true]);
+        $table->addCell(1500)->addText('Class', ['bold' => true]);
+        $table->addCell(2000)->addText('Test Title', ['bold' => true]);
+        $table->addCell(1500)->addText('Subject', ['bold' => true]);
+        $table->addCell(1000)->addText('Score', ['bold' => true]);
+        $table->addCell(1000)->addText('Percentage', ['bold' => true]);
+        $table->addCell(1500)->addText('Date', ['bold' => true]);
+        $table->addCell(1000)->addText('Year', ['bold' => true]);
+
+        foreach ($export_results as $result) {
+            $percentage = round(($result['score'] / $result['total_questions']) * 100, 2);
+            $table->addRow();
+            $table->addCell(2000)->addText(htmlspecialchars($result['student_name']));
+            $table->addCell(1500)->addText(htmlspecialchars($result['student_class']));
+            $table->addCell(2000)->addText(htmlspecialchars($result['test_title']));
+            $table->addCell(1500)->addText(htmlspecialchars($result['subject']));
+            $table->addCell(1000)->addText($result['score'] . '/' . $result['total_questions']);
+            $table->addCell(1000)->addText($percentage . '%');
+            $table->addCell(1500)->addText(date('M j, Y g:i A', strtotime($result['created_at'])));
+            $table->addCell(1000)->addText(htmlspecialchars($result['year']));
+        }
+
+        $filename = 'Exam_Results_' . date('Ymd_His') . '.docx';
+        $temp_file = tempnam(sys_get_temp_dir(), 'phpword');
+        $writer = IOFactory::createWriter($phpWord, 'Word2007');
+        $writer->save($temp_file);
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . filesize($temp_file));
+        readfile($temp_file);
+        unlink($temp_file);
+        exit;
+    }
+
+    // Count total results for pagination
+    $count_query = "SELECT COUNT(*) as total 
+                    FROM results r
+                    JOIN students s ON r.user_id = s.id
+                    JOIN tests t ON r.test_id = t.id
+                    WHERE 1=1";
+
+    $select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class,
+                     t.subject, t.title AS test_title, t.class AS test_class, t.year
+                     FROM results r
+                     JOIN students s ON r.user_id = s.id
+                     JOIN tests t ON r.test_id = t.id
+                     WHERE 1=1";
+
+    $params = [];
+    $types = '';
+
+    if (!empty($test_title_filter)) {
+        $count_query .= " AND t.title = ?";
+        $select_query .= " AND t.title = ?";
+        $params[] = $test_title_filter;
+        $types .= 's';
+    }
+    if (!empty($class_filter)) {
+        $count_query .= " AND s.class = ?";
+        $select_query .= " AND s.class = ?";
+        $params[] = $class_filter;
+        $types .= 's';
+    }
+    if (!empty($subject_filter)) {
+        $count_query .= " AND t.subject = ?";
+        $select_query .= " AND t.subject = ?";
+        $params[] = $subject_filter;
+        $types .= 's';
+    }
+    if (!empty($year_filter)) {
+        $count_query .= " AND t.year = ?";
+        $select_query .= " AND t.year = ?";
+        $params[] = $year_filter;
+        $types .= 's';
+    }
+    if (!empty($student_name_filter)) {
+        $count_query .= " AND s.name LIKE ?";
+        $select_query .= " AND s.name LIKE ?";
+        $params[] = "%$student_name_filter%";
+        $types .= 's';
+    }
+
+    // Get total results
     $stmt = $conn->prepare($count_query);
-    if ($params) {
+    if (!$stmt) {
+        error_log("Prepare failed for count query: " . $conn->error);
+        die("Database error");
+    }
+    if (!empty($params)) {
         $stmt->bind_param($types, ...$params);
     }
     $stmt->execute();
     $total_results = $stmt->get_result()->fetch_assoc()['total'];
+    error_log("Total results: $total_results"); // Debug log
     $stmt->close();
-} catch (Exception $e) {
-    error_log("Error counting results: " . $e->getMessage());
-    $error = "Failed to load results count.";
-}
 
-// Adjust pagination
-$total_pages = ceil($total_results / $results_per_page);
-$current_page = min($current_page, max(1, $total_pages));
-$offset = ($current_page - 1) * $results_per_page;
+    $total_pages = ceil($total_results / $results_per_page);
+    if ($current_page > $total_pages && $total_pages > 0) {
+        $current_page = $total_pages;
+        $offset = ($current_page - 1) * $results_per_page;
+    }
 
-// Fetch results
-try {
+    // Fetch results for current page
     $select_query .= " ORDER BY r.created_at DESC LIMIT ? OFFSET ?";
     $params[] = $results_per_page;
     $params[] = $offset;
     $types .= 'ii';
+
     $stmt = $conn->prepare($select_query);
-    $stmt->bind_param($types, ...$params);
+    if (!$stmt) {
+        error_log("Prepare failed for select query: " . $conn->error);
+        die("Database error");
+    }
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
     $stmt->execute();
     $results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    error_log("Fetched results count: " . count($results)); // Debug log
     $stmt->close();
+
+    // Get unique classes, years, and test titles for filters (no subject restriction for admin)
+    $stmt = $conn->prepare("SELECT DISTINCT s.class FROM students s JOIN results r ON s.id = r.user_id JOIN tests t ON r.test_id = t.id ORDER BY s.class");
+    $stmt->execute();
+    $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id ORDER BY t.year DESC");
+    $stmt->execute();
+    $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT DISTINCT t.title FROM tests t JOIN results r ON t.id = r.test_id ORDER BY t.title");
+    $stmt->execute();
+    $test_titles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
 } catch (Exception $e) {
-    error_log("Error fetching results: " . $e->getMessage());
-    $error = "Failed to load results.";
+    error_log("View results error: " . $e->getMessage());
+    die("System error");
 }
-
-// Log filter application
-if ($test_title_filter || $class_filter || $subject_filter) {
-    $activity = "Admin applied filters: Title=$test_title_filter, Class=$class_filter, Subject=$subject_filter";
-    try {
-        $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-        $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
-        $stmt->execute();
-        $stmt->close();
-    } catch (Exception $e) {
-        error_log("Error logging filter application: " . $e->getMessage());
-    }
-}
-
 $conn->close();
 ?>
 
@@ -201,68 +280,18 @@ $conn->close();
     <title>View Results | D-Portal CBT</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
-    <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
-    <link rel="stylesheet" href="../css/dashboard.css">
-    <link rel="stylesheet" href="../css/sidebar.css">
+    <link rel="stylesheet" href="../css/view_results.css">
     <style>
-        .results-table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: white;
-        }
-        .results-table th {
-            background-color: #4361ee;
-            color: white;
-            padding: 12px;
-            text-align: left;
-        }
-        .results-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #e9ecef;
-            color: #212529;
-        }
-        .results-table tr:hover {
-            background-color: #f8f9fa;
-        }
-        .badge-class, .badge-subject {
-            background-color: #e9ecef;
-            color: #212529;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
-        .percentage-cell.high {
-            color: #28a745;
-            font-weight: bold;
-        }
-        .percentage-cell.medium {
-            color: #ffc107;
-            font-weight: bold;
-        }
-        .percentage-cell.low {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 50px;
-            color: #6c757d;
-        }
-        .pagination .btn {
-            min-width: 100px;
-        }
-        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: #4361ee;
-            color: white !important;
-            border-color: #4361ee;
-        }
-        .dataTables_wrapper .dataTables_paginate .paginate_button {
-            color: #4361ee !important;
-        }
-        .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_length {
-            color: #333 !important;
-        }
+        .filter-card { background: #f8f9fa; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .results-table { background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-group-spacing { margin-bottom: 1.5rem; }
+        .percentage-cell.high { color: #28a745; }
+        .percentage-cell.medium { color: #ffc107; }
+        .percentage-cell.low { color: #dc3545; }
+        .empty-state { text-align: center; padding: 3rem; color: #6c757d; }
+        .pagination .page-link { color: #4361ee; }
+        .pagination .page-item.active .page-link { background-color: #4361ee; border-color: #4361ee; color: white; }
     </style>
 </head>
 <body>
@@ -271,13 +300,13 @@ $conn->close();
         <div class="sidebar-brand">
             <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
             <div class="admin-info">
-                <b><small>Welcome back,</small>
-                <h6><?php echo htmlspecialchars($admin['username']); ?></h6></b>
+                <small>Welcome back,</small>
+                <h6><?php echo htmlspecialchars($admin['username']); ?></h6>
             </div>
         </div>
         <div class="sidebar-menu mt-4">
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-            <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="add_question.php" style="text-decoration: line-through"><i class="fas fa-plus-circle"></i>Add Questions</a>
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php" class="active"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
@@ -291,47 +320,19 @@ $conn->close();
     <div class="main-content">
         <!-- Header -->
         <div class="header d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">Exam Results</h2>
-            <div class="d-flex gap-3">
-                <?php if ($total_results > 0): ?>
-                    <a href="../admin/export_results_word.php?<?php echo http_build_query([
-                        'selected_title' => $test_title_filter,
-                        'selected_class' => $class_filter,
-                        'selected_subject' => $subject_filter,
-                        'admin_id' => $admin_id
-                    ]); ?>" class="btn btn-success" id="exportWord">
-                        <i class="fas fa-file-word me-2"></i>Export to Word
-                    </a>
-                <?php endif; ?>
-                <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
-            </div>
+            <h2 class="mb-0">View Results</h2>
+            <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
         </div>
 
-        <!-- Alerts -->
-        <?php if ($error): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <?php echo htmlspecialchars($error); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-        <?php if ($success): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <?php echo htmlspecialchars($success); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
-        <!-- Filter Card -->
-        <div class="card bg-white border-0 shadow-sm filter-card mb-4">
-            <div class="card-header bg-white border-0">
-                <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filter Results</h5>
-            </div>
-            <div class="card-body">
-                <form method="GET" id="filterForm">
+        <div class="container-fluid">
+            <!-- Filter Card -->
+            <div class="filter-card mb-4">
+                <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Results</h5>
+                <form method="GET" action="">
                     <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold" for="titleFilter">Test Title</label>
-                            <select class="form-select" name="selected_title" id="titleFilter">
+                        <div class="col-md-2 form-group-spacing">
+                            <label class="form-label fw-bold">Test Title</label>
+                            <select class="form-select" name="selected_title">
                                 <option value="">All Tests</option>
                                 <?php foreach ($test_titles as $title): ?>
                                     <option value="<?php echo htmlspecialchars($title['title']); ?>" <?php echo $test_title_filter == $title['title'] ? 'selected' : ''; ?>>
@@ -339,47 +340,99 @@ $conn->close();
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="invalid-feedback">Please select a valid test title.</div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold" for="classFilter">Class</label>
-                            <select class="form-select" name="selected_class" id="classFilter">
+                        <div class="col-md-2 form-group-spacing">
+                            <label class="form-label fw-bold">Class</label>
+                            <select class="form-select" name="selected_class" id="selectedClass">
                                 <option value="">All Classes</option>
-                                <?php foreach ($all_classes as $class): ?>
-                                    <option value="<?php echo htmlspecialchars($class); ?>" <?php echo $class_filter == $class ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($class); ?>
+                                <?php foreach ($classes as $class): ?>
+                                    <option value="<?php echo htmlspecialchars($class['class']); ?>" <?php echo $class_filter == $class['class'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($class['class']); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="invalid-feedback">Please select a valid class.</div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold" for="subjectFilter">Subject</label>
-                            <select class="form-select" name="selected_subject" id="subjectFilter">
+                        <div class="col-md-2 form-group-spacing">
+                            <label class="form-label fw-bold">Subject</label>
+                            <select class="form-select" name="selected_subject" id="selectedSubject">
                                 <option value="">All Subjects</option>
+                                <?php
+                                $available_subjects = array_merge($jss_subjects, $ss_subjects); // Admin sees all subjects
+                                foreach ($available_subjects as $subject): ?>
+                                    <option value="<?php echo htmlspecialchars($subject); ?>" <?php echo $subject_filter == $subject ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($subject); ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
-                            <div class="invalid-feedback">Please select a valid subject.</div>
                         </div>
-                        <div class="col-md-3 d-flex align-items-end">
+                        <div class="col-md-2 form-group-spacing">
+                            <label class="form-label fw-bold">Year</label>
+                            <select class="form-select" name="selected_year">
+                                <option value="">All Years</option>
+                                <?php foreach ($years as $year): ?>
+                                    <option value="<?php echo htmlspecialchars($year['year']); ?>" <?php echo $year_filter == $year['year'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($year['year']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2 form-group-spacing">
+                            <label class="form-label fw-bold">Student Name</label>
+                            <input type="text" class="form-control" name="student_name" value="<?php echo htmlspecialchars($student_name_filter); ?>" placeholder="Enter student name">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end form-group-spacing">
                             <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-2"></i>Apply</button>
                         </div>
                     </div>
-                    <?php if ($test_title_filter || $class_filter || $subject_filter): ?>
-                        <a href="view_results.php" class="btn btn-outline-secondary mt-3"><i class="fas fa-times me-2"></i>Clear Filters</a>
-                    <?php endif; ?>
                 </form>
+                <?php if ($total_results > 0): ?>
+                    <form method="POST" action="" class="mt-3">
+                        <input type="hidden" name="selected_title" value="<?php echo htmlspecialchars($test_title_filter); ?>">
+                        <input type="hidden" name="selected_class" value="<?php echo htmlspecialchars($class_filter); ?>">
+                        <input type="hidden" name="selected_subject" value="<?php echo htmlspecialchars($subject_filter); ?>">
+                        <input type="hidden" name="selected_year" value="<?php echo htmlspecialchars($year_filter); ?>">
+                        <input type="hidden" name="student_name" value="<?php echo htmlspecialchars($student_name_filter); ?>">
+                        <input type="hidden" name="export_results" value="1">
+                        <button type="submit" class="btn btn-success"><i class="fas fa-file-word me-2"></i>Export to Word</button>
+                    </form>
+                <?php endif; ?>
             </div>
-        </div>
 
-        <!-- Results Table -->
-        <div class="card bg-white border-0 shadow-sm">
-            <div class="card-header bg-white border-0">
-                <h5 class="mb-0">Results List (<?php echo $total_results; ?> total)</h5>
+            <!-- Results Summary -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>
+                    <?php if ($total_results > 0): ?>
+                        Showing <?php echo count($results); ?> of <?php echo $total_results; ?> result<?php echo $total_results !== 1 ? 's' : ''; ?>
+                        (Page <?php echo $current_page; ?> of <?php echo $total_pages; ?>)
+                        <?php if (!empty($test_title_filter)): ?>
+                            for "<?php echo htmlspecialchars($test_title_filter); ?>"
+                        <?php endif; ?>
+                        <?php if (!empty($class_filter)): ?>
+                            in <?php echo htmlspecialchars($class_filter); ?>
+                        <?php endif; ?>
+                        <?php if (!empty($subject_filter)): ?>
+                            - <?php echo htmlspecialchars($subject_filter); ?>
+                        <?php endif; ?>
+                        <?php if (!empty($year_filter)): ?>
+                            - Year <?php echo htmlspecialchars($year_filter); ?>
+                        <?php endif; ?>
+                        <?php if (!empty($student_name_filter)): ?>
+                            - Student <?php echo htmlspecialchars($student_name_filter); ?>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        No results found
+                    <?php endif; ?>
+                </h5>
+                <?php if (!empty($test_title_filter) || !empty($class_filter) || !empty($subject_filter) || !empty($year_filter) || !empty($student_name_filter)): ?>
+                    <a href="view_results.php" class="btn btn-outline-secondary"><i class="fas fa-times me-2"></i>Clear Filters</a>
+                <?php endif; ?>
             </div>
-            <div class="card-body">
-                <?php if (!empty($results)): ?>
-                    <table id="resultsTable" class="table table-striped table-hover results-table">
-                        <thead>
+
+            <!-- Results Table -->
+            <?php if (!empty($results)): ?>
+                <div class="results-table table-responsive">
+                    <table class="table table-hover">
+                        <thead class="bg-primary text-white">
                             <tr>
                                 <th>Student</th>
                                 <th>Class</th>
@@ -388,53 +441,81 @@ $conn->close();
                                 <th>Score</th>
                                 <th>Percentage</th>
                                 <th>Date</th>
+                                <th>Year</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($results as $result): 
-                                $percentage = $result['total_questions'] > 0 ? round(($result['score'] / $result['total_questions']) * 100, 2) : 0;
+                                $percentage = round(($result['score'] / $result['total_questions']) * 100, 2);
                                 $percentage_class = $percentage >= 70 ? 'high' : ($percentage >= 50 ? 'medium' : 'low');
                             ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($result['student_name']); ?></td>
-                                    <td><span class="badge badge-class"><?php echo htmlspecialchars($result['student_class']); ?></span></td>
+                                    <td><span class="badge bg-primary text-white"><?php echo htmlspecialchars($result['student_class']); ?></span></td>
                                     <td><?php echo htmlspecialchars($result['test_title']); ?></td>
-                                    <td><span class="badge badge-subject"><?php echo htmlspecialchars($result['subject']); ?></span></td>
-                                    <td><?php echo htmlspecialchars($result['score'] . ' / ' . $result['total_questions']); ?></td>
-                                    <td class="percentage-cell <?php echo $percentage_class; ?>"><?php echo $percentage; ?>%</td>
+                                    <td><span class="badge bg-secondary text-white"><?php echo htmlspecialchars($result['subject']); ?></span></td>
+                                    <td><?php echo $result['score']; ?> / <?php echo $result['total_questions']; ?></td>
+                                    <td class="percentage-cell <?php echo $percentage_class; ?>">
+                                        <?php echo $percentage; ?>%
+                                    </td>
                                     <td><?php echo date('M j, Y g:i A', strtotime($result['created_at'])); ?></td>
+                                    <td><?php echo htmlspecialchars($result['year']); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
-                    <?php if ($total_pages > 1): ?>
-                        <div class="pagination d-flex justify-content-center mt-4">
-                            <?php if ($current_page > 1): ?>
-                                <a href="?page=<?php echo $current_page - 1; ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>" class="btn btn-outline-primary me-2">Previous</a>
+                </div>
+
+                <!-- Pagination -->
+                <?php if ($total_pages > 1): ?>
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="?page=<?php echo $current_page - 1; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>" aria-label="Previous">
+                                    <span aria-hidden="true">« Previous</span>
+                                </a>
+                            </li>
+                            <?php
+                            $start_page = max(1, $current_page - 2);
+                            $end_page = min($total_pages, $current_page + 2);
+                            if ($start_page > 1): ?>
+                                <li class="page-item"><a class="page-link" href="?page=1&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>">1</a></li>
+                                <?php if ($start_page > 2): ?>
+                                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                                <?php endif; ?>
                             <?php endif; ?>
-                            <span class="align-self-center">Page <?php echo $current_page; ?> of <?php echo $total_pages; ?></span>
-                            <?php if ($current_page < $total_pages): ?>
-                                <a href="?page=<?php echo $current_page + 1; ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>" class="btn btn-outline-primary ms-2">Next</a>
+                            <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                                <li class="page-item <?php echo $i == $current_page ? 'active' : ''; ?>">
+                                    <a class="page-link" href="?page=<?php echo $i; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>"><?php echo $i; ?></a>
+                                </li>
+                            <?php endfor; ?>
+                            <?php if ($end_page < $total_pages): ?>
+                                <?php if ($end_page < $total_pages - 1): ?>
+                                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                                <?php endif; ?>
+                                <li class="page-item"><a class="page-link" href="?page=<?php echo $total_pages; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>"><?php echo $total_pages; ?></a></li>
                             <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-chart-bar fa-3x mb-3"></i>
-                        <h4>No Results Found</h4>
-                        <p>Try adjusting your filters or check back later.</p>
-                    </div>
+                            <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="?page=<?php echo $current_page + 1; ?>&selected_class=<?php echo urlencode($class_filter); ?>&selected_subject=<?php echo urlencode($subject_filter); ?>&selected_title=<?php echo urlencode($test_title_filter); ?>&selected_year=<?php echo urlencode($year_filter); ?>&student_name=<?php echo urlencode($student_name_filter); ?>" aria-label="Next">
+                                    <span aria-hidden="true">Next »</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
                 <?php endif; ?>
-            </div>
+            <?php else: ?>
+                <div class="empty-state">
+                    <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                    <h4>No Results Found</h4>
+                    <p>Try adjusting your filters or check back later.</p>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
     <!-- Scripts -->
     <script src="../js/jquery-3.7.0.min.js"></script>
     <script src="../js/bootstrap.bundle.min.js"></script>
-    <script src="../js/jquery.dataTables.min.js"></script>
-    <script src="../js/dataTables.bootstrap5.min.js"></script>
-    <script src="../js/jquery.validate.min.js"></script>
     <script>
         $(document).ready(function() {
             // Sidebar toggle
@@ -442,121 +523,40 @@ $conn->close();
                 $('.sidebar').toggleClass('active');
             });
 
-            // Define subjects arrays
-            const jssSubjects = <?php echo json_encode($jss_subjects); ?>;
-            const ssSubjects = <?php echo json_encode($ss_subjects); ?>;
-            const allSubjects = [...new Set([...jssSubjects, ...ssSubjects])].sort();
+            // Class-subject mapping
+            const classSubjectMapping = {
+                'JSS1': <?php echo json_encode($jss_subjects); ?>,
+                'JSS2': <?php echo json_encode($jss_subjects); ?>,
+                'JSS3': <?php echo json_encode($jss_subjects); ?>,
+                'SS1': <?php echo json_encode($ss_subjects); ?>,
+                'SS2': <?php echo json_encode($ss_subjects); ?>,
+                'SS3': <?php echo json_encode($ss_subjects); ?>
+            };
+            const assignedSubjects = <?php echo json_encode($available_subjects); ?>;
 
-            // Function to populate subjects
-            function populateSubjects(selectedClass) {
-                const subjectSelect = $('#subjectFilter');
-                subjectSelect.find('option:not(:first)').remove();
-                let subjects = allSubjects;
-                if (selectedClass) {
-                    const isJSS = selectedClass.toUpperCase().includes('JSS');
-                    subjects = isJSS ? jssSubjects : ssSubjects;
-                }
-                subjects.forEach(subject => {
-                    const displaySubject = subject.charAt(0).toUpperCase() + subject.slice(1);
-                    subjectSelect.append(`<option value="${subject}">${displaySubject}</option>`);
-                });
-                // Restore selected subject
-                const currentSubject = "<?php echo addslashes($subject_filter); ?>".toLowerCase();
-                if (currentSubject) {
-                    if (subjects.includes(currentSubject)) {
-                        const displaySubject = currentSubject.charAt(0).toUpperCase() + currentSubject.slice(1);
-                        subjectSelect.val(currentSubject);
-                    } else {
-                        const displaySubject = currentSubject.charAt(0).toUpperCase() + currentSubject.slice(1);
-                        subjectSelect.append(`<option value="${currentSubject}">${displaySubject}</option>`);
-                        subjectSelect.val(currentSubject);
+            // Update subjects when class changes
+            const classSelect = document.getElementById('selectedClass');
+            const subjectSelect = document.getElementById('selectedSubject');
+            if (classSelect && subjectSelect) {
+                classSelect.addEventListener('change', function() {
+                    const selectedClass = this.value;
+                    subjectSelect.innerHTML = '<option value="">All Subjects</option>';
+                    if (selectedClass && classSubjectMapping[selectedClass]) {
+                        classSubjectMapping[selectedClass].filter(subject => assignedSubjects.includes(subject)).forEach(subject => {
+                            const option = document.createElement('option');
+                            option.value = subject;
+                            option.textContent = subject;
+                            subjectSelect.appendChild(option);
+                        });
                     }
+                });
+
+                // Trigger change event to populate subjects on page load if class is selected
+                if (classSelect.value) {
+                    classSelect.dispatchEvent(new Event('change'));
+                    subjectSelect.value = '<?php echo addslashes($subject_filter); ?>';
                 }
             }
-
-            // Class filter change handler
-            $('#classFilter').on('change', function() {
-                const selectedClass = $(this).val();
-                populateSubjects(selectedClass);
-            });
-
-            // Initialize subjects if class is selected
-            <?php if ($class_filter): ?>
-                populateSubjects("<?php echo addslashes($class_filter); ?>");
-            <?php else: ?>
-                populateSubjects("");
-            <?php endif; ?>
-
-            // Form validation
-            $('#filterForm').validate({
-                rules: {
-                    selected_title: {
-                        maxlength: 255
-                    },
-                    selected_class: {
-                        regex: /^(JSS[1-3]|SS[1-3])$/ // Allow valid class names or empty
-                    },
-                    selected_subject: {
-                        regex: /^[a-z0-9\s\-\.]+$/
-                    }
-                },
-                messages: {
-                    selected_title: {
-                        maxlength: "Test title is too long."
-                    },
-                    selected_class: {
-                        regex: "Please select a valid class (e.g., JSS1, SS2)."
-                    },
-                    selected_subject: {
-                        regex: "Please select a valid subject."
-                    }
-                },
-                errorElement: 'div',
-                errorClass: 'invalid-feedback',
-                highlight: function(element) {
-                    $(element).addClass('is-invalid');
-                },
-                unhighlight: function(element) {
-                    $(element).removeClass('is-invalid');
-                },
-                submitHandler: function(form) {
-                    const titleVal = $('#titleFilter').val().trim();
-                    const classVal = $('#classFilter').val().trim();
-                    const subjectVal = $('#subjectFilter').val().trim();
-                    if (!titleVal && !classVal && !subjectVal) {
-                        window.location.href = 'view_results.php';
-                    } else {
-                        form.submit();
-                    }
-                }
-            });
-
-            // Initialize DataTables
-            $('#resultsTable').DataTable({
-                pageLength: <?php echo $results_per_page; ?>,
-                paging: false, // Disable DataTables pagination to use custom pagination
-                searching: false,
-                lengthChange: false,
-                responsive: true,
-                columnDefs: [
-                    { orderable: false, targets: [4, 5] } // Disable sorting on Score and Percentage
-                ],
-                language: {
-                    emptyTable: '<div class="text-center py-4 empty-state"><i class="fas fa-chart-bar fa-3x mb-3"></i><h4>No Results Found</h4><p>Try adjusting your filters or check back later.</p></div>'
-                }
-            });
-
-            // Auto-hide alerts after 5 seconds
-            setTimeout(() => {
-                $('.alert').each(function() {
-                    new bootstrap.Alert(this).close();
-                });
-            }, 5000);
-
-            // Log filter application
-            <?php if ($test_title_filter || $class_filter || $subject_filter): ?>
-                console.log('Filters applied: Title=<?php echo htmlspecialchars($test_title_filter); ?>, Class=<?php echo htmlspecialchars($class_filter); ?>, Subject=<?php echo htmlspecialchars($subject_filter); ?>');
-            <?php endif; ?>
         });
     </script>
 </body>
