@@ -157,6 +157,7 @@ CREATE TABLE true_false_questions (
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
+-- 15. exam_attempts
 16. CREATE TABLE exam_attempts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -170,7 +171,7 @@ CREATE TABLE true_false_questions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_attempt (user_id, test_id, question_id),
     FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
-    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
+    --FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
 UPDATE settings SET setting_value = '1' WHERE setting_name = 'show_results_immediately';
