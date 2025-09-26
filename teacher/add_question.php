@@ -164,9 +164,8 @@ try {
 
 } catch (Exception $e) {
     error_log("Add question error: " . $e->getMessage());
-    die("System error");
+    die("An unexpected error occurred. Please try again later.");
 }
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -179,12 +178,6 @@ $conn->close();
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link rel="stylesheet" href="../css/add_question.css">
-    <style>
-        #imageUploadContainer { display: none; }
-        .question-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .form-group-spacing { margin-bottom: 1.5rem; }
-        .preview-disabled { cursor: not-allowed; opacity: 0.6; }
-    </style>
 </head>
 <body>
     <!-- Sidebar -->
@@ -246,17 +239,17 @@ $conn->close();
                         <h5 class="mb-3">Test Setup</h5>
                         <form method="POST" id="testForm" action="handle_test.php">
                             <div class="row g-4">
-                            <div class="col-md-3 form-group-spacing">
-                            <label class="form-label fw-bold" for="year">Academic Year:</label>
-                            <select class="form-select" name="year" id="year" required>
-                                <option value="">Select Academic Year</option>
-                                <option value="2025/2026">2025/2026</option>
-                                <option value="2026/2027">2026/2027</option>
-                                <option value="2027/2028">2027/2028</option>
-                                <option value="2028/2029">2028/2029</option>
-                                <option value="2029/2030">2029/2030</option>
-                            </select>
-                            </div>
+                                <div class="col-md-3 form-group-spacing">
+                                    <label class="form-label fw-bold" for="year">Academic Year:</label>
+                                    <select class="form-select" name="year" id="year" required>
+                                        <option value="">Select Academic Year</option>
+                                        <option value="2025/2026">2025/2026</option>
+                                        <option value="2026/2027">2026/2027</option>
+                                        <option value="2027/2028">2027/2028</option>
+                                        <option value="2028/2029">2028/2029</option>
+                                        <option value="2029/2030">2029/2030</option>
+                                    </select>
+                                </div>
                                 <div class="col-md-3 form-group-spacing">
                                     <label class="form-label fw-bold">Test Title</label>
                                     <select class="form-select" name="test_title" required>
@@ -301,17 +294,16 @@ $conn->close();
                             <hr>
                             <h6>Upload Test</h6>
                             <form method="POST" id="uploadForm" enctype="multipart/form-data" action="upload.php">
-                            <label class="form-label fw-bold" for="year">Academic Year:</label>
-                            <select class="form-select" name="year" id="year" required>
-                                <option value="">Select Academic Year</option>
-                                <option value="2025/2026">2025/2026</option>
-                                <option value="2026/2027">2026/2027</option>
-                                <option value="2027/2028">2027/2028</option>
-                                <option value="2028/2029">2028/2029</option>
-                                <option value="2029/2030">2029/2030</option>
-                            </select>
-                            <br><br>
-
+                                <label class="form-label fw-bold" for="year">Academic Year:</label>
+                                <select class="form-select" name="year" id="year" required>
+                                    <option value="">Select Academic Year</option>
+                                    <option value="2025/2026">2025/2026</option>
+                                    <option value="2026/2027">2026/2027</option>
+                                    <option value="2027/2028">2027/2028</option>
+                                    <option value="2028/2029">2028/2029</option>
+                                    <option value="2029/2030">2029/2030</option>
+                                </select>
+                                <br><br>
                                 <label class="form-label fw-bold">Select Test File (.docx):</label>
                                 <input type="file" class="form-control" name="test_file" accept=".docx" required>
                                 <button type="submit" class="btn btn-primary mt-3">
@@ -319,8 +311,6 @@ $conn->close();
                                 </button>
                             </form>
                         </div>
-
-
                         <?php if (!empty($tests)): ?>
                             <hr>
                             <h6>Select Existing Test</h6>
@@ -346,7 +336,7 @@ $conn->close();
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Type</label>
                                 <select class="form-select form-select-lg" name="question_type" id="questionType" required>
-                                    <option value="multiple_choice_single" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_single') ? 'selected' : ''; ?>>Single Choice Question</option>
+                                    <option value="multiple_choice_single" <?php echo (!$edit_question || !$edit_question['question_type'] || $edit_question['question_type'] == 'multiple_choice_single') ? 'selected' : ''; ?>>Single Choice Question</option>
                                     <option value="multiple_choice_multiple" <?php echo ($edit_question && $edit_question['question_type'] == 'multiple_choice_multiple') ? 'selected' : ''; ?>>Multiple Choice Question</option>
                                     <option value="true_false" <?php echo ($edit_question && $edit_question['question_type'] == 'true_false') ? 'selected' : ''; ?>>True/False</option>
                                     <option value="fill_blanks" <?php echo ($edit_question && $edit_question['question_type'] == 'fill_blanks') ? 'selected' : ''; ?>>Fill in Blanks</option>
@@ -523,7 +513,7 @@ $conn->close();
                     </div>
                 </div>
                 <div class="option-group">
-                    ${[1,2,3,4].map(i => `
+                    ${[1, 2, 3, 4].map(i => `
                         <div class="mb-3 option-highlight">
                             <label class="form-label">Option ${i}</label>
                             <input type="text" class="form-control" name="option${i}" required placeholder="Enter option ${i}" value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '"') : ''}">
@@ -533,7 +523,7 @@ $conn->close();
                         <label class="form-label">Correct Answer</label>
                         <select class="form-select" name="correct_answer" required>
                             <option value="">Select Correct Answer</option>
-                            ${[1,2,3,4].map(i => `
+                            ${[1, 2, 3, 4].map(i => `
                                 <option value="${i}" ${editData.options.correct_answer && editData.options['option' + editData.options.correct_answer] === editData.options['option' + i] ? 'selected' : ''}>Option ${i}</option>
                             `).join('')}
                         </select>
@@ -562,7 +552,7 @@ $conn->close();
                     </div>
                 </div>
                 <div class="option-group">
-                    ${[1,2,3,4].map(i => `
+                    ${[1, 2, 3, 4].map(i => `
                         <div class="mb-3 option-highlight">
                             <label class="form-label">Option ${i}</label>
                             <input type="text" class="form-control" name="option${i}" required placeholder="Enter option ${i}" value="${editData.options['option' + i] ? editData.options['option' + i].replace(/"/g, '"') : ''}">
@@ -571,7 +561,7 @@ $conn->close();
                     <div class="mb-3">
                         <label class="form-label">Correct Answers</label>
                         <div class="form-check">
-                            ${[1,2,3,4].map(i => `
+                            ${[1, 2, 3, 4].map(i => `
                                 <div>
                                     <input class="form-check-input" type="checkbox" name="correct_answers[]" value="${i}" id="correct${i}" ${editData.correct_answers.includes(i) ? 'checked' : ''}>
                                     <label class="form-check-label" for="correct${i}">Option ${i}</label>
@@ -603,8 +593,15 @@ $conn->close();
             const questionTypeSelect = document.getElementById('questionType');
             const optionsContainer = document.getElementById('optionsContainer');
             if (questionTypeSelect && optionsContainer) {
-                const questionType = questionTypeSelect.value || 'multiple_choice_single';
+                const questionType = questionTypeSelect.value || 'multiple_choice_single'; // Default to single choice
                 optionsContainer.innerHTML = questionTemplates[questionType] || '';
+                // Re-initialize image toggle functionality
+                $(document).on('click', '#toggleImageBtn', function() {
+                    const container = document.getElementById('imageUploadContainer');
+                    if (container) {
+                        container.style.display = container.style.display === 'none' ? 'block' : 'none';
+                    }
+                });
             }
         }
 
@@ -615,15 +612,33 @@ $conn->close();
             });
 
             // Initialize question form with default question type
-            $(document).ready(function() {
-    const questionTypeSelect = document.getElementById('questionType');
-    if (questionTypeSelect) {
-        updateOptionsContainer();
-    }
-});
+            const questionTypeSelect = document.getElementById('questionType');
+            if (questionTypeSelect) {
+                // Force default to multiple_choice_single if not editing or no specific type is set
+                if (!editData.question_type || !editData.question_type.trim()) {
+                    questionTypeSelect.value = 'multiple_choice_single';
+                }
+                updateOptionsContainer(); // Initial load
+            }
 
             // Update options when question type changes
             $('#questionType').on('change', updateOptionsContainer);
+
+            // Handle form reset to restore default options
+            $('#questionForm').on('reset', function() {
+                setTimeout(() => {
+                    const questionTypeSelect = document.getElementById('questionType');
+                    if (questionTypeSelect) {
+                        questionTypeSelect.value = 'multiple_choice_single'; // Reset to default
+                        updateOptionsContainer(); // Re-render options
+                    }
+                }, 0); // Use setTimeout to ensure reset completes first
+            });
+
+            // Handle form submission to maintain state
+            $('#questionForm').on('submit', function() {
+                return true; // Allow form submission
+            });
 
             // Image toggle
             $(document).on('click', '#toggleImageBtn', function() {
@@ -739,3 +754,4 @@ $conn->close();
     </script>
 </body>
 </html>
+<?php $conn->close(); ?>
