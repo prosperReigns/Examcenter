@@ -167,7 +167,7 @@ $conn->close();
                 <td><?= htmlspecialchars($row['class']) ?></td>
                 <td><?= htmlspecialchars($row['subject']) ?></td>
                 <td><?= htmlspecialchars($row['duration']) ?></td>
-               <td>
+                <td>
                     <a class="btn btn-sm btn-primary" 
                     href="download.php?class=<?= urlencode($row['class']) ?>&subject=<?= urlencode($row['subject']) ?>&title=<?= urlencode($row['title']) ?>">
                     Download
@@ -178,6 +178,7 @@ $conn->close();
                         Delete
                     </button>
                 </td>
+
 
             </tr>
             <?php endwhile; ?>
@@ -194,17 +195,17 @@ $conn->close();
             });
         });
     </script>
-    <script>
+ <script>
 $(document).ready(function() {
-    // Delete test handler
     $('.delete-test').click(function() {
         const testId = $(this).data('id');
         const testTitle = $(this).data('title');
+
         if (confirm(`Are you sure you want to delete the test "${testTitle}"? This action cannot be undone.`)) {
             $.ajax({
                 url: 'delete_test.php',
                 type: 'POST',
-                data: { id: testId },
+                data: { id: testId},
                 success: function(response) {
                     const res = JSON.parse(response);
                     if (res.success) {
@@ -222,6 +223,7 @@ $(document).ready(function() {
     });
 });
 </script>
+
 
 </body>
 </html>
