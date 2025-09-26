@@ -11,9 +11,10 @@ $conn = Database::getInstance()->getConnection();
 $student_id = $_SESSION['student_id'];
 $test_id = $_SESSION['current_test_id'];
 $questions = $_SESSION['exam_questions'];
-$submitted_answers = $_POST['answers'];
+$submitted_answers = $_POST['answers'] ?? [];
+$submit_reason = $_POST['submit_reason'] ?? 'manual';
 
-// Check if exam time is still valid
+// Check if exam time is still valid or if submission is due to timeout
 $stmt = $conn->prepare("SELECT started_at FROM exam_attempts WHERE user_id = ? AND test_id = ?");
 $stmt->bind_param("ii", $student_id, $test_id);
 $stmt->execute();
@@ -43,8 +44,9 @@ $duration_seconds = (int)$test['duration'] * 60;
 $now = time();
 $elapsed = $now - $started_at;
 
-if ($elapsed > $duration_seconds) {
-    // session cleanup
+// Allow grading even if time has expired for timeout submissions
+if ($submit_reason !== 'timeout' && $elapsed > $duration_seconds) {
+    // Session cleanup for invalid submissions
     unset($_SESSION['exam_questions']);
     unset($_SESSION['current_test_id']);
     header("Location: register.php");
@@ -122,7 +124,7 @@ foreach ($questions as $question) {
             break;
 
         case 'fill_blanks':
-        case 'short_answer':
+        case 'fill_blank': // Corrected typo from 'fill_blanks' to 'fill_blank'
             $query = "SELECT correct_answer FROM fill_blank_questions WHERE question_id = ?";
             $stmt = $conn->prepare($query);
             $stmt->bind_param("i", $question_id);
@@ -138,11 +140,12 @@ foreach ($questions as $question) {
 }
 
 // Store result in database with test_id
-$sql = "INSERT INTO results (user_id, test_id, score, total_questions) 
-        VALUES (?, ?, ?, ?)";
+$sql = "INSERT INTO results (user_id, test_id, score, total_questions, created_at) 
+        VALUES (?, ?, ?, ?, NOW())";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("iiii", $student_id, $test_id, $score, $total_questions);
 $stmt->execute();
+$stmt->close();
 
 // Store score in session for result page
 $_SESSION['exam_score'] = $score;

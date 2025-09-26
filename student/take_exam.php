@@ -474,6 +474,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             const interval = setInterval(() => {
                 if (timeLeft <= 0) {
                     clearInterval(interval);
+                    alert('Time has run out. Submitting exam automatically...');
                     submitExam('timeout', () => {
                         window.location.href = 'register.php';
                     });
@@ -617,7 +618,15 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
 
         function submitExam(reason = 'manual', callback = null) {
-            formEl.querySelector('input[name="submit_reason"]').value = reason;
+            // Ensure the hidden input for submit_reason exists
+            let submitReasonInput = formEl.querySelector('input[name="submit_reason"]');
+            if (!submitReasonInput) {
+                submitReasonInput = document.createElement('input');
+                submitReasonInput.type = 'hidden';
+                submitReasonInput.name = 'submit_reason';
+                formEl.appendChild(submitReasonInput);
+            }
+            submitReasonInput.value = reason;
             formEl.submit();
 
             if (callback) {
