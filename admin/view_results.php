@@ -204,67 +204,8 @@ $conn->close();
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/sidebar.css">
     <style>
-        .sidebar {
-            background-color: #2c3e50;
-            color: white;
-            width: 250px;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            padding: 20px;
-            transition: transform 0.3s ease;
-        }
-        .sidebar.active {
-            transform: translateX(-250px);
-        }
-        .sidebar-brand h3 {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-       .admin-info small {
-            font-size: 0.8rem;
-            opacity: 0.7;
-            color: white;
-        }
-        .admin-info h6{
-            color: white;
-        }
-        .sidebar-menu a {
-            display: flex;
-            align-items: center;
-            color: white;
-            padding: 10px;
-            margin-bottom: 5px;
-            border-radius: 5px;
-            text-decoration: none;
-            transition: background 0.2s;
-        }
-        .sidebar-menu a:hover, .sidebar-menu a.active {
-            background-color: #34495e;
-        }
-        .sidebar-menu a i {
-            margin-right: 10px;
-        }
-        .main-content {
-            margin-left: 250px;
-            padding: 20px;
-            min-height: 100vh;
-            background: #f8f9fa;
-        }
-        .header {
-            background: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .filter-card {
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            background-color: white;
-        }
         .results-table {
             width: 100%;
             border-collapse: collapse;
@@ -321,17 +262,6 @@ $conn->close();
         }
         .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_length {
             color: #333 !important;
-        }
-        @media (max-width: 991px) {
-            .sidebar {
-                transform: translateX(-250px);
-            }
-            .sidebar.active {
-                transform: translateX(0);
-            }
-            .main-content {
-                margin-left: 0;
-            }
         }
     </style>
 </head>

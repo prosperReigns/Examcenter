@@ -36,7 +36,8 @@ CREATE TABLE admins (
 CREATE TABLE fill_blank_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
-    correct_answer TEXT
+    correct_answer TEXT,
+    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
 -- 5. image_questions
@@ -45,7 +46,8 @@ CREATE TABLE image_questions (
     question_id INT,
     image_path TEXT,
     description TEXT,
-    correct_answer TEXT
+    correct_answer TEXT,
+    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
 -- 6. multiple_choice_questions
@@ -57,7 +59,8 @@ CREATE TABLE multiple_choice_questions (
     option3 TEXT,
     option4 TEXT,
     correct_answers TEXT,
-    image_path TEXT
+    image_path TEXT,
+    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
 -- 7. new_questions
@@ -68,7 +71,8 @@ CREATE TABLE new_questions (
     class VARCHAR(20),
     subject VARCHAR(100),
     question_type VARCHAR(50),
-    created_at DATETIME
+    created_at DATETIME,
+    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
 );
 
 -- 8. results
@@ -80,7 +84,8 @@ CREATE TABLE results (
     total_questions INT,
     created_at DATETIME,
     status VARCHAR(50),
-    reattempt_approved BOOLEAN
+    reattempt_approved BOOLEAN,
+    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
 );
 
 -- 9. settings
@@ -99,7 +104,8 @@ CREATE TABLE single_choice_questions (
     option3 TEXT,
     option4 TEXT,
     correct_answer TEXT,
-    image_path TEXT
+    image_path TEXT,
+    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
 -- 11. students
@@ -147,7 +153,8 @@ CREATE TABLE tests (
 CREATE TABLE true_false_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
-    correct_answer BOOLEAN
+    correct_answer BOOLEAN,
+    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
 16. CREATE TABLE exam_attempts (
@@ -161,7 +168,9 @@ CREATE TABLE true_false_questions (
     current_index INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_attempt (user_id, test_id, question_id)
+    UNIQUE KEY unique_attempt (user_id, test_id, question_id),
+    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+    FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
 UPDATE settings SET setting_value = '1' WHERE setting_name = 'show_results_immediately';

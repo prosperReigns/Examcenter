@@ -7,7 +7,7 @@ $subject = $_GET['subject'];
 $title = $_GET['title'];
 
 // Fetch test
-$stmt = $conn->prepare("SELECT * FROM tests WHERE class=? AND subject=? AND title=?");
+$stmt = $conn->prepare("SELECT * FROM tests WHERE class=? AND subject=? AND title=? ORDER BY created_at DESC LIMIT 1");
 $stmt->bind_param("sss", $class, $subject, $title);
 $stmt->execute();
 $test = $stmt->get_result()->fetch_assoc();
