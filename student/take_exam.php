@@ -8,7 +8,7 @@ ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 ini_set('error_log', '../logs/errors.log');
 
-// DISABLE CAHING
+// DISABLE CACHING
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 header("Expires: 0");
@@ -80,7 +80,8 @@ $attempt_result = $stmt->get_result();
 $exam_state = $attempt_result->fetch_assoc();
 $stmt->close();
 
-$time_left = $exam_state ? $exam_state['time_left'] : $exam_duration;
+$time_left = $exam_state ? max($exam_state['time_left'], $exam_duration) : $exam_duration;
+error_log("Initial time_left: $time_left seconds");
 $current_index = $exam_state ? (int)$exam_state['current_index'] : 0;
 
 if (!$exam_state) {
@@ -91,7 +92,7 @@ if (!$exam_state) {
     $stmt->close();
 }
 
-// Get questions for the test
+// Get questions for the test (unchanged)
 $stmt = $conn->prepare("SELECT * FROM new_questions WHERE test_id = ? ORDER BY RAND()");
 if ($stmt === false) {
     error_log("Prepare failed: SELECT * FROM new_questions - " . $conn->error);
@@ -107,7 +108,6 @@ while ($row = $questions_result->fetch_assoc()) {
     $question_id = $row['id'];
     $type = $row['question_type'];
 
-    // Initialize image handling
     $image_html = '';
 
     $detail_query = null;
@@ -139,7 +139,6 @@ while ($row = $questions_result->fetch_assoc()) {
         $detail = $detail_result->fetch_assoc();
         $detail_stmt->close();
 
-        // Handle image for single_choice
         if ($type === 'multiple_choice_single' && !empty($detail['image_path'])) {
             $image_path = $base_url . '/' . $detail['image_path'];
             $file_path = $_SERVER['DOCUMENT_ROOT'] . '/EXAMCENTER/' . $detail['image_path'];
@@ -153,14 +152,12 @@ while ($row = $questions_result->fetch_assoc()) {
         }
     }
 
-    // Load saved answer and flagged status
-$answer_stmt = $conn->prepare("SELECT answer, is_flagged FROM exam_attempts WHERE user_id = ? AND test_id = ? AND question_id = ?");
-$answer_stmt->bind_param("iii", $user_id, $test_id, $question_id);
-$answer_stmt->execute();
-$answer_result = $answer_stmt->get_result();
-$saved_answer = $answer_result->fetch_assoc();
-$answer_stmt->close();
-
+    $answer_stmt = $conn->prepare("SELECT answer, is_flagged FROM exam_attempts WHERE user_id = ? AND test_id = ? AND question_id = ?");
+    $answer_stmt->bind_param("iii", $user_id, $test_id, $question_id);
+    $answer_stmt->execute();
+    $answer_result = $answer_stmt->get_result();
+    $saved_answer = $answer_result->fetch_assoc();
+    $answer_stmt->close();
 
     $questions[] = array_merge($row, $detail ?? [], [
         'image_html' => $image_html,
@@ -169,7 +166,6 @@ $answer_stmt->close();
     ]);
 }
 
-
 if (empty($questions)) {
     error_log("No questions found for test_id=$test_id");
     die("No questions available for this test.");
@@ -177,7 +173,7 @@ if (empty($questions)) {
 
 $_SESSION['exam_questions'] = $questions;
 
-// Fetch show_results_immediately setting
+// Fetch show_results_immediately setting (unchanged)
 $stmt = $conn->prepare("SELECT setting_value FROM settings WHERE setting_name = ?");
 if ($stmt === false) {
     error_log("Prepare failed: SELECT setting_value FROM settings - " . $conn->error);
@@ -203,244 +199,18 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../css/all.min.css">
+    <link rel="stylesheet" href="../css/take_exam.css">
     <script src="https://cdn.jsdelivr.net/npm/mathjs@10.6.4/lib/browser/math.js"></script>
-    <style>
-        :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-            --warning: #ffc107;
-            --danger: #dc3545;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f8f9fa;
-            color: #212529;
-        }
-
-        .exam-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            padding: 1rem 0;
-            margin-bottom: 1.5rem;
-            border-bottom-left-radius: 20px;
-            border-bottom-right-radius: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .exam-container {
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.05);
-            padding: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .question-card {
-            border-left: 4px solid var(--primary);
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            transition: all 0.3s;
-        }
-
-        .question-card:hover {
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .question-image img {
-            max-width: 100%;
-            width: auto;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-            cursor: pointer;
-        }
-
-        .question-nav {
-            position: sticky;
-            top: 20px;
-        }
-
-        .question-boxes {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-            gap: 10px;
-            margin-top: 1rem;
-        }
-
-        .question-box {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 5px;
-            background-color: #e9ecef;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-        }
-
-        .question-box:hover {
-            background-color: #dee2e6;
-        }
-
-        .question-box.current {
-            background-color: var(--primary);
-            color: white;
-        }
-
-        .question-box.answered {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .question-box.flagged {
-            background-color: var(--warning);
-            color: #212529;
-        }
-
-        .timer-container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 1rem;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-            margin-bottom: 1.5rem;
-        }
-
-        .timer {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary);
-        }
-
-        .timer.warning {
-            color: var(--warning);
-        }
-
-        .timer.danger {
-            color: var(--danger);
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .calculator-btn {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .calculator-btn:hover {
-            background-color: var(--secondary);
-        }
-
-        .calculator-modal .btn {
-            min-width: 50px;
-            height: 50px;
-            font-size: 1.2rem;
-            margin: 0.2rem;
-        }
-
-        .option-label {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1.25rem;
-            border-radius: 5px;
-            transition: all 0.2s;
-            cursor: pointer;
-            border: 1px solid #dee2e6;
-            margin-bottom: 0.5rem;
-        }
-
-        .option-label:hover {
-            background-color: #f8f9fa;
-        }
-
-        .option-input {
-            margin-right: 10px;
-        }
-
-        .navigation-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 2rem;
-        }
-
-        .btn-submit {
-            background-color: #28a745;
-            border-color: #28a745;
-        }
-
-        .btn-submit:hover {
-            background-color: #218838;
-            border-color: #1e7e34;
-        }
-
-        .full-screen-warning {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.9);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            display: none;
-        }
-
-        .question-container {
-            display: none;
-        }
-
-        .question-container.active {
-            display: block;
-        }
-
-        #imageModal img {
-            max-width: 90%;
-            max-height: 90vh;
-            margin: auto;
-            display: block;
-        }
-
-        @media (max-width: 768px) {
-            .exam-header {
-                border-radius: 0;
-            }
-            .question-nav {
-                position: static;
-                margin-bottom: 1.5rem;
-            }
-            .question-boxes {
-                grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
-            }
-        }
-    </style>
 </head>
 <body>
-    <!-- Full screen warning -->
+    <!-- Full screen warning (unchanged) -->
     <div class="full-screen-warning" id="fullscreenWarning">
         <h2><i class="bi bi-exclamation-triangle-fill"></i> Warning!</h2>
         <p>You have exited full screen mode. Please return to full screen to continue your exam.</p>
         <button class="btn btn-primary mt-3" onclick="requestFullscreen()">Return to Full Screen</button>
     </div>
 
-    <!-- Image Zoom Modal -->
+    <!-- Image Zoom Modal (unchanged) -->
     <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content">
@@ -455,7 +225,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         </div>
     </div>
 
-    <!-- Exam Header -->
+    <!-- Exam Header (unchanged) -->
     <div class="exam-header">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
@@ -477,7 +247,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
     <div class="container">
         <div class="row">
-            <!-- Question Navigation -->
+            <!-- Question Navigation (unchanged) -->
             <div class="col-md-3">
                 <div class="question-nav">
                     <div class="card mb-3">
@@ -497,12 +267,12 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                         </div>
                     </div>
 
-                    <!-- Calculator Button -->
+                    <!-- Calculator Button (unchanged) -->
                     <button class="calculator-btn w-100 mb-3" data-bs-toggle="modal" data-bs-target="#calculatorModal">
                         <i class="bi bi-calculator"></i> Calculator
                     </button>
 
-                    <!-- Instructions -->
+                    <!-- Instructions (unchanged) -->
                     <div class="card">
                         <div class="card-header bg-info text-white">
                             <h5 class="mb-0">Instructions</h5>
@@ -520,7 +290,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 </div>
             </div>
 
-            <!-- Exam Questions -->
+            <!-- Exam Questions (unchanged) -->
             <div class="col-md-9">
                 <?php if (empty($questions)): ?>
                     <div class="alert alert-warning">No questions available for this test.</div>
@@ -628,7 +398,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         </div>
     </div>
 
-    <!-- Calculator Modal -->
+    <!-- Calculator Modal (unchanged) -->
     <div class="modal fade" id="calculatorModal" tabindex="-1" aria-labelledby="calculatorModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -680,7 +450,10 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     </div>
 
     <script src="../js/bootstrap.bundle.min.js"></script>
-    <script src="../js/lock_exam_window.js"></script>
+    <!-- Temporarily remove other scripts to isolate issues -->
+    <!-- <script src="../js/lock_exam_window.js"></script>
+    <script src="../js/exam_timer.js"></script> -->
+
     <script>
         let currentIndex = <?php echo $current_index; ?>;
         const totalQuestions = <?php echo count($questions); ?>;
@@ -722,7 +495,6 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                     timerDanger = true;
                 }
 
-                // Save time periodically (every 10 seconds)
                 if (timeLeft % 10 === 0) {
                     saveState();
                 }
@@ -848,13 +620,12 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             formEl.querySelector('input[name="submit_reason"]').value = reason;
             formEl.submit();
 
-            // optionally, after submitting, do a timed redirect:
             if (callback) {
-                setTimeout(callback, 3000); // allow 3s for form to post before redirect
+                setTimeout(callback, 3000);
             }
         }
 
-        // Calculator Functions
+        // Calculator Functions (unchanged)
         let calcExpression = '';
         function calcAppend(char) {
             try {
@@ -937,14 +708,14 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             }
         }
 
-        // Image Zoom
+        // Image Zoom (unchanged)
         function openImageModal(src) {
             document.getElementById('zoomedImage').src = src;
             const modal = new bootstrap.Modal(document.getElementById('imageModal'));
             modal.show();
         }
 
-        // Full Screen Control
+        // Full Screen Control (unchanged)
         function requestFullscreen() {
             const elem = document.documentElement;
             if (elem.requestFullscreen) {
@@ -960,7 +731,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             document.getElementById('fullscreenWarning').style.display = 'none';
         }
 
-        // Security
+        // Security (unchanged)
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
                 document.getElementById('fullscreenWarning').style.display = 'flex';
@@ -984,9 +755,9 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         });
 
         // Prevent Back Navigation
-        window.history.pushState(null, null, window.location.href);
+        history.pushState(null, null, location.href);
         window.addEventListener('popstate', () => {
-            window.history.pushState(null, null, window.location.href);
+            history.go(1);
         });
 
         // Initialize
@@ -996,16 +767,12 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 startTimer();
                 showQuestion(currentIndex);
                 formEl.insertAdjacentHTML('beforeend', '<input type="hidden" name="submit_reason" value="manual">');
+                console.log('DOM loaded, currentIndex:', currentIndex, 'totalQuestions:', totalQuestions);
+                console.log('Containers length:', containers.length, 'QuestionBoxes length:', questionBoxes.length);
             } catch (e) {
                 console.error('Initialization error:', e);
             }
         });
-    </script>
-    <script>
-        history.pushState(null, null, location.href);
-        window.onpopstate = function () {
-        history.go(1);
-    };
     </script>
 </body>
 </html>

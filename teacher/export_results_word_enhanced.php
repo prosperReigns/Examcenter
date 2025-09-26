@@ -46,7 +46,7 @@ try {
     }
 
     // Fetch assigned subjects
-    $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE id = ?");
+    $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
     $stmt->bind_param("i", $teacher_id);
     $stmt->execute();
     $result = $stmt->get_result();

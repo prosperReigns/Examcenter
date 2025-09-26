@@ -20,9 +20,9 @@ if (!isset($_SESSION['csrf_token'])) {
 $classes = ['JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'];
 
 // Define subject categories (lowercase to match database)
-$common_subjects = ['mathematics', 'english', 'civic education', 'agric science'];
-$jss_specific_subjects = ['ict', 'agriculture', 'history', 'basic science', 'basic technology', 'security', 'cultural and creative art', 'coding and robotics'];
-$ss_specific_subjects = ['data processing', 'economics', 'government', 'accounting', 'physics', 'chemistry', 'biology', 'coding and robotics'];
+$common_subjects = ['mathematics', 'english', 'civic education', 'c.r.s', 'i.r.s', 'yoruba', 'french', 'agriculture sci',];
+$jss_specific_subjects = ['ict', 'history', 'basic science', 'basic technology', 'security edu', 'cultural and creative art', 'coding and robotics', 'history', 'business studies', 'physical health edu',];
+$ss_specific_subjects = ['data processing', 'economics', 'government', 'accounting', 'physics', 'chemistry', 'biology', 'coding and robotics', 'geography', 'technical drawing', 'further maths', 'literature in english',];
 
 // Fetch active subjects for today
 $today = date('Y-m-d');
@@ -78,7 +78,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $error = "Name must contain only letters and spaces";
         } elseif (!in_array($class, $classes)) {
             $error = "Invalid class selected";
-        } elseif (!in_array($subject, $active_subjects)) {
+        } elseif (!in_array(strtolower($subject), array_map('strtolower',$active_subjects))) {
             $error = "No test available for this subject today";
         } else {
             // Verify subject is valid for the selected class
@@ -86,7 +86,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 ? array_unique(array_merge($common_subjects, $jss_specific_subjects))
                 : array_unique(array_merge($common_subjects, $ss_specific_subjects));
                 
-            if (!in_array($subject, $allowed_subjects)) {
+            if (!in_array(strtolower($subject
+            ), array_map('strtolower', $allowed_subjects))) {
                 $error = "No test available for this combination";
             } else {
                 // Verify class-subject-test combination

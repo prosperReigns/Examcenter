@@ -67,60 +67,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_file'])) {
         die("Missing required test header information.");
     }
 
-    // --- Save test ---
-    $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("sssi", $test_title, $test_class, $test_subject, $test_duration);
-    $stmt->execute();
-    $test_id = $stmt->insert_id;
-    $stmt->close();
+      // --- Check if test already exists before inserting ---
+      $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ? LIMIT 1");
+      $stmt->bind_param("sss", $test_title, $test_class, $test_subject);
+      $stmt->execute();
+      $stmt->bind_result($existing_test_id);
+      if ($stmt->fetch()) {
+          $test_id = $existing_test_id;
+          $stmt->close();
+      } else {
+          $stmt->close();
+          $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration) VALUES (?, ?, ?, ?)");
+          $stmt->bind_param("sssi", $test_title, $test_class, $test_subject, $test_duration);
+          $stmt->execute();
+          $test_id = $stmt->insert_id;
+          $stmt->close();
+      }
 
-    // --- Parse questions ---
-    $questions = [];
-    $current_question = [];
+   // --- Parse questions ---
+$questions = [];
+$current_question = [];
 
-    foreach ($lines as $index => $line) {
-        if ($index === 0) continue; // skip title
-        if ($line === '' || preg_match('/^(Class|Subject|Duration):/i', $line)) continue;
+foreach ($lines as $index => $line) {
+    if ($index === 0) continue; // skip title
+    if ($line === '' || preg_match('/^(Class|Subject|Duration):/i', $line)) continue;
 
-        // Question detection: 1. question text A) opt1 B) opt2 ...
-        if (preg_match('/^(\d+)\.\s*(.+)$/', $line, $m)) {
-            if (!empty($current_question)) $questions[] = $current_question;
+    // Question detection: 1. question text a) opt1 (b) opt2 ...
+    if (preg_match('/^(\d+)\.\s*(.+)$/', $line, $m)) {
+        if (!empty($current_question)) $questions[] = $current_question;
 
-            $current_question = [
-                'question' => '',
-                'options' => [],
-                'correct_answer' => ''
-            ];
+        $current_question = [
+            'question' => '',
+            'options' => [],
+            'correct_answer' => ''
+        ];
 
-            $question_part = trim($m[2]);
+        $question_part = trim($m[2]);
 
-            // Extract options
-            if (preg_match_all('/([A-Da-d])\)\s*([^A-D]+)/', $question_part, $matches, PREG_SET_ORDER)) {
-                $option_texts = [];
-                foreach ($matches as $opt) {
-                    $letter = strtoupper($opt[1]);
-                    $current_question['options'][$letter] = trim($opt[2]);
-                    $option_texts[] = $opt[0];
-                }
-                $question_text = trim(str_replace($option_texts, '', $question_part));
-                $current_question['question'] = $question_text;
-            } else {
-                $current_question['question'] = $question_part;
+        // --- Extract options in strict a) or (a) format ---
+        if (preg_match_all('/\(?([A-Da-d])\)\s*(.*?)(?=\s*\(?[A-Da-d]\)|$)/i', $question_part, $matches, PREG_SET_ORDER)) {
+            $question_text = $question_part; // start with full question text
+
+            foreach ($matches as $opt) {
+                $letter = strtoupper($opt[1]);
+                $text = trim($opt[2]);
+                $current_question['options'][$letter] = $text;
+
+                // Remove this option from the question text
+                $question_text = str_replace($opt[0], '', $question_text);
             }
-            continue;
-        }
 
-        // Correct answer
-        if (preg_match('/^correct answer:\s*(.+)$/i', $line, $m)) {
-            $current_question['correct_answer'] = trim($m[1]);
-            continue;
+            $current_question['question'] = trim($question_text);
+        } else {
+            $current_question['question'] = $question_part;
         }
-
-        // Multi-line question continuation
-        if (!empty($current_question) && !preg_match('/^correct answer:/i', $line)) {
-            $current_question['question'] .= ' ' . $line;
-        }
+        continue;
     }
+
+    // --- Correct answer detection ---
+    if (preg_match('/^\s*correct answer\s*:\s*(.+)$/i', $line, $m)) {
+        $current_question['correct_answer'] = strtoupper(trim($m[1]));
+        continue;
+    }
+
+    // Multi-line question continuation
+    if (!empty($current_question) && !preg_match('/^correct answer:/i', $line)) {
+        $current_question['question'] .= ' ' . $line;
+    }
+}
 
     if (!empty($current_question)) $questions[] = $current_question;
 
@@ -130,6 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_file'])) {
     foreach ($questions as $q) {
         if (empty($q['question']) || empty($q['correct_answer'])) continue;
 
+        // Save the main question
         $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, class, subject, question_type) VALUES (?, ?, ?, ?, ?)");
         $type = 'multiple_choice_single';
         $stmt->bind_param("sisss", $q['question'], $test_id, $test_class, $test_subject, $type);
@@ -137,17 +152,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_file'])) {
         $question_id = $stmt->insert_id;
         $stmt->close();
 
+        // Prepare options safely, default empty if missing
         $opt1 = $q['options']['A'] ?? '';
         $opt2 = $q['options']['B'] ?? '';
         $opt3 = $q['options']['C'] ?? '';
         $opt4 = $q['options']['D'] ?? '';
-        $correct = $q['correct_answer'];
 
+        // Ensure correct answer exists in options
+        $correct = strtoupper($q['correct_answer']);
+        if (!array_key_exists($correct, $q['options'])) {
+            // fallback: pick first non-empty option as correct
+            foreach (['A','B','C','D'] as $letter) {
+                if (!empty($q['options'][$letter])) {
+                    $correct = $letter;
+                    break;
+                }
+            }
+        }
+
+        // Save the options
         $stmt = $conn->prepare("INSERT INTO single_choice_questions (question_id, option1, option2, option3, option4, correct_answer) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("isssss", $question_id, $opt1, $opt2, $opt3, $opt4, $correct);
         $stmt->execute();
         $stmt->close();
     }
+
 
     echo "✅ Test and questions uploaded successfully.";
 

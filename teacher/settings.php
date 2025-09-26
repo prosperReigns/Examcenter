@@ -288,8 +288,10 @@ $conn->close();
     <script src="../js/bootstrap.bundle.min.js"></script>
     <script>
         $(document).ready(function() {
+            console.log('jQuery and DOM ready');
             // Sidebar toggle
             $('#sidebarToggle').click(function() {
+                console.log('Sidebar toggle clicked');
                 $('.sidebar').toggleClass('active');
             });
 
