@@ -200,6 +200,7 @@ $conn->close();
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
             <a href="add_question.php" class="active"><i class="fas fa-plus-circle"></i>Add Questions</a>
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
+            <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="manage_students.php" style="text-decoration: line-through"><i class="fas fa-users"></i>Manage Students</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
@@ -214,7 +215,6 @@ $conn->close();
         <div class="header d-flex justify-content-between align-items-center mb-4">
             <h2 class="mb-0">Add Questions</h2>
             <div class="header-actions">
-                <a href="list_test.php" class="btn btn-primary" >download</a>
                 <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
                 <button class="btn btn-primary <?php echo !$current_test ? 'preview-disabled' : ''; ?>" 
                         <?php echo !$current_test ? 'disabled' : ''; ?>
@@ -245,15 +245,28 @@ $conn->close();
                     <?php if (!$current_test): ?>
                         <h5 class="mb-3">Test Setup</h5>
                         <form method="POST" id="testForm" action="handle_test.php">
-                            <div class="row g-3">
+                            <div class="row g-4">
+                            <div class="col-md-3 form-group-spacing">
+                            <label class="form-label fw-bold" for="year">Academic Year:</label>
+                            <select class="form-select" name="year" id="year" required>
+                                <option value="">Select Academic Year</option>
+                                <option value="2025/2026">2025/2026</option>
+                                <option value="2026/2027">2026/2027</option>
+                                <option value="2027/2028">2027/2028</option>
+                                <option value="2028/2029">2028/2029</option>
+                                <option value="2029/2030">2029/2030</option>
+                            </select>
+                            </div>
                                 <div class="col-md-3 form-group-spacing">
                                     <label class="form-label fw-bold">Test Title</label>
                                     <select class="form-select" name="test_title" required>
                                         <option value="">Select Test Title</option>
                                         <option value="First term exam">First term exam</option>
-                                        <option value="First term test">First term test</option>
+                                        <option value="First term mid-test">First term mid-test</option>
                                         <option value="Second term exam">Second term exam</option>
-                                        <option value="Second term test">Second term test</option>
+                                        <option value="Second term mid-test">Second term mid-test</option>
+                                        <option value="Third term exam">Third term exam</option>
+                                        <option value="Third term mid-test">Third term mid-test</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
@@ -268,7 +281,7 @@ $conn->close();
                                         <option value="SS3">SS3</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3 form-group-spacing">
+                                <div class="col-md-2 form-group-spacing">
                                     <label class="form-label fw-bold">Subject</label>
                                     <select class="form-select" name="subject" required id="subjectSelect">
                                         <option value="">Select Subject</option>
@@ -277,7 +290,7 @@ $conn->close();
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="col-md-3 form-group-spacing">
+                                <div class="col-md-2 form-group-spacing">
                                     <label class="form-label fw-bold">Duration (min)</label>
                                     <input type="number" class="form-control" name="duration" required placeholder="e.g. 30" min="1">
                                 </div>
@@ -285,8 +298,21 @@ $conn->close();
                             <button type="submit" name="create_test" class="btn btn-primary mt-3"><i class="fas fa-plus me-2"></i>Create Test</button>
                         </form>
                         <div class="mb-4">
+                            <hr>
+                            <h6>Upload Test</h6>
                             <form method="POST" id="uploadForm" enctype="multipart/form-data" action="upload.php">
-                                <label>Select Test File (.docx):</label>
+                            <label class="form-label fw-bold" for="year">Academic Year:</label>
+                            <select class="form-select" name="year" id="year" required>
+                                <option value="">Select Academic Year</option>
+                                <option value="2025/2026">2025/2026</option>
+                                <option value="2026/2027">2026/2027</option>
+                                <option value="2027/2028">2027/2028</option>
+                                <option value="2028/2029">2028/2029</option>
+                                <option value="2029/2030">2029/2030</option>
+                            </select>
+                            <br><br>
+
+                                <label class="form-label fw-bold">Select Test File (.docx):</label>
                                 <input type="file" class="form-control" name="test_file" accept=".docx" required>
                                 <button type="submit" class="btn btn-primary mt-3">
                                     <i class="fas fa-upload me-2"></i>Upload Test

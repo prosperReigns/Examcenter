@@ -145,6 +145,7 @@ CREATE TABLE tests (
     title VARCHAR(200),
     class VARCHAR(20),
     subject VARCHAR(100),
+    year VARCHAR(9) NOT NULL,
     created_at DATETIME,
     duration INT
 );
