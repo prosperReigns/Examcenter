@@ -8,12 +8,6 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower
     exit();
 }
 
-// Validate CSRF token
-if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-    echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
-    exit();
-}
-
 // Validate test ID
 if (!isset($_POST['id']) || !is_numeric($_POST['id'])) {
     echo json_encode(['success' => false, 'error' => 'Invalid test ID']);
