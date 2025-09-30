@@ -1,0 +1,97 @@
+body {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+    min-height: 100vh;
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    opacity: 0;
+    animation: fadeIn 0.5s forwards;
+}
+@keyframes fadeIn {
+    to { opacity: 1; }
+}
+
+.login-container:active,
+.login-container:focus,
+.login-container *:active,
+.login-container *:focus {
+    transform: none !important;
+    font-size: inherit !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.login-container {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+    max-width: 450px;
+    margin: 5rem auto;
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    background: white;
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: slideIn 0.5s forwards 0.2s;
+    font-size: 15px;
+}
+
+@keyframes slideIn {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.login-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 5px;
+    background: linear-gradient(to right, #4361ee, #3f37c9);
+}
+
+.login-container form * {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.form-control {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s;
+}
+
+.form-control:focus {
+    border-color: #4361ee;
+    box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.15);
+}
+
+.btn-primary {
+    background: #4361ee;
+    border: none;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s;
+    font-size: 15px;
+}
+
+.btn-primary:hover {
+    background: #3f37c9;
+}
+
+.btn-primary:active,
+.btn-primary:focus,
+.form-control:active,
+.form-control:focus {
+    transform: none !important;
+    box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.15) !important;
+}
+
+.fa-user-shield {
+    background: linear-gradient(to right, #4361ee, #3f37c9);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
