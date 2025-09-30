@@ -36,10 +36,10 @@ function fetchQuestions($conn, $table, $columns, $test_id) {
 $single = fetchQuestions($conn, 'single_choice_questions', ['n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answer'], $test_id);
 
 // Multiple choice (multiple answers)
-$multiple = fetchQuestions($conn, 'multiple_choice_questions', ['n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answers'], $test_id);
+$multiple = fetchQuestions($conn, 'multiple_choice_questions', ['n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answers', 't.image_path'], $test_id);
 
 // True/False
-$tf = fetchQuestions($conn, 'true_false_questions', ['n.question_text', 't.correct_answer'], $test_id);
+$tf = fetchQuestions($conn, 'true_false_questions', ['n.question_text', 't.correct_answer', 't.image_path'], $test_id);
 
 // Fill in the blank
 $fill = fetchQuestions($conn, 'fill_blank_questions', ['n.question_text', 't.correct_answer'], $test_id);

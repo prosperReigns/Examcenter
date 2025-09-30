@@ -103,7 +103,7 @@ $stmt->execute();
 $questions_result = $stmt->get_result();
 
 $questions = [];
-$base_url = 'http://localhost/EXAMCENTER';
+$base_url = 'http://127.0.0.1/Examcenter';
 while ($row = $questions_result->fetch_assoc()) {
     $question_id = $row['id'];
     $type = $row['question_type'];
@@ -121,7 +121,7 @@ while ($row = $questions_result->fetch_assoc()) {
         case 'true_false':
             $detail_query = "SELECT correct_answer FROM true_false_questions WHERE question_id = ?";
             break;
-        case 'fill_blank':
+        case 'fill_blanks': // Corrected to match earlier code
             $detail_query = "SELECT correct_answer FROM fill_blank_questions WHERE question_id = ?";
             break;
     }
@@ -140,16 +140,30 @@ while ($row = $questions_result->fetch_assoc()) {
         $detail_stmt->close();
 
         if ($type === 'multiple_choice_single' && !empty($detail['image_path'])) {
-            $image_path = $base_url . '/' . $detail['image_path'];
-            $file_path = $_SERVER['DOCUMENT_ROOT'] . '/EXAMCENTER/' . $detail['image_path'];
+            $relative_path = str_replace('\\', '/', $detail['image_path']);
+        
+            // Fix path by including project folder
+            $file_path = $_SERVER['DOCUMENT_ROOT'] . '/Examcenter/' . $relative_path;
+            $image_url = $base_url . '/' . $relative_path;
+        
+            error_log("DOCUMENT_ROOT = " . $_SERVER['DOCUMENT_ROOT']);
+            error_log("Relative path = " . $relative_path);
+            error_log("Checking file at: $file_path");
+        
             if (file_exists($file_path)) {
-                error_log("Image found at: $file_path");
-                $image_html = "<div class='question-image mb-3'><img src='$image_path' class='img-fluid zoomable' alt='Question Image' onclick='openImageModal(this.src)' onerror='this.src=\"/images/fallback.jpg\"; this.alt=\"Image not found\"'></div>";
+                $image_html = "<div class='question-image mb-3'>
+                    <img src='$image_url' class='img-fluid zoomable' alt='Question Image'
+                         onclick='openImageModal(this.src)' 
+                         onerror='this.src=\"/images/fallback.jpg\"; this.alt=\"Image not found\"'>
+                </div>";
             } else {
-                error_log("Image not found at: $file_path for path: " . $detail['image_path']);
-                $image_html = "<div class='question-image mb-3'><img src='/images/fallback.jpg' class='img-fluid' alt='Image not found'></div>";
+                error_log("Image not found at: $file_path");
+                $image_html = "<div class='question-image mb-3'>
+                    <img src='/images/fallback.jpg' class='img-fluid' alt='Image not found'>
+                </div>";
             }
-        }
+        }        
+        
     }
 
     $answer_stmt = $conn->prepare("SELECT answer, is_flagged FROM exam_attempts WHERE user_id = ? AND test_id = ? AND question_id = ?");
