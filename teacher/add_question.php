@@ -63,21 +63,18 @@ try {
         $error = "No subjects assigned to you. Contact your admin.";
     }
 
-    // Define subjects by category
-    $jss_subjects = [
-        'Mathematics', 'English', 'ICT', 'Agriculture', 'History',
-        'Civic Education', 'Basic Science', 'Basic Technology',
-        'Business studies', 'Agricultural sci', 'Physical Health Edu',
-        'Cultural and Creative Art', 'Social Studies', 'Security Edu',
-        'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
-    ];
-    $ss_subjects = [
-        'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-        'Government', 'Commerce', 'Accounting', 'Financial Accounting',
-        'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology',
-        'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
-        'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
-    ];
+// Define subjects by category by fetching from DB
+    $jss_subjects_stmt = $conn->prepare("SELECT subject_name FROM subjects WHERE class_level = 'JSS'");
+    $jss_subjects_stmt->execute();
+    $jss_subjects_result = $jss_subjects_stmt->get_result();
+    $jss_subjects = array_column($jss_subjects_result->fetch_all(MYSQLI_ASSOC), 'subject_name');
+    $jss_subjects_stmt->close();
+
+    $ss_subjects_stmt = $conn->prepare("SELECT subject_name FROM subjects WHERE class_level = 'SS'");
+    $ss_subjects_stmt->execute();
+    $ss_subjects_result = $ss_subjects_stmt->get_result();
+    $ss_subjects = array_column($ss_subjects_result->fetch_all(MYSQLI_ASSOC), 'subject_name');
+    $ss_subjects_stmt->close();
 
     // Initialize variables
     $error = $success = '';
@@ -243,11 +240,12 @@ try {
                                     <label class="form-label fw-bold" for="year">Academic Year:</label>
                                     <select class="form-select" name="year" id="year" required>
                                         <option value="">Select Academic Year</option>
-                                        <option value="2025/2026">2025/2026</option>
-                                        <option value="2026/2027">2026/2027</option>
-                                        <option value="2027/2028">2027/2028</option>
-                                        <option value="2028/2029">2028/2029</option>
-                                        <option value="2029/2030">2029/2030</option>
+                                        <?php
+                                            $yearQuery = $conn->query("SELECT year FROM academic_years ORDER BY year ASC");
+                                            while ($row = $yearQuery->fetch_assoc()) {
+                                                echo '<option value="' . htmlspecialchars($row['year']) . '">' . htmlspecialchars($row['year']) . '</option>';
+                                            }
+                                        ?>
                                     </select>
                                 </div>
                                 <div class="col-md-3 form-group-spacing">
@@ -276,11 +274,8 @@ try {
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
                                     <label class="form-label fw-bold">Subject</label>
-                                    <select class="form-select" name="subject" required id="subjectSelect">
-                                        <option value="">Select Subject</option>
-                                        <?php foreach ($assigned_subjects as $subject): ?>
-                                            <option value="<?php echo htmlspecialchars($subject); ?>"><?php echo htmlspecialchars($subject); ?></option>
-                                        <?php endforeach; ?>
+                                    <select class="form-select" name="subject" required id="subjectSelect" disabled>
+                                        <option value="">Select Class First</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
@@ -297,11 +292,12 @@ try {
                                 <label class="form-label fw-bold" for="year">Academic Year:</label>
                                 <select class="form-select" name="year" id="year" required>
                                     <option value="">Select Academic Year</option>
-                                    <option value="2025/2026">2025/2026</option>
-                                    <option value="2026/2027">2026/2027</option>
-                                    <option value="2027/2028">2027/2028</option>
-                                    <option value="2028/2029">2028/2029</option>
-                                    <option value="2029/2030">2029/2030</option>
+                                    <?php
+                                        $yearQuery = $conn->query("SELECT year FROM academic_years ORDER BY year ASC");
+                                        while ($row = $yearQuery->fetch_assoc()) {
+                                            echo '<option value="' . htmlspecialchars($row['year']) . '">' . htmlspecialchars($row['year']) . '</option>';
+                                        }
+                                    ?>
                                 </select>
                                 <br><br>
                                 <label class="form-label fw-bold">Select Test File (.docx):</label>
@@ -344,7 +340,7 @@ try {
                             </div>
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Text</label>
-                                <textarea class="form-control" name="question" rows="4" placeholder="Enter your question here..." required><?php echo htmlspecialchars($edit_question['question_text'] ?? ''); ?></textarea>
+                                <textarea class="form-control" name="question" rows="4" placeholder="Enter your question here..." required><?php echo nl2br(htmlspecialchars($edit_question['question_text'] ?? '')); ?></textarea>
                             </div>
                             <div id="optionsContainer" class="form-group-spacing"></div>
                             <div class="d-flex justify-content-end gap-3 mt-4">
@@ -399,7 +395,7 @@ try {
                         <?php foreach ($questions as $index => $question): ?>
                             <div class="mb-4">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <strong>Question <?php echo $index + 1; ?>: <?php echo htmlspecialchars($question['question_text']); ?></strong>
+                                    <strong>Question <?php echo $index + 1; ?>: <?php echo nl2br(htmlspecialchars($question['question_text'])); ?></strong>
                                     <div class="action-buttons">
                                         <form method="POST" style="display: inline;" action="handle_question.php">
                                             <input type="hidden" name="question_id" value="<?php echo (int)$question['id']; ?>">
@@ -488,6 +484,27 @@ try {
     <script src="../js/bootstrap.bundle.min.js"></script>
     <script src="../js/jquery.validate.min.js"></script>
     <!-- <script src="../js/questionType.js"></script> -->
+    <script>
+document.getElementById("classSelect").addEventListener("change", function () {
+    let classLevel = this.value;
+
+    const subjectSelect = document.getElementById("subjectSelect");
+    subjectSelect.innerHTML = `<option>Loading subjects...</option>`;
+
+    fetch("get_subjects.php?class=" + classLevel)
+        .then(res => res.json())
+        .then(data => {
+            subjectSelect.innerHTML = `<option value="">Select Subject</option>`;
+            data.forEach(sub => {
+                subjectSelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+            });
+            subjectSelect.disabled = false;
+        })
+        .catch(() => {
+            subjectSelect.innerHTML = `<option>Error loading subjects</option>`;
+        });
+    });
+    </script>
     <script>
         const editData = <?php echo json_encode($edit_data); ?>;
         const questionTemplates = {

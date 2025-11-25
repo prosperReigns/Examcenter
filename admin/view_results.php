@@ -40,21 +40,7 @@ try {
         exit();
     }
 
-    // Define subjects (added to match teacher version)
-    $jss_subjects = [
-        'Mathematics', 'English', 'ICT', 'Agriculture', 'History',
-        'Civic Education', 'Basic Science', 'Basic Technology',
-        'Business studies', 'Agricultural sci', 'Physical Health Edu',
-        'Cultural and Creative Art', 'Social Studies', 'Security Edu',
-        'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
-    ];
-    $ss_subjects = [
-        'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-        'Government', 'Commerce', 'Accounting', 'Financial Accounting',
-        'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology',
-        'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
-        'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
-    ];
+    // The hardcoded subject arrays have been removed.
 
     // Pagination settings
     $results_per_page = 10;
@@ -310,6 +296,8 @@ $conn->close();
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php" class="active"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
+            <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
+            <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
             <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>

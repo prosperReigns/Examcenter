@@ -63,165 +63,153 @@
     $exam_date = date('Y-m-d');
     $selected_subjects = [];
 
-    // Fetch available subjects (lowercase to match database)
-    $jss_subjects = [
-        'mathematics', 'english', 'ict', 'agriculture', 'history', 
-        'civic education', 'basic science', 'basic technology', 
-        'business studies', 'agriculture sci', 'physical health edu',
-        'cultural and creative art', 'social studies', 'security edu', 
-        'yoruba', 'french', 'coding and robotics', 'c.r.s', 'i.r.s', 'chess'
-    ];
-    $ss_subjects = [
-        'mathematics', 'english', 'civic education', 'data processing', 'economics',
-        'government', 'commerce', 'accounting','dyeing and bleaching', 'physics', 'chemistry', 'biology', 'agriculture sci', 'geography', 'technical drawing', 'yoruba',
-        'french', 'further maths', 'literature in english', 'c.r.s', 'i.r.s'
-    ];
-    $all_subjects = array_unique(array_merge($jss_subjects, $ss_subjects));
+    // --- Fetch subjects ---
+    $all_subjects = [];
+    try {
+        $stmt = $conn->prepare("SELECT DISTINCT LCASE(subject_name) as subject_name FROM subjects");
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $all_subjects = array_column($result->fetch_all(MYSQLI_ASSOC), 'subject_name');
+        $stmt->close();
+    } catch (Exception $e) {
+        error_log("Error fetching subjects: " . $e->getMessage());
+    }
 
-    // Fetch current settings
+    // --- Fetch system settings ---
     $settings = [];
     try {
-        $settings_query = "SELECT setting_name, setting_value FROM settings WHERE setting_name IN ('show_results_immediately')";
-        $settings_result = $conn->query($settings_query);
-        if ($settings_result) {
-            while ($row = $settings_result->fetch_assoc()) {
-                $settings[$row['setting_name']] = $row['setting_value'];
-            }
-            $settings_result->free();
+        $result = $conn->query("SELECT setting_name, setting_value FROM settings WHERE setting_name='show_results_immediately'");
+        while ($row = $result->fetch_assoc()) {
+            $settings[$row['setting_name']] = $row['setting_value'];
         }
+        $result->free();
     } catch (Exception $e) {
         error_log("Error fetching settings: " . $e->getMessage());
         $error = "Failed to load system settings.";
     }
 
-    // Handle password change
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
+    // --- Handle Password Change ---
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         $current_password = trim($_POST['current_password']);
         $new_password = trim($_POST['new_password']);
         $confirm_password = trim($_POST['confirm_password']);
-        
-        // Server-side validation
+
         if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
-            $error = "Please fill in all password fields.";
+            $error = "All password fields are required.";
         } elseif ($new_password !== $confirm_password) {
             $error = "New passwords do not match.";
-        } elseif (strlen($new_password) < 8) {
-            $error = "Password must be at least 8 characters long.";
-        } elseif (!preg_match('/[A-Za-z0-9]/', $new_password)) {
-            $error = "Password must contain letters or numbers.";
-        } else {
+        } elseif (strlen($new_password) < 8 || !preg_match('/[A-Za-z0-9]/', $new_password)) {
+            $error = "Password must be at least 8 characters and contain letters or numbers.";
+        } elseif (password_verify($current_password, $admin['password'])) {
             try {
-                // Verify current password
-                if (password_verify($current_password, $admin['password'])) {
-                    // Update password
-                    $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-                    $stmt = $conn->prepare("UPDATE admins SET password = ? WHERE id = ?");
-                    $stmt->bind_param("si", $hashed_password, $admin_id);
-                    if ($stmt->execute()) {
-                        $success = "Password changed successfully!";
-                        $current_password = $new_password = $confirm_password = '';
-                        // Log activity
-                        $activity = "Admin {$admin['username']} changed their password.";
-                        $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-                        $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
-                        $stmt->execute();
-                    } else {
-                        $error = "Error updating password: " . $conn->error;
-                    }
-                } else {
-                    $error = "Current password is incorrect.";
-                }
+                $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("UPDATE admins SET password=? WHERE id=?");
+                $stmt->bind_param("si", $hashed_password, $admin_id);
+                $stmt->execute();
                 $stmt->close();
-            } catch (Exception $e) {
-                error_log("Error changing password: " . $e->getMessage());
-                $error = "Error changing password.";
-            }
-        }
-    }
 
-    // Handle system settings update
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_settings'])) {
-        $show_results = isset($_POST['show_results']) ? 1 : 0;
-        
-        try {
-            $stmt = $conn->prepare("INSERT INTO settings (setting_name, setting_value) VALUES (?, ?) 
-                                    ON DUPLICATE KEY UPDATE setting_value = ?");
-            $setting_name = 'show_results_immediately';
-            $stmt->bind_param("sii", $setting_name, $show_results, $show_results);
-            if ($stmt->execute()) {
-                $success = "System settings updated successfully!";
+                $success = "Password changed successfully!";
+                $current_password = $new_password = $confirm_password = '';
+
                 // Log activity
-                $activity = "Admin {$admin['username']} updated system settings: show_results_immediately=$show_results.";
-                $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
+                $activity = "Admin {$admin['username']} changed their password.";
+                $stmt = $conn->prepare(
+                    "INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())"
+                );
                 $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
                 $stmt->execute();
-            } else {
-                $error = "Error updating settings: " . $conn->error;
+                $stmt->close();
+            } catch (Exception $e) {
+                error_log("Error updating password: " . $e->getMessage());
+                $error = "Failed to update password.";
             }
-            $stmt->close();
-        } catch (Exception $e) {
-            error_log("Error updating settings: " . $e->getMessage());
-            $error = "Error updating system settings.";
+        } else {
+            $error = "Current password is incorrect.";
         }
     }
 
-    // Handle daily subjects update
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_daily_subjects'])) {
+    // --- Handle System Settings Update ---
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
+        $show_results = isset($_POST['show_results']) ? 1 : 0;
+
+        try {
+            $stmt = $conn->prepare(
+                "INSERT INTO settings (setting_name, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value=?"
+            );
+            $setting_name = 'show_results_immediately';
+            $stmt->bind_param("sii", $setting_name, $show_results, $show_results);
+            $stmt->execute();
+            $stmt->close();
+
+            $success = "System settings updated successfully!";
+
+            // Log activity
+            $activity = "Admin {$admin['username']} updated system settings: show_results_immediately={$show_results}";
+            $stmt = $conn->prepare(
+                "INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())"
+            );
+            $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
+            $stmt->execute();
+            $stmt->close();
+        } catch (Exception $e) {
+            error_log("Error updating system settings: " . $e->getMessage());
+            $error = "Failed to update system settings.";
+        }
+    }
+
+   // --- Handle Daily Subjects Update ---
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_daily_subjects'])) {
         $exam_date = trim($_POST['exam_date']);
         $selected_subjects = array_unique($_POST['subjects'] ?? []);
-        
-        // Validate inputs
-        if (empty($exam_date)) {
-            $error = "Please select a date.";
-        } elseif (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $exam_date)) {
-            $error = "Invalid date format.";
+
+        if (empty($exam_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $exam_date)) {
+            $error = "Please provide a valid date.";
         } elseif (empty($selected_subjects)) {
-            $error = "Please select at least one subject.";
+            $error = "Select at least one subject.";
         } else {
             try {
                 $conn->begin_transaction();
-                
-                // Clear existing subjects for the date
-                $stmt = $conn->prepare("DELETE FROM active_exams WHERE exam_date = ?");
+
+                // Clear previous subjects
+                $stmt = $conn->prepare("DELETE FROM active_exams WHERE exam_date=?");
                 $stmt->bind_param("s", $exam_date);
                 $stmt->execute();
-                
-                // Insert new active subjects
+
+                // Insert new subjects
                 $stmt = $conn->prepare("INSERT INTO active_exams (subject, is_active, exam_date) VALUES (?, 1, ?)");
                 $valid_subjects = array_intersect($selected_subjects, $all_subjects);
                 foreach ($valid_subjects as $subject) {
                     $stmt->bind_param("ss", $subject, $exam_date);
                     $stmt->execute();
                 }
-                
                 $conn->commit();
                 $success = "Daily subjects updated successfully!";
                 $selected_subjects = [];
+
                 // Log activity
-                $activity = "Admin {$admin['username']} updated daily subjects for date $exam_date: " . implode(', ', $valid_subjects);
-                $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
+                $activity = "Admin {$admin['username']} updated daily subjects for {$exam_date}: " . implode(', ', $valid_subjects);
+                $stmt = $conn->prepare(
+                    "INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())"
+                );
                 $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
                 $stmt->execute();
                 $stmt->close();
             } catch (Exception $e) {
                 $conn->rollback();
                 error_log("Error updating daily subjects: " . $e->getMessage());
-                $error = "Error updating daily subjects.";
+                $error = "Failed to update daily subjects.";
             }
         }
     }
 
-    // Fetch current active subjects
+    // --- Fetch current active subjects ---
+    $active_subjects = [];
     try {
-        $active_subjects_query = "SELECT subject, exam_date FROM active_exams WHERE is_active = 1 ORDER BY exam_date DESC, subject";
-        $active_subjects_result = $conn->query($active_subjects_query);
-        $active_subjects = [];
-        if ($active_subjects_result) {
-            while ($row = $active_subjects_result->fetch_assoc()) {
-                $active_subjects[$row['exam_date']][] = $row['subject'];
-            }
-            $active_subjects_result->free();
+        $result = $conn->query("SELECT subject, exam_date FROM active_exams WHERE is_active=1 ORDER BY exam_date DESC, subject");
+        while ($row = $result->fetch_assoc()) {
+            $active_subjects[$row['exam_date']][] = $row['subject'];
         }
+        $result->free();
     } catch (Exception $e) {
         error_log("Error fetching active subjects: " . $e->getMessage());
         $error = "Failed to load active subjects.";
@@ -314,6 +302,8 @@
                 <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
                 <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
                 <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
+                <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
+                <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
                 <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
                 <a href="settings.php" class="active"><i class="fas fa-cog"></i>Settings</a>
                 <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>

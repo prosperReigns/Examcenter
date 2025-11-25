@@ -3,7 +3,7 @@ session_start();
 require_once '../db.php';
 
 // Check if user is logged in
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'admin') {
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'super_admin') {
     error_log("Redirecting to login: No user_id or invalid role in session");
     header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
@@ -20,32 +20,40 @@ try {
     }
 
     // Fetch admin profile
-    $admin_id = (int)$_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT username FROM admins WHERE id = ?");
+    $super_admin_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username FROM super_admins WHERE id = ?");
     if (!$stmt) {
         error_log("Prepare failed for admin profile: " . $conn->error);
         die("Database error");
     }
-    $stmt->bind_param("i", $admin_id);
-    $stmt->execute();
-    $admin = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+    
+ $stmt->bind_param("i", $super_admin_id);
+$stmt->execute();
+$user_data = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-    if (!$admin) {
-        error_log("No admin found for user_id=$admin_id");
-        session_destroy();
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
-        exit();
-    }
+// if (!$user_data || !isset($user_data['username'])) {
+//     error_log("Invalid super admin data for user_id=$super_admin_id");
+//     session_destroy();
+//     header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+//     exit();
+// }
+// $activity = "Super_admin {$user_data['username']} accessed the dashboard.";
 
-    // Log admin dashboard access
-    $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
-    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-    $activity = "Admin {$admin['username']} accessed the dashboard.";
-    $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-    $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
-    $stmt->execute();
-    $stmt->close();
+// // Log admin dashboard access
+// $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
+// $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+// $activity = "Super_admin {$user_data['username']} accessed the dashboard.";
+
+// $stmt = $conn->prepare("INSERT INTO activities_log (activity, super_admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
+// if (!$stmt) {
+//     throw new Exception("Failed to prepare activities_log insert: " . $conn->error);
+// }
+// $stmt->bind_param("siss", $activity, $super_admin_id, $ip_address, $user_agent);
+// $stmt->execute();
+// $stmt->close();
+
+
 
     // Initialize stats array
     $stats = [
@@ -192,7 +200,7 @@ function time_ago($datetime) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | D-Portal CBT</title>
+    <title>Super Admin Dashboard | D-Portal CBT</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
@@ -295,20 +303,14 @@ function time_ago($datetime) {
             <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
             <div class="admin-info">
                 <small><b>Welcome back,</b></small>
-                <h6><b><?php echo htmlspecialchars($admin['username']); ?></b></h6>
+                <h6><b><?php echo htmlspecialchars($user_data['username']); ?></b></h6>
             </div>
         </div>
         <div class="sidebar-menu mt-4">
             <a href="dashboard.php" class="active"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-            <a href="add_question.php" style="text-decoration: line-through"><i class="fas fa-plus-circle"></i>Add Questions</a>
-            <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
-            <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
-            <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
-            <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
-            <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
-            <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
+            <a href="manage_admins.php"><i class="fas fa-list"></i>manage admins</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
-            <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
+            <a href="../admin/logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>
     </div>
 
@@ -316,7 +318,7 @@ function time_ago($datetime) {
     <div class="main-content">
         <!-- Header -->
         <div class="header d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">Admin Dashboard</h2>
+            <h2 class="mb-0">Super Admin Dashboard</h2>
             <div class="d-flex gap-3">
                 <a href="../admin/view_results.php" class="btn btn-secondary"><i class="fas fa-chart-bar me-2"></i>View Results</a>
                 <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
