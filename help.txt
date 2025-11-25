@@ -36,9 +36,9 @@ CREATE TABLE admins (
 CREATE TABLE fill_blank_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
-    correct_answer TEXT,
+    correct_answer TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 5. image_questions
 CREATE TABLE image_questions (
@@ -54,26 +54,26 @@ CREATE TABLE image_questions (
 CREATE TABLE multiple_choice_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
-    option1 TEXT,
-    option2 TEXT,
-    option3 TEXT,
-    option4 TEXT,
-    correct_answers TEXT,
+    option1 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    option2 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    option3 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    option4 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    correct_answers TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     image_path TEXT,
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 7. new_questions
 CREATE TABLE new_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    question_text TEXT,
+    question_text TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     test_id INT,
     class VARCHAR(20),
     subject VARCHAR(100),
     question_type VARCHAR(50),
     created_at DATETIME,
     FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 8. results
 CREATE TABLE results (
@@ -99,14 +99,14 @@ CREATE TABLE settings (
 CREATE TABLE single_choice_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
-    option1 TEXT,
-    option2 TEXT,
-    option3 TEXT,
-    option4 TEXT,
-    correct_answer TEXT,
+    option1 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    option2 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    option3 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    option4 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    correct_answer TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     image_path TEXT,
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 11. students
 CREATE TABLE students (
@@ -159,7 +159,7 @@ CREATE TABLE true_false_questions (
 );
 
 -- 15. exam_attempts
-16. CREATE TABLE exam_attempts (
+CREATE TABLE exam_attempts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     test_id INT NOT NULL,
@@ -176,3 +176,66 @@ CREATE TABLE true_false_questions (
 );
 
 UPDATE settings SET setting_value = '1' WHERE setting_name = 'show_results_immediately';
+
+-- 16. subjects
+CREATE TABLE `subjects` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `subject_name` varchar(255) NOT NULL,
+  `class_level` varchar(10) NOT NULL COMMENT 'e.g., JSS, SS',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `subject_name_class_level` (`subject_name`,`class_level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert existing JSS Subjects
+INSERT INTO `subjects` (`subject_name`, `class_level`) VALUES
+('Mathematics', 'JSS'),
+('English', 'JSS'),
+('ICT', 'JSS'),
+('Agriculture', 'JSS'),
+('History', 'JSS'),
+('Civic Education', 'JSS'),
+('Basic Science', 'JSS'),
+('Basic Technology', 'JSS'),
+('Business studies', 'JSS'),
+('Agricultural sci', 'JSS'),
+('Physical Health Edu', 'JSS'),
+('Cultural and Creative Art', 'JSS'),
+('Social Studies', 'JSS'),
+('Security Edu', 'JSS'),
+('Yoruba', 'JSS'),
+('french', 'JSS'),
+('Coding and Robotics', 'JSS'),
+('C.R.S', 'JSS'),
+('I.R.S', 'JSS'),
+('Chess', 'JSS');
+
+-- Insert existing SS Subjects
+INSERT INTO `subjects` (`subject_name`, `class_level`) VALUES
+('Mathematics', 'SS'),
+('English', 'SS'),
+('Civic Edu', 'SS'),
+('Data Processing', 'SS'),
+('Economics', 'SS'),
+('Government', 'SS'),
+('Commerce', 'SS'),
+('Accounting', 'SS'),
+('Financial Accounting', 'SS'),
+('Dyeing and Bleaching', 'SS'),
+('Physics', 'SS'),
+('Chemistry', 'SS'),
+('Biology', 'SS'),
+('Agricultural Sci', 'SS'),
+('Geography', 'SS'),
+('technical Drawing', 'SS'),
+('yoruba Lang', 'SS'),
+('French Lang', 'SS'),
+('Further Maths', 'SS'),
+('Literature in English', 'SS'),
+('C.R.S', 'SS'),
+('I.R.S', 'SS');
+--17. academic year
+CREATE TABLE academic_years (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    year VARCHAR(9) NOT NULL UNIQUE,
+    status ENUM('active','inactive') DEFAULT 'inactive'
+);

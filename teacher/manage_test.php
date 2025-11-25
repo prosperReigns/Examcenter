@@ -61,22 +61,21 @@ try {
         $error = "No subjects assigned to you. Contact your admin.";
     }
 
-    // Define subjects by category
-    $jss_subjects = [
-        'Mathematics', 'English', 'ICT', 'Agriculture', 'History',
-        'Civic Education', 'Basic Science', 'Basic Technology',
-        'Business studies', 'Physical Health Edu',
-        'Cultural and Creative Art', 'Social Studies', 'Security Edu',
-        'Yoruba', 'French', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
-    ];
-    $ss_subjects = [
-        'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-        'Government', 'Commerce', 'Accounting',
-        'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology',
-        'Agriculture', 'Geography', 'Technical Drawing', 'Yoruba',
-        'French', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
-    ];
-    $result = $conn->query("SELECT * FROM tests ORDER BY id DESC");
+    // Only show tests that match the teacher's assigned subjects
+if (!empty($assigned_subjects)) {
+    $safe_subjects = array_map([$conn, 'real_escape_string'], $assigned_subjects);
+    $subject_list = "'" . implode("','", $safe_subjects) . "'";
+
+    $result = $conn->query("
+        SELECT *
+        FROM tests
+        WHERE subject IN ($subject_list)
+        ORDER BY id DESC
+    ");
+    } else {
+        $result = false;
+    }
+
 } catch (Exception $e) {
     error_log("View results error: " . $e->getMessage());
     die("System error");

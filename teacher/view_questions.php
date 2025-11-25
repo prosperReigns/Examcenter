@@ -57,21 +57,7 @@ try {
         $error = "No subjects assigned to you. Contact your admin.";
     }
 
-    // Define subjects by category
-    $jss_subjects = [
-        'Mathematics', 'English', 'ICT', 'Agriculture', 'History',
-        'Civic Education', 'Basic Science', 'Basic Technology',
-        'Business studies', 'Agricultural sci', 'Physical Health Edu',
-        'Cultural and Creative Art', 'Social Studies', 'Security Edu',
-        'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
-    ];
-    $ss_subjects = [
-        'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-        'Government', 'Commerce', 'Accounting', 'Financial Accounting',
-        'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology',
-        'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
-        'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
-    ];
+    // The hardcoded subject arrays have been removed.
 
     // Pagination settings
     $questions_per_page = 10;
@@ -248,25 +234,11 @@ try {
     $questions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    // Get unique classes, years, and test titles for filters (restricted to assigned subjects)
-    $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-    $stmt = $conn->prepare("SELECT DISTINCT class FROM tests WHERE subject IN ($placeholders) ORDER BY class");
-    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
-    $stmt->execute();
-    $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-
-    $stmt = $conn->prepare("SELECT DISTINCT year FROM tests WHERE subject IN ($placeholders) ORDER BY year DESC");
-    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
-    $stmt->execute();
-    $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-
-    $stmt = $conn->prepare("SELECT DISTINCT title FROM tests WHERE subject IN ($placeholders) ORDER BY title");
-    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
-    $stmt->execute();
-    $test_titles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    // Fetch filter options
+    $class_options_stmt = $conn->query("SELECT DISTINCT class FROM tests WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY class");
+    $subject_options_stmt = $conn->query("SELECT name as subject FROM subjects WHERE name IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY name");
+    $year_options_stmt = $conn->query("SELECT DISTINCT year FROM tests WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY year");
+    $test_title_options_stmt = $conn->query("SELECT DISTINCT title FROM tests WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY title");
 
 } catch (Exception $e) {
     error_log("View questions error: " . $e->getMessage());
@@ -515,8 +487,8 @@ try {
                             </form>
                         </div>
                     </div>
-                <?php endforeach; ?>
-
+                <?php endforeach; 
+                
                 <!-- Pagination -->
                 <?php if ($total_pages > 1): ?>
                     <nav aria-label="Page navigation">

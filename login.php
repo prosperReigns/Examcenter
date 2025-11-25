@@ -22,6 +22,20 @@ $error = '';
 // Helper function to validate user and get role
 function getUserRole($conn, $user_id) {
     try {
+        // Check super admins table
+        $stmt = $conn->prepare("SELECT id, role FROM super_admins WHERE id = ?");
+        if (!$stmt) {
+            error_log("getUserRole: Prepare failed for super admins - " . $conn->error);
+            return false;
+        }
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($user = $result->fetch_assoc()) {
+            $stmt->close();
+            return ['id' => $user['id'], 'role' => strtolower($user['role'])];
+        }
+
         // Check admins table
         $stmt = $conn->prepare("SELECT id, role FROM admins WHERE id = ?");
         if (!$stmt) {
@@ -63,6 +77,9 @@ function redirectByRole($role) {
     $base_url = 'http://' . $_SERVER['HTTP_HOST'];
     
     switch($role) {
+        case 'super_admin':
+            $target = $base_url . '/EXAMCENTER/super_admin/dashboard.php';
+            break;
         case 'admin':
             $target = $base_url . '/EXAMCENTER/admin/dashboard.php';
             break;
@@ -71,15 +88,13 @@ function redirectByRole($role) {
             break;
         default:
             session_destroy();
-            header("Location: " . $base_url . "/EXAMCENTER/admin/login.php");
+            header("Location: " . $base_url . "/EXAMCENTER/login.php");
             exit();
     }
     
     // Only redirect if we're not already on the target page
-    if ($_SERVER['PHP_SELF'] !== parse_url($target, PHP_URL_PATH)) {
-        header("Location: $target");
-        exit();
-    }
+    header("Location: $target");
+    exit();
 }
 
 // Initialize database connection
@@ -100,15 +115,17 @@ if (isset($_SESSION['user_id']) && empty($error)) {
     if ($user = getUserRole($conn, $user_id)) {
         // Store role in session if not already set
         if (!isset($_SESSION['user_role'])) {
-            $_SESSION['user_role'] = $user['role'];
+            $role = strtolower(str_replace(' ', '_', $row['role']));
+            $_SESSION['user_role'] = $role;
         }
         
         // Check if we're already on the correct dashboard
         $current_page = $_SERVER['PHP_SELF'];
+        $is_super_admin_dashboard = strpos($current_page, 'super_admin/dashboard.php') !== false;
         $is_admin_dashboard = strpos($current_page, 'admin/dashboard.php') !== false;
         $is_teacher_dashboard = strpos($current_page, 'teacher/dashboard.php') !== false;
         
-        if (($user['role'] === 'admin' && !$is_admin_dashboard) || 
+        if (($user['role'] === 'super_admin' && !$is_super_admin_dashboard) || ($user['role'] === 'admin' && !$is_admin_dashboard) || 
             ($user['role'] === 'teacher' && !$is_teacher_dashboard)) {
             redirectByRole($user['role']);
         }
@@ -118,69 +135,63 @@ if (isset($_SESSION['user_id']) && empty($error)) {
         $error = "Session invalid";
     }
 }
-
 // Handle login form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
     try {
         $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
-        
+
         if (empty($username) || empty($password)) {
             $error = "Username and password are required";
         } else {
-            // Try admins table
-            $stmt = $conn->prepare("SELECT id, username, password, role FROM admins WHERE username = ?");
-            if ($stmt === false) {
-                error_log("Login: Prepare failed for admins - " . $conn->error);
-                $error = "Database error. Please try again.";
-            } else {
+
+            // Tables to check in order
+            $tables = [
+                "super_admins",
+                "admins",
+                "teachers"
+            ];
+
+            $loggedIn = false;
+
+            foreach ($tables as $table) {
+                $stmt = $conn->prepare("SELECT id, username, password, role FROM $table WHERE username = ?");
+                if ($stmt === false) {
+                    error_log("Login: Prepare failed for $table - " . $conn->error);
+                    continue;
+                }
+
                 $stmt->bind_param("s", $username);
                 $stmt->execute();
                 $result = $stmt->get_result();
-                
+
                 if ($result->num_rows == 1) {
                     $row = $result->fetch_assoc();
+
                     if (password_verify($password, $row['password'])) {
+
+                        // Session Assignments
                         $_SESSION['user_id'] = $row['id'];
                         $_SESSION['user_username'] = $row['username'];
                         $_SESSION['user_role'] = strtolower($row['role']);
-                        Logger::log("Successful login for username=$username, role={$row['role']} from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+
+                        Logger::log("Successful login for username=$username, role={$row['role']} table=$table from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+
                         redirectByRole($_SESSION['user_role']);
+                        exit;
                     } else {
                         $error = "Invalid login credentials";
-                        Logger::log("Failed login attempt for username=$username: Invalid password from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-                    }
-                    $stmt->close();
-                } else {
-                    // Try teachers table
-                    $stmt = $conn->prepare("SELECT id, username, password, role FROM teachers WHERE username = ?");
-                    if ($stmt === false) {
-                        error_log("Login: Prepare failed for teachers - " . $conn->error);
-                        $error = "Database error. Please try again.";
-                    } else {
-                        $stmt->bind_param("s", $username);
-                        $stmt->execute();
-                        $result = $stmt->get_result();
-                        
-                        if ($result->num_rows == 1) {
-                            $row = $result->fetch_assoc();
-                            if (password_verify($password, $row['password'])) {
-                                $_SESSION['user_id'] = $row['id'];
-                                $_SESSION['user_username'] = $row['username'];
-                                $_SESSION['user_role'] = strtolower($row['role']);
-                                Logger::log("Successful login for username=$username, role={$row['role']} from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-                                redirectByRole($_SESSION['user_role']);
-                            } else {
-                                $error = "Invalid login credentials";
-                                Logger::log("Failed login attempt for username=$username: Invalid password from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-                            }
-                        } else {
-                            $error = "Invalid login credentials";
-                            Logger::log("Failed login attempt: Username=$username not found from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-                        }
-                        $stmt->close();
+                        Logger::log("Failed login attempt for username=$username: Invalid password table=$table from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+                        $loggedIn = true;
+                        break;
                     }
                 }
+                $stmt->close();
+            }
+
+            if (!$loggedIn && empty($error)) {
+                $error = "Invalid login credentials";
+                Logger::log("Failed login attempt: Username=$username not found from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
             }
         }
     } catch (Exception $e) {
@@ -188,6 +199,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
         $error = "System error during login";
     }
 }
+
 ob_end_flush();
 ?>
 

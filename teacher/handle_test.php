@@ -24,48 +24,48 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// Define subjects by category
-$jss_subjects = [
-    'Mathematics', 'English', 'ICT', 'Agriculture', 'History',
-    'Civic Education', 'Basic Science', 'Basic Technology',
-    'Business studies', 'Agricultural sci', 'Physical Health Edu',
-    'Cultural and Creative Art', 'Social Studies', 'Security Edu',
-    'Yoruba', 'french', 'Coding and Robotics', 'C.R.S', 'I.R.S', 'Chess'
-];
-$ss_subjects = [
-    'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-    'Government', 'Commerce', 'Accounting', 'Financial Accounting',
-    'Dyeing and Bleaching', 'Physics', 'Chemistry', 'Biology',
-    'Agricultural Sci', 'Geography', 'technical Drawing', 'yoruba Lang',
-    'French Lang', 'Further Maths', 'Literature in English', 'C.R.S', 'I.R.S'
-];
+// The hardcoded subject arrays have been removed.
 
 // Update is_valid_subject function
-function is_valid_subject($class, $subject, $assigned_subjects) {
-    global $jss_subjects, $ss_subjects;
-    $subject = strtolower(trim($subject));
-    $class = strtolower(trim($class));
-    $valid_subjects = [];
+function is_valid_subject($class, $subject, $assigned_subjects, $conn) {
+    $subject_lower = strtolower(trim($subject));
+    $class_lower = strtolower(trim($class));
+    $class_type = '';
 
-    if (strpos($class, 'jss') === 0) {
-        $valid_subjects = array_map('strtolower', $jss_subjects);
-    } elseif (strpos($class, 'ss') === 0) {
-        $valid_subjects = array_map('strtolower', $ss_subjects);
+    if (strpos($class_lower, 'jss') === 0) {
+        $class_type = 'JSS';
+    } elseif (strpos($class_lower, 'ss') === 0) {
+        $class_type = 'SS';
+    } else {
+        return false; // Not a JSS or SS class
     }
 
-    return in_array($subject, $valid_subjects) && in_array($subject, array_map('strtolower', $assigned_subjects));
+    // Check if subject is valid for the class type in the subjects table
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM subjects WHERE LOWER(name) = ? AND class = ?");
+    $stmt->bind_param("ss", $subject_lower, $class_type);
+    $stmt->execute();
+    $count = $stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+
+    if ($count == 0) {
+        return false; // Subject not valid for this class
+    }
+
+    // Check if the subject is assigned to the teacher
+    return in_array($subject, $assigned_subjects);
 }
 
 // Handle test creation
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
+    $year = trim($_POST['year'] ?? '');
     $title = trim($_POST['test_title'] ?? '');
     $class = trim($_POST['class'] ?? '');
     $subject = trim($_POST['subject'] ?? '');
     $duration = (int)($_POST['duration'] ?? 0);
 
-    if (empty($title) || empty($class) || empty($subject) || $duration <= 0) {
+    if (empty($year) || empty($title) || empty($class) || empty($subject) || $duration <= 0) {
         $_SESSION['error'] = "Please fill in all test details, including a valid duration.";
-    } elseif (!is_valid_subject($class, $subject, $assigned_subjects)) {
+    } elseif (!is_valid_subject($class, $subject, $assigned_subjects, $conn)) {
         $_SESSION['error'] = "Invalid or unauthorized subject for selected class!";
         error_log("Invalid subject attempt: {$subject} for {$class} by teacher_id=$teacher_id");
     } else {
@@ -82,12 +82,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
             if ($existing_test) {
                 $_SESSION['error'] = "A test with the same title, class, and subject already exists!";
             } else {
-                $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration, created_at) VALUES (?, ?, ?, ?, NOW())");
+                $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                 if (!$stmt) {
                     error_log("Prepare failed for test creation: " . $conn->error);
                     $_SESSION['error'] = "Database error.";
                 } else {
-                    $stmt->bind_param("sssi", $title, $class, $subject, $duration);
+                    $stmt->bind_param("sssis", $title, $class, $subject, $duration, $year);
                     if ($stmt->execute()) {
                         $_SESSION['current_test_id'] = $stmt->insert_id;
                         $_SESSION['success'] = "Test created successfully!";

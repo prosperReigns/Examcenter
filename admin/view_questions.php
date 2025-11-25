@@ -19,7 +19,7 @@ try {
     }
 
     // Fetch admin profile
-    $admin_id = (int)$_SESSION['user_id'];
+    $admin_id = (int)$_SESSION['user_id']; 
     $stmt = $conn->prepare("SELECT username FROM admins WHERE id = ?");
     if (!$stmt) {
         error_log("Prepare failed for admin profile: " . $conn->error);
@@ -51,21 +51,7 @@ try {
     die("System error");
 }
 
-// Define subjects by category
-$jss_subjects = [
-    'mathematics', 'english', 'ict', 'agriculture', 'history', 
-    'civic education', 'basic science', 'basic technology', 
-    'business studies', 'agricultural sci', 'physical health edu',
-    'cultural and creative art', 'social studies', 'security edu', 
-    'yoruba', 'french', 'coding and robotics', 'c.r.s', 'i.r.s', 'chess'
-];
-$ss_subjects = [
-    'mathematics', 'english', 'civic edu', 'data processing', 'economics',
-    'government', 'commerce', 'accounting', 'financial accounting', 
-    'dyeing and bleaching', 'physics', 'chemistry', 'biology', 
-    'agricultural sci', 'geography', 'technical drawing', 'yoruba lang',
-    'french lang', 'further maths', 'literature in english', 'c.r.s', 'i.r.s'
-];
+// The hardcoded subject arrays have been removed.
 
 // Initialize variables
 $error = $success = '';
@@ -186,7 +172,7 @@ $stmt->execute();
 $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-$stmt = $conn->prepare("SELECT DISTINCT subject FROM tests ORDER BY subject");
+$stmt = $conn->prepare("SELECT name as subject FROM subjects ORDER BY name");
 $stmt->execute();
 $subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
@@ -250,6 +236,8 @@ $stmt->close();
             <a href="view_questions.php" class="active"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
+            <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
+            <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
             <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>

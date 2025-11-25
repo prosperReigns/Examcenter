@@ -47,15 +47,14 @@ try {
     die("System error");
 }
 
-// Define available subjects
-$subjects = [
-    'Mathematics', 'English', 'Civic Edu', 'Data Processing', 'Economics',
-    'Government', 'Commerce', 'Financial Accounting', 'Agricultural Sci',
-    'Literature in English', 'C.R.S', 'I.R.S', 'Accounting', 'Dyeing and Bleaching',
-    'Physics', 'Chemistry', 'Biology', 'Geography', 'Technical Drawing', 'Yoruba Lang',
-    'Further Maths', 'Basic Science', 'Basic Technology', 'Business Studies', 'PHE',
-    'CCA', 'Social Studies', 'Security Edu', 'Yoruba', 'French', 'Coding & Robotics'
-];
+// Fetch available subjects from the database
+$subjects_stmt = $conn->query("SELECT name FROM subjects ORDER BY name");
+$available_subjects = [];
+if ($subjects_stmt) {
+    while ($row = $subjects_stmt->fetch_assoc()) {
+        $available_subjects[] = $row['name'];
+    }
+}
 
 // Initialize variables
 $error = $success = '';
@@ -180,7 +179,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 // Insert subjects
                 foreach ($selected_subjects as $subject) {
-                    if (!in_array($subject, $subjects)) {
+                    if (!in_array($subject, $available_subjects)) {
                         throw new Exception("Invalid subject: $subject");
                     }
                     $stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject) VALUES (?, ?)");
@@ -274,6 +273,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php" class="active"><i class="fas fa-user-plus"></i>Add Teachers</a>
+            <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
+            <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
             <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>

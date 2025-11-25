@@ -402,7 +402,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                             <button type="button" class="btn btn-primary" id="nextBtn" onclick="nextQuestion()">
                                 Next <i class="bi bi-chevron-right"></i>
                             </button>
-                            <button type="submit" class="btn btn-submit" id="submitBtn" style="display: none;">
+                            <button type="submit" class="btn btn-submit" id="submitBtn" style="display: none;" onclick="return confirmSubmission();">
                                 <i class="bi bi-send-fill"></i> Submit Exam
                             </button>
                         </div>
@@ -465,8 +465,8 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
     <script src="../js/bootstrap.bundle.min.js"></script>
     <!-- Temporarily remove other scripts to isolate issues -->
-    <!-- <script src="../js/lock_exam_window.js"></script>
-    <script src="../js/exam_timer.js"></script> -->
+    <script src="../js/lock_exam_window.js"></script>
+    <!-- <script src="../js/exam_timer.js"></script> -->
 
     <script>
         let currentIndex = <?php echo $current_index; ?>;
@@ -796,6 +796,14 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 console.error('Initialization error:', e);
             }
         });
+
+        function confirmSubmission() {
+            return confirm(
+                "⚠️ FINAL SUBMISSION\n\n" +
+                "Once submitted, you cannot change your answers.\n\n" +
+                "Are you sure you want to submit your exam now?"
+            );
+        }
     </script>
 </body>
 </html>
