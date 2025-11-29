@@ -241,7 +241,7 @@ try {
                                     <select class="form-select" name="year" id="year" required>
                                         <option value="">Select Academic Year</option>
                                         <?php
-                                            $yearQuery = $conn->query("SELECT year FROM academic_years ORDER BY year ASC");
+                                             $yearQuery = $conn->query("SELECT DISTINCT year FROM academic_years ORDER BY year ASC");
                                             while ($row = $yearQuery->fetch_assoc()) {
                                                 echo '<option value="' . htmlspecialchars($row['year']) . '">' . htmlspecialchars($row['year']) . '</option>';
                                             }
@@ -252,12 +252,15 @@ try {
                                     <label class="form-label fw-bold">Test Title</label>
                                     <select class="form-select" name="test_title" required>
                                         <option value="">Select Test Title</option>
-                                        <option value="First term exam">First term exam</option>
-                                        <option value="First term mid-test">First term mid-test</option>
-                                        <option value="Second term exam">Second term exam</option>
-                                        <option value="Second term mid-test">Second term mid-test</option>
-                                        <option value="Third term exam">Third term exam</option>
-                                        <option value="Third term mid-test">Third term mid-test</option>
+                                        <?php
+                                        // Fetch sessions + exam titles from academic_years table
+                                        $ayQuery = $conn->query("SELECT DISTINCT session, exam_title FROM academic_years ORDER BY session ASC");
+                                        while ($row = $ayQuery->fetch_assoc()) {
+                                            // Combine session + exam_title without dash or year
+                                            $combinedTitle = htmlspecialchars($row['session'] . ' ' . $row['exam_title']);
+                                            echo '<option value="' . $combinedTitle . '">' . $combinedTitle . '</option>';
+                                        }
+                                        ?>
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">

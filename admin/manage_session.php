@@ -343,6 +343,7 @@ $stmt->close();
 <link href="../css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../css/all.css">
 <link rel="stylesheet" href="../css/sidebar.css">
+<link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
 <style>
 /* Simple two-column layout: vertical left years, right workspace */
 .page-wrap { display:flex; gap:1rem; padding:1rem; }
