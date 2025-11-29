@@ -41,7 +41,7 @@ function is_valid_subject($class, $subject, $assigned_subjects, $conn) {
     }
 
     // Check if subject is valid for the class type in the subjects table
-    $stmt = $conn->prepare("SELECT COUNT(*) FROM subjects WHERE LOWER(name) = ? AND class = ?");
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM subjects WHERE LOWER(subject_name) = ? AND class_level = ?");
     $stmt->bind_param("ss", $subject_lower, $class_type);
     $stmt->execute();
     $count = $stmt->get_result()->fetch_row()[0];
