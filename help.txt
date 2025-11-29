@@ -236,7 +236,7 @@ INSERT INTO `subjects` (`subject_name`, `class_level`) VALUES
 --17. academic year
 CREATE TABLE academic_years (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  year VARCHAR(9) NOT NULL UNIQUE,
+  year VARCHAR(9) NOT NULL,
   session VARCHAR(50),
   exam_title VARCHAR(50),
   status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
