@@ -235,7 +235,10 @@ INSERT INTO `subjects` (`subject_name`, `class_level`) VALUES
 ('I.R.S', 'SS');
 --17. academic year
 CREATE TABLE academic_years (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    year VARCHAR(9) NOT NULL UNIQUE,
-    status ENUM('active','inactive') DEFAULT 'inactive'
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  year VARCHAR(9) NOT NULL UNIQUE,
+  session VARCHAR(50),
+  exam_title VARCHAR(50),
+  status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
