@@ -102,6 +102,7 @@ $subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_n
         <a href="manage_session.php"><i class="fas fa-users"></i>Manage Session</a>
         <a href="manage_subject.php" class="active"><i class="fas fa-users"></i>Manage Subject</a>
         <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
+        <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
         <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
         <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
     </div>
