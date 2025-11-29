@@ -234,11 +234,41 @@ try {
     $questions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    // Fetch filter options
-    $class_options_stmt = $conn->query("SELECT DISTINCT class FROM tests WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY class");
-    $subject_options_stmt = $conn->query("SELECT name as subject FROM subjects WHERE name IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY name");
-    $year_options_stmt = $conn->query("SELECT DISTINCT year FROM tests WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY year");
-    $test_title_options_stmt = $conn->query("SELECT DISTINCT title FROM tests WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') ORDER BY title");
+   // Fetch filter options
+    $class_options_stmt = $conn->query("
+    SELECT DISTINCT class 
+    FROM tests 
+    WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') 
+    ORDER BY class
+    ");
+
+    $subject_options_stmt = $conn->query("
+    SELECT name AS subject 
+    FROM subjects 
+    WHERE name IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') 
+    ORDER BY name
+    ");
+
+    $year_options_stmt = $conn->query("
+    SELECT DISTINCT year 
+    FROM tests 
+    WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') 
+    ORDER BY year
+    ");
+
+    $test_title_options_stmt = $conn->query("
+    SELECT DISTINCT title 
+    FROM tests 
+    WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') 
+    ORDER BY title
+    ");
+
+    // Convert result sets into arrays for dropdowns
+    $classes = $class_options_stmt->fetch_all(MYSQLI_ASSOC);
+    $subjects = $subject_options_stmt->fetch_all(MYSQLI_ASSOC);
+    $years = $year_options_stmt->fetch_all(MYSQLI_ASSOC);
+    $test_titles = $test_title_options_stmt->fetch_all(MYSQLI_ASSOC);
+
 
 } catch (Exception $e) {
     error_log("View questions error: " . $e->getMessage());
