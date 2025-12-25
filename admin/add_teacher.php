@@ -48,18 +48,41 @@ try {
 }
 
 // Fetch available subjects from the database
-$subjects = $conn->query("SELECT subject_name FROM subjects ORDER BY subject_name");
+$subjects = $conn->query("
+    SELECT s.id AS subject_id, s.subject_name, sl.class_level
+    FROM subjects s
+    JOIN subject_levels sl ON s.id = sl.subject_id
+    ORDER BY s.subject_name, sl.class_level
+");
 $available_subjects = [];
 if ($subjects) {
     while ($row = $subjects->fetch_assoc()) {
-        $available_subjects[] = $row['subject_name'];
+        $available_subjects[] = [
+            'id' => $row['subject_id'],
+            'name' => $row['subject_name'],
+            'level' => $row['class_level']
+        ];
     }
+}
+
+
+// Fetch active classes
+$classes = [];
+$result = $conn->query("
+    SELECT c.id, c.class_name
+    FROM classes c
+    WHERE c.is_active = 1
+    ORDER BY c.class_name
+");
+while ($row = $result->fetch_assoc()) {
+    $classes[] = $row;
 }
 
 // Initialize variables
 $error = $success = '';
 $first_name = $last_name = $email = $phone = $username = '';
 $selected_subjects = [];
+$selected_classes = [];
 $is_edit_mode = false;
 $teacher_id = null;
 
@@ -93,6 +116,17 @@ if (isset($_GET['edit_id'])) {
         while ($row = $result->fetch_assoc()) {
             $selected_subjects[] = $row['subject'];
         }
+
+        // Fetch assigned classes
+        $stmt = $conn->prepare("
+        SELECT class_id FROM teacher_classes WHERE teacher_id = ?
+        ");
+        $stmt->bind_param("i", $teacher_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+        $selected_classes[] = $row['class_id'];
+        }
     } else {
         $error = "Teacher not found!";
         $is_edit_mode = false;
@@ -107,6 +141,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
     $selected_subjects = $_POST['subjects'] ?? [];
+    $selected_classes  = $_POST['classes'] ?? [];
 
     $username = strtolower($first_name . '.' . $last_name);
     $username = preg_replace('/[^a-z.]/', '', $username);
@@ -117,6 +152,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error = "Invalid email format";
     } elseif (empty($selected_subjects)) {
         $error = "Please select at least one subject";
+    } elseif (empty($selected_classes)) {
+        $error = "Please assign the teacher to at least one class";
     } else {
         try {
             // Check for duplicate email and username
@@ -177,17 +214,44 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $success = "Teacher added successfully! Username: $username";
                 }
 
-                // Insert subjects
-                foreach ($selected_subjects as $subject) {
-                    if (!in_array($subject, $available_subjects)) {
-                        throw new Exception("Invalid subject: $subject");
+                // Clear old class assignments (edit mode)
+                $stmt = $conn->prepare("DELETE FROM teacher_classes WHERE teacher_id = ?");
+                $stmt->bind_param("i", $teacher_id);
+                $stmt->execute();
+
+                // Insert class assignments
+                foreach ($selected_classes as $class_id) {
+                    $stmt = $conn->prepare("
+                        INSERT INTO teacher_classes (teacher_id, class_id)
+                        VALUES (?, ?)
+                    ");
+                    $stmt->bind_param("ii", $teacher_id, $class_id);
+                    if (!$stmt->execute()) {
+                        throw new Exception("Assign class failed");
                     }
-                    $stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject) VALUES (?, ?)");
-                    $stmt->bind_param("is", $teacher_id, $subject);
+                }
+
+                // Insert subjects
+                foreach ($selected_subjects as $subject_level) {
+                    list($subject_id, $class_level) = explode('_', $subject_level);
+                
+                    // Validate subject-level exists
+                    $found = false;
+                    foreach ($available_subjects as $sub) {
+                        if ($sub['id'] == $subject_id && $sub['level'] == $class_level) {
+                            $found = true;
+                            break;
+                        }
+                    }
+                    if (!$found) throw new Exception("Invalid subject or level: $subject_level");
+                
+                    $stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject_id, class_level) VALUES (?, ?, ?)");
+                    $stmt->bind_param("iis", $teacher_id, $subject_id, $class_level);
                     if (!$stmt->execute()) {
                         throw new Exception("Insert subject failed: " . $stmt->error);
                     }
                 }
+                
 
                 $conn->commit();
                 error_log("Teacher added/updated: ID=$teacher_id, Username=$username, Email=$email");
@@ -359,21 +423,43 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <div class="mt-4">
                         <label class="form-label fw-bold">Subjects Taught</label>
                         <div class="subjects-container">
-                            <?php foreach ($subjects as $subject): ?>
+                        <?php foreach ($available_subjects as $subject): ?>
+                            <div class="subject-item">
+                                <div class="form-check">
+                                    <input class="form-check-input subject-checkbox" type="checkbox" 
+                                        name="subjects[]" value="<?= $subject['id'] ?>_<?= $subject['level'] ?>"
+                                        id="subject-<?= $subject['id'] ?>-<?= strtolower($subject['level']) ?>"
+                                        <?= in_array($subject['id'].'_'.$subject['level'], $selected_subjects) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="subject-<?= $subject['id'] ?>-<?= strtolower($subject['level']) ?>">
+                                        <?= htmlspecialchars($subject['name'] . ' (' . $subject['level'] . ')') ?>
+                                    </label>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label class="form-label fw-bold">Assigned Classes</label>
+                        <div class="subjects-container">
+                            <?php foreach ($classes as $class): ?>
                                 <div class="subject-item">
                                     <div class="form-check">
-                                        <input class="form-check-input subject-checkbox" type="checkbox" 
-                                               name="subjects[]" value="<?php echo htmlspecialchars($subject); ?>"
-                                               id="subject-<?php echo preg_replace('/[^a-z0-9]/', '-', strtolower($subject)); ?>"
-                                               <?php echo in_array($subject, $selected_subjects) ? 'checked' : ''; ?>>
-                                        <label class="form-check-label" for="subject-<?php echo preg_replace('/[^a-z0-9]/', '-', strtolower($subject)); ?>">
-                                            <?php echo htmlspecialchars($subject); ?>
+                                        <input class="form-check-input" type="checkbox"
+                                            name="classes[]"
+                                            value="<?= $class['id'] ?>"
+                                            id="class-<?= $class['id'] ?>"
+                                            <?= isset($selected_classes) && in_array($class['id'], $selected_classes) ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="class-<?= $class['id'] ?>">
+                                            <?= htmlspecialchars($class['class_name']) ?>
                                         </label>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                     </div>
+
 
                     <div class="d-flex justify-content-end gap-3 mt-4">
                         <button type="reset" class="btn btn-secondary" onclick="clearForm()">Clear</button>
@@ -415,7 +501,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         required: <?php echo $is_edit_mode ? 'false' : 'true'; ?>,
                         equalTo: '[name="password"]' 
                     },
-                    'subjects[]': { required: true }
+                    'subjects[]': { required: true },
+                    'classes[]': { required: true }
                 },
                 messages: {
                     first_name: "Please enter a first name (max 50 characters).",
@@ -424,7 +511,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     phone: "Phone number is too long (max 15 characters).",
                     password: "Password must be at least 8 characters long.",
                     confirm_password: "Passwords do not match.",
-                    'subjects[]': "Please select at least one subject."
+                    'subjects[]': "Please select at least one subject.",
+                    'classes[]': "Please assign at least one class."
                 },
                 errorElement: 'div',
                 errorClass: 'invalid-feedback',

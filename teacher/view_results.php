@@ -42,8 +42,32 @@
             exit();
         }
 
+        // fetch classes dynamically
+        $stmt = $conn->prepare("
+    SELECT DISTINCT c.class_name, ts.subject
+    FROM classes c
+    JOIN academic_levels al ON al.id = c.academic_level_id
+    JOIN subject_levels sl ON sl.class_level = al.class_group
+    JOIN subjects s ON s.id = sl.subject_id
+    JOIN teacher_subjects ts ON ts.subject = s.subject_name
+    WHERE ts.teacher_id = ?
+");
+
+
+
+        $stmt->bind_param("i", $teacher_id);
+        $stmt->execute();
+        $class_subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
         // Fetch assigned subjects
-        $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
+        $stmt = $conn->prepare("
+        SELECT s.subject_name, sl.class_level
+        FROM teacher_subjects ts
+        JOIN subjects s ON ts.subject = s.subject_name
+        JOIN subject_levels sl ON s.id = sl.subject_id
+        WHERE ts.teacher_id = ?
+    ");
+
         if (!$stmt) {
             error_log("Prepare failed for assigned subjects: " . $conn->error);
             die("Database error");
@@ -53,7 +77,9 @@
         $result = $stmt->get_result();
         $assigned_subjects = [];
         while ($row = $result->fetch_assoc()) {
-            $assigned_subjects[] = $row['subject'];
+            $assigned_subjects[] = $row['subject_name'];
+            // Build class-subject mapping for JS
+            $class_subjects[$row['class_level']][] = $row['subject_name'];
         }
         $stmt->close();
 
@@ -82,10 +108,12 @@
         // Handle export to Word
         if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
             try {
-                $export_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
-                                t.subject, t.title AS test_title, t.class AS test_class, t.year 
+                $export_query = "SELECT r.*, s.name AS student_name, c.class_name AS student_class, 
+                                t.subject, t.title AS test_title, t.year 
                                 FROM results r
                                 JOIN students s ON r.user_id = s.id
+                                JOIN classes c ON s.class_id = c.id
+                                JOIN academic_levels al ON c.academic_level_id = al.id
                                 JOIN tests t ON r.test_id = t.id
                                 WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
                 $export_params = $assigned_subjects;
@@ -199,7 +227,7 @@
                         JOIN tests t ON r.test_id = t.id
                         WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
         $select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
-                                t.subject, t.title AS test_title, t.class AS test_class, t.year 
+                                t.subject, t.title AS test_title, t.academic_level_id AS test_class, t.year 
                         FROM results r
                         JOIN students s ON r.user_id = s.id
                         JOIN tests t ON r.test_id = t.id
@@ -279,13 +307,20 @@
 
         // Get unique classes, years, and test titles for filters (restricted to assigned subjects)
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-        $stmt = $conn->prepare("SELECT DISTINCT s.class FROM students s JOIN results r ON s.id = r.user_id JOIN tests t ON r.test_id = t.id WHERE t.subject IN ($placeholders) ORDER BY s.class");
+        $stmt = $conn->prepare("
+            SELECT DISTINCT s.class AS class 
+            FROM students s 
+            JOIN results r ON s.id = r.user_id 
+            JOIN tests t ON r.test_id = t.id 
+            WHERE t.subject IN ($placeholders) 
+            ORDER BY s.class
+        ");
         $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
         $stmt->execute();
         $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id WHERE t.subject IN ($placeholders) ORDER BY t.year DESC");
+        $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id JOIN classes c ON t.academic_level_id = c.academic_level_id WHERE t.subject IN ($placeholders) ORDER BY t.year DESC");
         $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
         $stmt->execute();
         $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -299,6 +334,8 @@
 
     } catch (Exception $e) {
         error_log("View results error: " . $e->getMessage());
+        // echo "<pre>System error: " . $e->getMessage() . "</pre>"; // dev only
+        // die();
         die("System error");
     }
     $conn->close();
@@ -392,8 +429,8 @@
                                 <select class="form-select" name="selected_class" id="selectedClass">
                                     <option value="">All Classes</option>
                                     <?php foreach ($classes as $class): ?>
-                                        <option value="<?php echo htmlspecialchars($class['class']); ?>" <?php echo $class_filter == $class['class'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($class['class']); ?>
+                                        <option value="<?php echo htmlspecialchars($class['class_level']); ?>" <?php echo $class_filter == $class['class_level'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($class['class_level']); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -569,14 +606,8 @@
                 });
 
                 // Class-subject mapping
-                const classSubjectMapping = {
-                    'JSS1': <?php echo json_encode($jss_subjects); ?>,
-                    'JSS2': <?php echo json_encode($jss_subjects); ?>,
-                    'JSS3': <?php echo json_encode($jss_subjects); ?>,
-                    'SS1': <?php echo json_encode($ss_subjects); ?>,
-                    'SS2': <?php echo json_encode($ss_subjects); ?>,
-                    'SS3': <?php echo json_encode($ss_subjects); ?>
-                };
+                const classSubjectMapping = <?php echo json_encode($class_subjects); ?>;
+
                 const assignedSubjects = <?php echo json_encode($assigned_subjects); ?>;
 
                 // Update subjects when class changes

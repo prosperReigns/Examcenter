@@ -46,30 +46,28 @@ CREATE TABLE IF NOT EXISTS teachers (
 );
 
 --20. classes
-CREATE TABLE IF NOT EXISTS classes (
+CREATE TABLE classes (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    class_name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT NULL,
-    teacher_id INT NULL,
-    is_active TINYINT(1) DEFAULT 1,   -- 1 = active, 0 = soft deleted/disabled
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_classes_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL
-)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    academic_level_id INT NOT NULL,
+    stream_id INT NOT NULL,
+    class_name VARCHAR(100),  -- "JSS1 Gold"
+    is_active TINYINT(1) DEFAULT 1,
+    FOREIGN KEY (academic_level_id) REFERENCES academic_levels(id),
+    FOREIGN KEY (stream_id) REFERENCES streams(id),
+    UNIQUE (academic_level_id, stream_id)
+);
 
 -- 14. tests
-CREATE TABLE IF NOT EXISTS tests (
+CREATE TABLE tests (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-    class VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-    class_id INT NULL,
+    academic_level_id INT NOT NULL,
     subject VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-    year VARCHAR(9) NOT NULL,
-    created_at DATETIME,
+    year VARCHAR(9),
     duration INT,
-    CONSTRAINT fk_tests_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
-)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+    created_at DATETIME,
+    FOREIGN KEY (academic_level_id) REFERENCES academic_levels(id)
+)CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- 7. new_questions
 CREATE TABLE IF NOT EXISTS new_questions (
@@ -196,58 +194,17 @@ UPDATE settings SET setting_value = '1' WHERE setting_name = 'show_results_immed
 CREATE TABLE IF NOT EXISTS subjects (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `subject_name` varchar(255) NOT NULL,
-  `class_level` varchar(10) NOT NULL COMMENT 'e.g., JSS, SS',
   PRIMARY KEY (`id`),
   UNIQUE KEY `subject_name_class_level` (`subject_name`,`class_level`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Insert existing JSS Subjects
-INSERT INTO `subjects` (`subject_name`, `class_level`) VALUES
-('Mathematics', 'JSS'),
-('English', 'JSS'),
-('ICT', 'JSS'),
-('Agriculture', 'JSS'),
-('History', 'JSS'),
-('Civic Education', 'JSS'),
-('Basic Science', 'JSS'),
-('Basic Technology', 'JSS'),
-('Business studies', 'JSS'),
-('Agricultural sci', 'JSS'),
-('Physical Health Edu', 'JSS'),
-('Cultural and Creative Art', 'JSS'),
-('Social Studies', 'JSS'),
-('Security Edu', 'JSS'),
-('Yoruba', 'JSS'),
-('french', 'JSS'),
-('Coding and Robotics', 'JSS'),
-('C.R.S', 'JSS'),
-('I.R.S', 'JSS'),
-('Chess', 'JSS');
-
--- Insert existing SS Subjects
-INSERT INTO `subjects` (`subject_name`, `class_level`) VALUES
-('Mathematics', 'SS'),
-('English', 'SS'),
-('Civic Edu', 'SS'),
-('Data Processing', 'SS'),
-('Economics', 'SS'),
-('Government', 'SS'),
-('Commerce', 'SS'),
-('Accounting', 'SS'),
-('Financial Accounting', 'SS'),
-('Dyeing and Bleaching', 'SS'),
-('Physics', 'SS'),
-('Chemistry', 'SS'),
-('Biology', 'SS'),
-('Agricultural Sci', 'SS'),
-('Geography', 'SS'),
-('technical Drawing', 'SS'),
-('yoruba Lang', 'SS'),
-('French Lang', 'SS'),
-('Further Maths', 'SS'),
-('Literature in English', 'SS'),
-('C.R.S', 'SS'),
-('I.R.S', 'SS');
+CREATE TABLE subject_levels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subject_id INT NOT NULL,
+    class_level ENUM('PRIMARY','JSS','SS') NOT NULL,
+    UNIQUE(subject_id, class_level),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+);
 
 --17. academic year
 CREATE TABLE IF NOT EXISTS academic_years (
@@ -279,16 +236,22 @@ CREATE TABLE IF NOT EXISTS system_settings (
 );
 
 
-ALTER TABLE tests
-ADD COLUMN class_id INT NULL AFTER title,
-ADD CONSTRAINT fk_tests_class
+CREATE TABLE streams (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    stream_name VARCHAR(50) UNIQUE
+);
+
+
+CREATE TABLE academic_levels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    level_code VARCHAR(10) UNIQUE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,   -- JSS1, JSS2, SS1
+    class_group ENUM('JSS','SS') NOT NULL
+)CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE teacher_classes (
+    teacher_id INT NOT NULL,
+    class_id INT NOT NULL,
+    PRIMARY KEY (teacher_id, class_id),
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id),
     FOREIGN KEY (class_id) REFERENCES classes(id)
-    ON DELETE SET NULL;
-
-
-
-ALTER TABLE classes
-ADD COLUMN teacher_id INT NULL AFTER description,
-ADD CONSTRAINT fk_classes_teacher
-    FOREIGN KEY (teacher_id) REFERENCES teachers(id)
-    ON DELETE SET NULL;
+);

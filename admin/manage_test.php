@@ -43,7 +43,15 @@ try {
     }
 
 // Admin sees all tests
-$result = $conn->query("SELECT * FROM tests ORDER BY id DESC");
+$result = $conn->query("SELECT t.id, t.title, t.subject, t.duration, 
+                               CONCAT(al.level_code, ' ', s.stream_name) AS class
+                        FROM tests t
+                        JOIN academic_levels al ON t.academic_level_id = al.id
+                        JOIN classes c ON c.academic_level_id = al.id
+                        JOIN streams s ON c.stream_id = s.id
+                        GROUP BY t.id
+                        ORDER BY t.id DESC");
+
 
 
 } catch (Exception $e) {

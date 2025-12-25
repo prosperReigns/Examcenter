@@ -42,12 +42,37 @@ try {
 
     $subjects = $conn->query("SELECT subject_name FROM subjects ORDER BY subject_name");
     $available_subjects = [];
-    if ($subjects) {
-        while ($row = $subjects->fetch_assoc()) {
-            $available_subjects[] = $row['subject_name'];
+    if (!empty($class_filter)) {
+        // Fetch subjects for the selected class level
+        $stmt = $conn->prepare("
+            SELECT s.subject_name 
+            FROM subjects s
+            JOIN subject_levels sl ON s.id = sl.subject_id
+            WHERE sl.class_level = ?
+            ORDER BY s.subject_name
+        ");
+
+        if ($stmt) {
+            $stmt->bind_param("s", $class_filter); // class_filter should be 'JSS', 'SS', or 'PRIMARY'
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $available_subjects[] = $row['subject_name'];
+            }
+            $stmt->close();
+        }
+    } else {
+        // If no class selected, fetch all subjects
+        $stmt = $conn->prepare("SELECT subject_name FROM subjects ORDER BY subject_name");
+        if ($stmt) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $available_subjects[] = $row['subject_name'];
+            }
+            $stmt->close();
         }
     }
-    // The hardcoded subject arrays have been removed.
 
     // Pagination settings
     $results_per_page = 10;
@@ -64,12 +89,14 @@ try {
 
     // Export to Word
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
-        $export_query = "SELECT r.*, s.name AS student_name, s.class AS student_class,
-                         t.subject, t.title AS test_title, t.class AS test_class, t.year
-                         FROM results r
-                         JOIN students s ON r.user_id = s.id
-                         JOIN tests t ON r.test_id = t.id
-                         WHERE 1=1";
+        $export_query = "SELECT r.*, s.name AS student_name, c.class_name AS student_class,
+                 t.subject, t.title AS test_title, al.level_code AS test_class, t.year
+                 FROM results r
+                 JOIN students s ON r.user_id = s.id
+                 JOIN tests t ON r.test_id = t.id
+                 JOIN classes c ON t.academic_level_id = c.academic_level_id
+                 JOIN academic_levels al ON t.academic_level_id = al.id
+                 WHERE 1=1";
 
         $export_params = [];
         $export_types = '';
@@ -80,10 +107,10 @@ try {
             $export_types .= 's';
         }
         if (!empty($class_filter)) {
-            $export_query .= " AND s.class = ?";
+            $export_query .= " AND c.class_name = ?";
             $export_params[] = $class_filter;
             $export_types .= 's';
-        }
+        }        
         if (!empty($subject_filter)) {
             $export_query .= " AND t.subject = ?";
             $export_params[] = $subject_filter;
@@ -157,17 +184,21 @@ try {
 
     // Count total results for pagination
     $count_query = "SELECT COUNT(*) as total 
+                FROM results r
+                JOIN students s ON r.user_id = s.id
+                JOIN tests t ON r.test_id = t.id
+                JOIN classes c ON t.academic_level_id = c.academic_level_id
+                JOIN academic_levels al ON t.academic_level_id = al.id
+                WHERE 1=1";
+
+    $select_query = "SELECT r.*, s.name AS student_name, c.class_name AS student_class,
+                    t.subject, t.title AS test_title, al.level_code AS test_class, t.year
                     FROM results r
                     JOIN students s ON r.user_id = s.id
                     JOIN tests t ON r.test_id = t.id
+                    JOIN classes c ON t.academic_level_id = c.academic_level_id
+                    JOIN academic_levels al ON t.academic_level_id = al.id
                     WHERE 1=1";
-
-    $select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class,
-                     t.subject, t.title AS test_title, t.class AS test_class, t.year
-                     FROM results r
-                     JOIN students s ON r.user_id = s.id
-                     JOIN tests t ON r.test_id = t.id
-                     WHERE 1=1";
 
     $params = [];
     $types = '';
@@ -179,11 +210,11 @@ try {
         $types .= 's';
     }
     if (!empty($class_filter)) {
-        $count_query .= " AND s.class = ?";
-        $select_query .= " AND s.class = ?";
+        $count_query .= " AND c.class_name = ?";
+        $select_query .= " AND c.class_name = ?";
         $params[] = $class_filter;
         $types .= 's';
-    }
+    }    
     if (!empty($subject_filter)) {
         $count_query .= " AND t.subject = ?";
         $select_query .= " AND t.subject = ?";
@@ -243,7 +274,7 @@ try {
     $stmt->close();
 
     // Get unique classes, years, and test titles for filters (no subject restriction for admin)
-    $stmt = $conn->prepare("SELECT DISTINCT s.class FROM students s JOIN results r ON s.id = r.user_id JOIN tests t ON r.test_id = t.id ORDER BY s.class");
+    $stmt = $conn->prepare("SELECT DISTINCT c.class_name AS class FROM classes c JOIN tests t ON c.academic_level_id = t.academic_level_id JOIN results r ON t.id = r.test_id ORDER BY c.class_name");
     $stmt->execute();
     $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -275,6 +306,7 @@ $conn->close();
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link rel="stylesheet" href="../css/view_results.css">
+    <link rel="stylesheet" href="../css/sidebar.css">
     <style>
         .filter-card { background: #f8f9fa; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .results-table { background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -285,6 +317,27 @@ $conn->close();
         .empty-state { text-align: center; padding: 3rem; color: #6c757d; }
         .pagination .page-link { color: #4361ee; }
         .pagination .page-item.active .page-link { background-color: #4361ee; border-color: #4361ee; color: white; }
+        /* Sidebar toggle for mobile */
+        @media (max-width: 991px) {
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                top: 0;
+                height: 100%;
+                width: 260px;
+                z-index: 1050;
+                transition: left 0.3s ease-in-out;
+            }
+
+            .sidebar.active {
+                left: 0;
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -512,6 +565,9 @@ $conn->close();
     <!-- Scripts -->
     <script src="../js/jquery-3.7.0.min.js"></script>
     <script src="../js/bootstrap.bundle.min.js"></script>
+    <script src="../js/jquery.dataTables.min.js"></script>
+    <script src="../js/dataTables.bootstrap5.min.js"></script>
+    <script src="../js/jquery.validate.min.js"></script>
     <script>
         $(document).ready(function() {
             // Sidebar toggle
@@ -519,16 +575,8 @@ $conn->close();
                 $('.sidebar').toggleClass('active');
             });
 
-            // Class-subject mapping
-            const classSubjectMapping = {
-                'JSS1': <?php echo json_encode($jss_subjects); ?>,
-                'JSS2': <?php echo json_encode($jss_subjects); ?>,
-                'JSS3': <?php echo json_encode($jss_subjects); ?>,
-                'SS1': <?php echo json_encode($ss_subjects); ?>,
-                'SS2': <?php echo json_encode($ss_subjects); ?>,
-                'SS3': <?php echo json_encode($ss_subjects); ?>
-            };
-            const assignedSubjects = <?php echo json_encode($available_subjects); ?>;
+            // // Class-subject mapping
+            assignedSubjects = <?php echo json_encode($available_subjects); ?>;
 
             // Update subjects when class changes
             const classSelect = document.getElementById('selectedClass');

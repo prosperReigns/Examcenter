@@ -67,11 +67,13 @@ if (!empty($assigned_subjects)) {
     $subject_list = "'" . implode("','", $safe_subjects) . "'";
 
     $result = $conn->query("
-        SELECT *
-        FROM tests
-        WHERE subject IN ($subject_list)
-        ORDER BY id DESC
+        SELECT t.id, t.title, t.subject, t.duration, c.class_name
+        FROM tests t
+        JOIN classes c ON t.academic_level_id = c.academic_level_id
+        WHERE t.subject IN ($subject_list)
+        ORDER BY t.id DESC
     ");
+
     } else {
         $result = false;
     }
@@ -163,12 +165,12 @@ $conn->close();
             <?php while($row = $result->fetch_assoc()): ?>
             <tr>
                 <td><?= htmlspecialchars($row['title']) ?></td>
-                <td><?= htmlspecialchars($row['class']) ?></td>
+                <td><?= htmlspecialchars($row['class_name']) ?></td>
                 <td><?= htmlspecialchars($row['subject']) ?></td>
                 <td><?= htmlspecialchars($row['duration']) ?></td>
                 <td>
                     <a class="btn btn-sm btn-primary" 
-                    href="download.php?class=<?= urlencode($row['class']) ?>&subject=<?= urlencode($row['subject']) ?>&title=<?= urlencode($row['title']) ?>">
+                    href="download.php?class=<?= urlencode($row['class_name']) ?>&subject=<?= urlencode($row['subject']) ?>&title=<?= urlencode($row['title']) ?>">
                     Download
                     </a>
                     <button class="btn btn-sm btn-danger delete-test" 

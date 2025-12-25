@@ -117,15 +117,23 @@ $subject_filter = trim($_GET['subject'] ?? '');
 $search_term = trim($_GET['search'] ?? '');
 
 // Build queries
-$count_query = "SELECT COUNT(*) as total FROM new_questions q JOIN tests t ON q.test_id = t.id WHERE 1=1";
-$select_query = "SELECT q.*, t.title as test_title, t.class, t.subject 
-                 FROM new_questions q JOIN tests t ON q.test_id = t.id WHERE 1=1";
+$count_query = "SELECT COUNT(*) as total 
+                FROM new_questions q 
+                JOIN tests t ON q.test_id = t.id 
+                JOIN classes c ON t.academic_level_id = c.academic_level_id 
+                WHERE 1=1";
+
+$select_query = "SELECT q.*, t.title as test_title, c.class_name AS class, t.subject
+                 FROM new_questions q 
+                 JOIN tests t ON q.test_id = t.id 
+                 JOIN classes c ON t.academic_level_id = c.academic_level_id 
+                 WHERE 1=1";
 $params = [];
 $types = '';
 
 if ($class_filter) {
-    $count_query .= " AND t.class = ?";
-    $select_query .= " AND t.class = ?";
+    $count_query .= " AND q.class = ?";
+    $select_query .= " AND q.class = ?";
     $params[] = $class_filter;
     $types .= 's';
 }
@@ -159,7 +167,7 @@ if ($current_page > $total_pages && $total_pages > 0) {
 }
 
 // Fetch questions
-$select_query .= " ORDER BY t.class, t.subject, q.id DESC LIMIT ? OFFSET ?";
+$select_query .= " ORDER BY q.class, t.subject, q.id DESC LIMIT ? OFFSET ?";
 $params[] = $questions_per_page;
 $params[] = $offset;
 $types .= 'ii';
@@ -170,15 +178,25 @@ $questions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 // Fetch classes and subjects
-$stmt = $conn->prepare("SELECT DISTINCT class FROM tests ORDER BY class");
+$stmt = $conn->prepare("SELECT c.id, c.class_name 
+                        FROM classes c 
+                        JOIN academic_levels al ON c.academic_level_id = al.id 
+                        ORDER BY al.level_code, c.class_name");
 $stmt->execute();
 $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-$stmt = $conn->prepare("SELECT subject_name as subject FROM subjects ORDER BY subject_name");
+// Fetch subjects with class levels
+$stmt = $conn->prepare("
+    SELECT s.subject_name, sl.class_level
+    FROM subjects s
+    JOIN subject_levels sl ON s.id = sl.subject_id
+    ORDER BY sl.class_level, s.subject_name
+");
 $stmt->execute();
 $subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
 ?>
 
 <!DOCTYPE html>
@@ -284,10 +302,11 @@ $stmt->close();
                             <select class="form-select" name="subject" id="subjectFilter">
                                 <option value="">All Subjects</option>
                                 <?php foreach ($subjects as $subject): ?>
-                                    <option value="<?= htmlspecialchars($subject['subject']) ?>" <?= $subject_filter == $subject['subject'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($subject['subject']) ?>
+                                    <option value="<?= htmlspecialchars($subject['subject_name']) ?>" <?= $subject_filter == $subject['subject_name'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($subject['subject_name']) ?> (<?= htmlspecialchars($subject['class_level']) ?>)
                                     </option>
                                 <?php endforeach; ?>
+
                             </select>
                             <div class="invalid-feedback">Please select a valid subject.</div>
                         </div>

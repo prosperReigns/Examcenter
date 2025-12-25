@@ -46,7 +46,14 @@ try {
 
 // Get all active classes
 $classes = [];
-$classStmt = $conn->prepare("SELECT id, class_name FROM classes WHERE is_active = 1 ORDER BY class_name");
+$classStmt = $conn->prepare("
+    SELECT c.id, c.class_name, c.academic_level_id, c.stream_id, al.level_code, s.stream_name
+    FROM classes c
+    JOIN academic_levels al ON c.academic_level_id = al.id
+    JOIN streams s ON c.stream_id = s.id
+    WHERE c.is_active = 1
+    ORDER BY al.level_code, s.stream_name
+");
 $classStmt->execute();
 $classResult = $classStmt->get_result();
 $classes = $classResult->fetch_all(MYSQLI_ASSOC);
@@ -54,11 +61,17 @@ $classStmt->close();
 
 // Pre-fetch teacher → class mapping to avoid N+1 queries
 $teacherClasses = [];
-$stmt = $conn->prepare("SELECT teacher_id, class_name FROM classes WHERE teacher_id IS NOT NULL");
+$stmt = $conn->prepare("
+    SELECT tc.teacher_id, c.id AS class_id, al.level_code, s.stream_name
+    FROM teacher_classes tc
+    JOIN classes c ON tc.class_id = c.id
+    JOIN academic_levels al ON c.academic_level_id = al.id
+    JOIN streams s ON c.stream_id = s.id
+");
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
-    $teacherClasses[$row['teacher_id']] = $row['class_name'];
+    $teacherClasses[$row['teacher_id']] = $row['level_code'] . ' ' . $row['stream_name'];
 }
 $stmt->close();
 
