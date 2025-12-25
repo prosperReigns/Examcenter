@@ -2,11 +2,11 @@ kingly log on to http://127.0.0.1/phpmyadmin/index.php?route=/sql&pos=0&db=cbt_a
 
 -- Create new admins table structure
 -- Create the database
-CREATE DATABASE IF NOT EXISTS cbt_app;
-USE cbt_app;
+CREATE DATABASE IF NOT EXISTS cbt_app_db;
+USE cbt_app_db;
 
 -- 1. active_exams
-CREATE TABLE active_exams (
+CREATE TABLE IF NOT EXISTS active_exams (
     id INT AUTO_INCREMENT PRIMARY KEY,
     subject VARCHAR(100),
     is_active BOOLEAN,
@@ -14,7 +14,7 @@ CREATE TABLE active_exams (
 );
 
 -- 2. activities_log
-CREATE TABLE activities_log (
+CREATE TABLE IF NOT EXISTS activities_log (
     id INT AUTO_INCREMENT PRIMARY KEY,
     activity TEXT,
     admin_id INT,
@@ -24,7 +24,7 @@ CREATE TABLE activities_log (
 );
 
 -- 3. admins
-CREATE TABLE admins (
+CREATE TABLE IF NOT EXISTS admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(100) UNIQUE,
     password VARCHAR(255),
@@ -32,8 +32,59 @@ CREATE TABLE admins (
     role VARCHAR(50)
 );
 
+-- 12. teachers
+CREATE TABLE IF NOT EXISTS teachers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    username VARCHAR(100) UNIQUE,
+    email VARCHAR(100),
+    password VARCHAR(255),
+    phone VARCHAR(20),
+    created_at DATETIME,
+    role VARCHAR(50)
+);
+
+--20. classes
+CREATE TABLE IF NOT EXISTS classes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    class_name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT NULL,
+    teacher_id INT NULL,
+    is_active TINYINT(1) DEFAULT 1,   -- 1 = active, 0 = soft deleted/disabled
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_classes_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 14. tests
+CREATE TABLE IF NOT EXISTS tests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    class VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    class_id INT NULL,
+    subject VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    year VARCHAR(9) NOT NULL,
+    created_at DATETIME,
+    duration INT,
+    CONSTRAINT fk_tests_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- 7. new_questions
+CREATE TABLE IF NOT EXISTS new_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    test_id INT,
+    class VARCHAR(20),
+    subject VARCHAR(100),
+    question_type VARCHAR(50),
+    created_at DATETIME,
+    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 4. fill_blank_questions
-CREATE TABLE fill_blank_questions (
+CREATE TABLE IF NOT EXISTS ill_blank_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
     correct_answer TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -41,7 +92,7 @@ CREATE TABLE fill_blank_questions (
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 5. image_questions
-CREATE TABLE image_questions (
+CREATE TABLE IF NOT EXISTS image_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
     image_path TEXT,
@@ -51,7 +102,7 @@ CREATE TABLE image_questions (
 );
 
 -- 6. multiple_choice_questions
-CREATE TABLE multiple_choice_questions (
+CREATE TABLE IF NOT EXISTS multiple_choice_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
     option1 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -63,20 +114,8 @@ CREATE TABLE multiple_choice_questions (
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 7. new_questions
-CREATE TABLE new_questions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_text TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-    test_id INT,
-    class VARCHAR(20),
-    subject VARCHAR(100),
-    question_type VARCHAR(50),
-    created_at DATETIME,
-    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
-)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- 8. results
-CREATE TABLE results (
+CREATE TABLE IF NOT EXISTS results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     test_id INT,
@@ -89,14 +128,14 @@ CREATE TABLE results (
 );
 
 -- 9. settings
-CREATE TABLE settings (
+CREATE TABLE IF NOT EXISTS settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     setting_name VARCHAR(100),
     setting_value TEXT
 );
 
 -- 10. single_choice_questions
-CREATE TABLE single_choice_questions (
+CREATE TABLE IF NOT EXISTS single_choice_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
     option1 TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -109,7 +148,7 @@ CREATE TABLE single_choice_questions (
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 11. students
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150),
     email VARCHAR(100),
@@ -118,40 +157,16 @@ CREATE TABLE students (
     role VARCHAR(50)
 );
 
--- 12. teachers
-CREATE TABLE teachers (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    username VARCHAR(100) UNIQUE,
-    email VARCHAR(100),
-    password VARCHAR(255),
-    phone VARCHAR(20),
-    created_at DATETIME,
-    role VARCHAR(50)
-);
-
 -- 13. teacher_subjects
-CREATE TABLE teacher_subjects (
+CREATE TABLE IF NOT EXISTS teacher_subjects (
     id INT AUTO_INCREMENT PRIMARY KEY,
     teacher_id INT,
     subject VARCHAR(100),
     FOREIGN KEY (teacher_id) REFERENCES teachers(id)
 );
 
--- 14. tests
-CREATE TABLE tests (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(200),
-    class VARCHAR(20),
-    subject VARCHAR(100),
-    year VARCHAR(9) NOT NULL,
-    created_at DATETIME,
-    duration INT
-);
-
 -- 15. true_false_questions
-CREATE TABLE true_false_questions (
+CREATE TABLE IF NOT EXISTS true_false_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
     correct_answer BOOLEAN,
@@ -159,7 +174,7 @@ CREATE TABLE true_false_questions (
 );
 
 -- 15. exam_attempts
-CREATE TABLE exam_attempts (
+CREATE TABLE IF NOT EXISTS exam_attempts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     test_id INT NOT NULL,
@@ -178,7 +193,7 @@ CREATE TABLE exam_attempts (
 UPDATE settings SET setting_value = '1' WHERE setting_name = 'show_results_immediately';
 
 -- 16. subjects
-CREATE TABLE `subjects` (
+CREATE TABLE IF NOT EXISTS subjects (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `subject_name` varchar(255) NOT NULL,
   `class_level` varchar(10) NOT NULL COMMENT 'e.g., JSS, SS',
@@ -233,8 +248,9 @@ INSERT INTO `subjects` (`subject_name`, `class_level`) VALUES
 ('Literature in English', 'SS'),
 ('C.R.S', 'SS'),
 ('I.R.S', 'SS');
+
 --17. academic year
-CREATE TABLE academic_years (
+CREATE TABLE IF NOT EXISTS academic_years (
   id INT AUTO_INCREMENT PRIMARY KEY,
   year VARCHAR(9) NOT NULL,
   session VARCHAR(50),
@@ -242,3 +258,37 @@ CREATE TABLE academic_years (
   status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 18. super_admins
+CREATE TABLE IF NOT EXISTS super_admins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) UNIQUE,
+    password VARCHAR(255),
+    created_at DATETIME,
+    role VARCHAR(50),
+    
+);
+
+--19. system_settings
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setup_completed TINYINT(1) DEFAULT 0,
+    setup_completed_at TIMESTAMP NULL,
+    setup_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE tests
+ADD COLUMN class_id INT NULL AFTER title,
+ADD CONSTRAINT fk_tests_class
+    FOREIGN KEY (class_id) REFERENCES classes(id)
+    ON DELETE SET NULL;
+
+
+
+ALTER TABLE classes
+ADD COLUMN teacher_id INT NULL AFTER description,
+ADD CONSTRAINT fk_classes_teacher
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id)
+    ON DELETE SET NULL;

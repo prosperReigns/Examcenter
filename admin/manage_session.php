@@ -347,7 +347,7 @@ $stmt->close();
 <style>
 /* Simple two-column layout: vertical left years, right workspace */
 .page-wrap { display:flex; gap:1rem; padding:1rem; }
-.left-col { width:260px; }
+.left-col { width:260px; }  
 .year-list { max-height:70vh; overflow:auto; }
 .year-item { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-bottom:0.5rem; }
 .year-item .actions { display:flex; gap:0.35rem; }
@@ -383,6 +383,7 @@ $stmt->close();
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
+            <a href="manage_classes.php"><i class="fas fa-users"></i>Manage Classes</a>
             <a href="manage_session.php" class="active"><i class="fas fa-users"></i>Manage Session</a>
             <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
             <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>

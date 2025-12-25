@@ -19,6 +19,29 @@ try {
 
 $error = '';
 
+// Initialize database connection
+try {
+    $conn = Database::getInstance()->getConnection();
+    if (!$conn || $conn->connect_error) {
+        error_log("Database connection failed: " . ($conn ? $conn->connect_error : 'No connection'));
+        $error = "Database connection failed. Please try again later.";
+    }
+} catch (Exception $e) {
+    error_log("DB init error: " . $e->getMessage());
+    $error = "System error";
+}
+
+$stmt = $conn->prepare("SELECT setup_completed FROM system_settings WHERE id = 1");
+if (!$stmt) {
+    error_log("Prepare failed for system_settings - " . $conn->error);
+    return false;
+}
+
+$stmt->execute();
+$result = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+$setupCompleted = (int)($result['setup_completed'] ?? 0);
+
 // Helper function to validate user and get role
 function getUserRole($conn, $user_id) {
     try {
@@ -73,17 +96,31 @@ function getUserRole($conn, $user_id) {
 }
 
 // Helper function to redirect based on role
-function redirectByRole($role) {
+function redirectByRole($role, $setupCompleted) {
     $base_url = 'http://' . $_SERVER['HTTP_HOST'];
     
     switch($role) {
         case 'super_admin':
+            if ($setupCompleted) {
+                header("Location: $base_url/EXAMCENTER/super_admin/system_setup.php");
+                exit();
+            }
             $target = $base_url . '/EXAMCENTER/super_admin/dashboard.php';
             break;
         case 'admin':
+            if ($setupCompleted) {
+                error_log("system setup incomplete, kindly contact super admin");
+                header("Location: $base_url/EXAMCENTER/login.php");
+                exit();
+            }
             $target = $base_url . '/EXAMCENTER/admin/dashboard.php';
             break;
         case 'teacher':
+            if ($setupCompleted) {
+                error_log("system setup incomplete, kindly contact super admin");
+                header("Location: $base_url/EXAMCENTER/login.php");
+                exit();
+            }
             $target = $base_url . '/EXAMCENTER/teacher/dashboard.php';
             break;
         default:
@@ -97,17 +134,7 @@ function redirectByRole($role) {
     exit();
 }
 
-// Initialize database connection
-try {
-    $conn = Database::getInstance()->getConnection();
-    if (!$conn || $conn->connect_error) {
-        error_log("Database connection failed: " . ($conn ? $conn->connect_error : 'No connection'));
-        $error = "Database connection failed. Please try again later.";
-    }
-} catch (Exception $e) {
-    error_log("DB init error: " . $e->getMessage());
-    $error = "System error";
-}
+
 
 // Check if already logged in and redirect if needed
 if (isset($_SESSION['user_id']) && empty($error)) {
@@ -127,7 +154,7 @@ if (isset($_SESSION['user_id']) && empty($error)) {
         
         if (($user['role'] === 'super_admin' && !$is_super_admin_dashboard) || ($user['role'] === 'admin' && !$is_admin_dashboard) || 
             ($user['role'] === 'teacher' && !$is_teacher_dashboard)) {
-            redirectByRole($user['role']);
+            redirectByRole($user['role'], $setupCompleted);
         }
     } else {
         error_log("No user found for user_id=$user_id");
@@ -177,7 +204,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
 
                         Logger::log("Successful login for username=$username, role={$row['role']} table=$table from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
 
-                        redirectByRole($_SESSION['user_role']);
+                        redirectByRole($_SESSION['user_role'], $setupCompleted);
                         exit;
                     } else {
                         $error = "Invalid login credentials";

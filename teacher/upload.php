@@ -39,8 +39,148 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['test_file'])) {
         $line = trim($line);
         $line = preg_replace('/_+/', '', $line); // remove underscores
         $line = str_replace("\xC2\xA0", ' ', $line); // remove non-breaking spaces
+
+         // Force UTF-8 encoding
+        if (!mb_check_encoding($line, 'UTF-8')) {
+            $line = mb_convert_encoding($line, 'UTF-8', 'auto');
+        }
+
+        // Fix common Word symbol corruption
+        $line = html_entity_decode($line, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
     unset($line);
+
+    // =======================
+    // STRICT FORMAT VALIDATOR
+    // =======================
+
+    function fail($lineNumber, $lineContent, $tip) {
+        die(
+            "❌ Format Error at line {$lineNumber}:<br>
+            <strong>{$lineContent}</strong><br><br>
+            💡 Tip: {$tip}"
+        );
+    }
+
+    $totalLines = count($lines);
+
+    // ---- HEADER VALIDATION (LINES 1–4) ----
+    if ($totalLines < 4) {
+        die("❌ File too short. Expected at least 4 header lines.");
+    }
+
+    // Line 1: Title
+    if (empty(trim($lines[0]))) {
+        fail(1, '[EMPTY LINE]', 'Provide a test title on the first line.');
+    }
+
+    // Line 2: Class
+    if (!preg_match('/^Class:\s*\w+/i', $lines[1])) {
+        fail(2, $lines[1], 'Use format: Class: SS1');
+    }
+
+    // Line 3: Subject
+    if (!preg_match('/^Subject:\s*.+/i', $lines[2])) {
+        fail(3, $lines[2], 'Use format: Subject: Data Processing');
+    }
+
+    // Line 4: Duration
+    if (!preg_match('/^Duration:\s*\d+/i', $lines[3])) {
+        fail(4, $lines[3], 'Use format: Duration: 30');
+    }
+
+    // ---- QUESTION VALIDATION ----
+    $expectedQuestion = 1;
+
+    for ($i = 4; $i < $totalLines; $i++) {
+
+        $line = trim($lines[$i]);
+        if ($line === '') continue;
+
+        // ---- Question number ----
+        if (preg_match('/^(\d+)\.\s*(.+)$/', $line, $qMatch)) {
+
+            $qNumber = (int)$qMatch[1];
+
+            if ($qNumber !== $expectedQuestion) {
+                fail(
+                    $i + 1,
+                    $line,
+                    "Question numbering error. Expected question {$expectedQuestion}."
+                );
+            }
+
+            $questionText = $qMatch[2];
+
+            // ---- Options extraction ----
+            preg_match_all(
+                '/\(?([A-Da-d])\)\s*(.*?)(?=\s*\(?[A-Da-d]\)|$)/',
+                $questionText,
+                $options,
+                PREG_SET_ORDER
+            );
+
+            if (count($options) !== 4) {
+                fail(
+                    $i + 1,
+                    $line,
+                    "Each question must have exactly 4 options (A–D)."
+                );
+            }
+
+            // Ensure all A–D exist
+            $found = [];
+            foreach ($options as $opt) {
+                $found[] = strtoupper($opt[1]);
+            }
+
+            foreach (['A','B','C','D'] as $req) {
+                if (!in_array($req, $found)) {
+                    fail(
+                        $i + 1,
+                        $line,
+                        "Missing option {$req}. Use a) or (a) format."
+                    );
+                }
+            }
+
+            // ---- Correct answer must be NEXT LINE ----
+            if (!isset($lines[$i + 1])) {
+                fail(
+                    $i + 1,
+                    $line,
+                    "Correct answer missing after this question."
+                );
+            }
+
+            $nextLine = trim($lines[$i + 1]);
+
+            if (!preg_match('/^correct answer\s*:\s*(.+)$/i', $nextLine, $ansMatch)) {
+                fail(
+                    $i + 2,
+                    $nextLine,
+                    "Correct answer must be on the next line. Format: Correct answer: Option"
+                );
+            }
+
+            $answer = trim($ansMatch[1]);
+
+            if ($answer === '') {
+                fail(
+                    $i + 2,
+                    $nextLine,
+                    "Correct answer cannot be empty."
+                );
+            }
+
+            $expectedQuestion++;
+            $i++; // skip correct answer line
+        }
+    }
+
+    // =======================
+    // END VALIDATION
+    // =======================
 
     // --- Parse header first ---
     if (empty($lines)) die("File is empty");

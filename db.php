@@ -14,6 +14,11 @@ class Database {
         if (!$this->conn) {
             die("Connection failed: " . mysqli_connect_error());
         }
+
+        // 🔴 FORCE UTF-8 (CRITICAL FOR MATH SYMBOLS)
+        if (!$this->conn->set_charset("utf8mb4")) {
+            die("Error loading character set utf8mb4: " . $this->conn->error);
+        }
     }
 
     public static function getInstance() {

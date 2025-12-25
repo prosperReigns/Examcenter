@@ -309,6 +309,7 @@ function time_ago($datetime) {
         <div class="sidebar-menu mt-4">
             <a href="dashboard.php" class="active"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
             <a href="manage_admins.php"><i class="fas fa-list"></i>manage admins</a>
+            <a href="system_setup.php"><i class="fas fa-list"></i>system setup</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="../admin/logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>

@@ -82,7 +82,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
             if ($existing_test) {
                 $_SESSION['error'] = "A test with the same title, class, and subject already exists!";
             } else {
-                $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                $stmt = $conn->prepare("INSERT INTO tests (title, class_id, class, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
                 if (!$stmt) {
                     error_log("Prepare failed for test creation: " . $conn->error);
                     $_SESSION['error'] = "Database error.";
@@ -121,7 +121,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['select_test'])) {
         $_SESSION['error'] = "Please select a valid test.";
     } else {
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-        $stmt = $conn->prepare("SELECT id, title, class, subject, duration FROM tests WHERE id = ? AND subject IN ($placeholders)");
+        $stmt = $conn->prepare("SELECT id, title, class, subject, duration, year FROM tests WHERE id = ? AND subject IN ($placeholders)");
         if (!$stmt) {
             error_log("Prepare failed for test selection: " . $conn->error);
             $_SESSION['error'] = "Database error.";

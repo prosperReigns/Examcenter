@@ -44,6 +44,24 @@ try {
     die("System error");
 }
 
+// Get all active classes
+$classes = [];
+$classStmt = $conn->prepare("SELECT id, class_name FROM classes WHERE is_active = 1 ORDER BY class_name");
+$classStmt->execute();
+$classResult = $classStmt->get_result();
+$classes = $classResult->fetch_all(MYSQLI_ASSOC);
+$classStmt->close();
+
+// Pre-fetch teacher → class mapping to avoid N+1 queries
+$teacherClasses = [];
+$stmt = $conn->prepare("SELECT teacher_id, class_name FROM classes WHERE teacher_id IS NOT NULL");
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $teacherClasses[$row['teacher_id']] = $row['class_name'];
+}
+$stmt->close();
+
 // Initialize variables
 $error = $success = '';
 
@@ -60,17 +78,20 @@ if (isset($_GET['delete_id'])) {
         $stmt->execute();
         $result = $stmt->get_result();
         $teacher = $result->fetch_assoc();
+        $stmt->close();
         
         if ($teacher) {
             // Delete from teacher_subjects
             $stmt = $conn->prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?");
             $stmt->bind_param("i", $teacher_id);
             $stmt->execute();
+            $stmt->close();
             
             // Delete from teachers
             $stmt = $conn->prepare("DELETE FROM teachers WHERE id = ?");
             $stmt->bind_param("i", $teacher_id);
             $stmt->execute();
+            $stmt->close();
             
             $conn->commit();
             $success = "Teacher deleted successfully!";
@@ -82,6 +103,7 @@ if (isset($_GET['delete_id'])) {
             $stmt = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
             $stmt->bind_param("siss", $activity, $user_id, $ip_address, $user_agent);
             $stmt->execute();
+            $stmt->close();
         } else {
             $error = "Teacher not found!";
         }
@@ -105,7 +127,9 @@ $stmt->execute();
 $result = $stmt->get_result();
 $teachers = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
-$conn->close();
+
+// Do NOT close connection here — PHP will handle it at end
+
 ?>
 
 <!DOCTYPE html>
@@ -168,7 +192,8 @@ $conn->close();
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
-            <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
+            <a href="manage_classes.php"><i class="fas fa-users"></i>Manage Classes</a>
+            <a href="manage_session.php"><i class="fas fa-user-plus"></i>Manage Session</a>
             <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
             <a href="manage_teachers.php" class="active"><i class="fas fa-users"></i>Manage Teachers</a>
             <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
@@ -210,9 +235,8 @@ $conn->close();
             <div class="card-body">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" class="form-control" placeholder="Search teachers..." form="searchForm">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search teachers...">
                 </div>
-                <form id="searchForm"></form>
                 <?php if (!empty($teachers)): ?>
                     <table id="teachersTable" class="table table-striped table-hover" style="width:100%">
                         <thead>
@@ -222,6 +246,7 @@ $conn->close();
                                 <th>Email</th>
                                 <th>Phone</th>
                                 <th>Subjects</th>
+                                <th>Class</th> 
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -243,6 +268,9 @@ $conn->close();
                                         <?php endif; ?>
                                     </td>
                                     <td>
+                                        <?php echo $teacherClasses[$teacher['id']] ?? '<span class="text-muted">No class assigned</span>'; ?>
+                                    </td>
+                                    <td>
                                         <a href="add_teacher.php?edit_id=<?php echo $teacher['id']; ?>" class="btn btn-sm btn-outline-primary me-1">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
@@ -255,8 +283,8 @@ $conn->close();
                         </tbody>
                     </table>
                 <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-users fa-3x mb-3"></i>
+                    <div class="empty-state text-center py-5">
+                        <i class="fas fa-users fa-3x mb-3 text-muted"></i>
                         <h4>No Teachers Found</h4>
                         <p>Add a new teacher to get started.</p>
                         <a href="add_teacher.php" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Teacher</a>
@@ -265,7 +293,7 @@ $conn->close();
             </div>
         </div>
     </div>
-
+    
     <!-- Delete Confirmation Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
@@ -298,80 +326,41 @@ $conn->close();
                 $('.sidebar').toggleClass('active');
             });
 
-            // Form validation for search
-            $('#searchForm').validate({
-                rules: {
-                    searchInput: {
-                        maxlength: 100,
-                        regex: /^[a-zA-Z0-9\s\-\.\,\?\!]*$/ // Allow common characters
-                    }
-                },
-                messages: {
-                    searchInput: {
-                        maxlength: 'Search term cannot exceed 100 characters',
-                        regex: 'Search term contains invalid characters'
-                    }
-                },
-                errorElement: 'div',
-                errorClass: 'invalid-feedback',
-                highlight: function(element) {
-                    $(element).addClass('is-invalid');
-                },
-                unhighlight: function(element) {
-                    $(element).removeClass('is-invalid');
-                },
-                submitHandler: function(form) {
-                    // Search is handled client-side, so no submission needed
-                    return false;
-                }
-            });
-
             // Initialize DataTables
             $('#teachersTable').DataTable({
                 pageLength: 10,
-                searching: false, // Disable DataTables search since we use custom search
+                searching: false,
                 lengthChange: false,
                 columnDefs: [
-                    { orderable: false, targets: [4, 5] } // Disable sorting on Subjects and Actions
+                    { orderable: false, targets: [4, 5, 6] }
                 ],
                 language: {
                     paginate: {
                         previous: '« Previous',
                         next: 'Next »'
                     },
-                    emptyTable: '<div class="text-center py-4 empty-state"><i class="fas fa-users fa-3x mb-3"></i><h4>No Teachers Found</h4><p>Add a new teacher to get started.</p><a href="add_teacher.php" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Teacher</a></div>'
+                    emptyTable: '<div class="text-center py-4"><i class="fas fa-users fa-3x mb-3 text-muted"></i><h4>No Teachers Found</h4><p>Add a new teacher to get started.</p><a href="add_teacher.php" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Add Teacher</a></div>'
                 }
             });
 
-            // Search functionality
+            // Client-side search
             $('#searchInput').on('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                const rows = $('.teacher-row');
-                
-                rows.each(function() {
+                const term = this.value.toLowerCase();
+                $('.teacher-row').each(function() {
                     const text = $(this).text().toLowerCase();
-                    $(this).toggle(text.includes(searchTerm));
+                    $(this).toggle(text.includes(term));
                 });
-                
-                // Update DataTable to reflect visible rows
-                $('#teachersTable').DataTable().draw();
             });
 
             // Delete confirmation
             $('.delete-btn').on('click', function() {
-                const teacherId = $(this).data('id');
-                $('#confirmDelete').attr('href', `manage_teachers.php?delete_id=${teacherId}`);
-                
-                const modal = new bootstrap.Modal($('#deleteModal')[0]);
-                modal.show();
+                const id = $(this).data('id');
+                $('#confirmDelete').attr('href', `manage_teachers.php?delete_id=${id}`);
+                new bootstrap.Modal('#deleteModal').show();
             });
 
-            // Auto-hide alerts after 5 seconds
-            setTimeout(() => {
-                $('.alert').each(function() {
-                    new bootstrap.Alert(this).close();
-                });
-            }, 5000);
+            // Auto-hide alerts
+            setTimeout(() => $('.alert').fadeOut(500), 5000);
         });
     </script>
 </body>
