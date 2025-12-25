@@ -213,9 +213,40 @@ if (empty($_POST['year'])) {
 }
 $test_year = $_POST['year'];
 
-    // --- Check if test already exists before inserting ---
-    $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ? AND year = ? LIMIT 1");
-    $stmt->bind_param("ssss", $test_title, $test_class, $test_subject, $test_year);
+    // Get academic_level_id for the class name
+    $stmt = $conn->prepare("SELECT id FROM classes WHERE class_name = ? LIMIT 1");
+    $stmt->bind_param("s", $test_class);
+    $stmt->execute();
+    $stmt->bind_result($academic_level_id);
+    if (!$stmt->fetch()) {
+        die("❌ Invalid class: {$test_class}");
+    }
+    $stmt->close();
+
+    // Derive class level (JSS / SS)
+    $test_class_level = str_starts_with($test_class, 'SS') ? 'SS' : 'JSS';
+
+    // Validate subject against subject_levels
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM subjects s
+        JOIN subject_levels sl ON sl.subject_id = s.id
+        WHERE s.subject_name = ?
+        AND sl.class_level = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("ss", $test_subject, $test_class_level);
+    $stmt->execute();
+
+    if (!$stmt->fetch()) {
+        die("❌ Subject '{$test_subject}' is not allowed for {$test_class_level}");
+    }
+    $stmt->close();
+
+    // Check if test exists
+    $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ? AND year = ? LIMIT 1");
+    $stmt->bind_param("siss", $test_title, $academic_level_id, $test_subject, $test_year);
+
     $stmt->execute();
     $stmt->bind_result($existing_test_id);
     if ($stmt->fetch()) {
@@ -223,8 +254,8 @@ $test_year = $_POST['year'];
         $stmt->close();
     } else {
         $stmt->close();
-        $stmt = $conn->prepare("INSERT INTO tests (title, class, subject, duration, year) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssis", $test_title, $test_class, $test_subject, $test_duration, $test_year);
+        $stmt = $conn->prepare("INSERT INTO tests (title, academic_level_id, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("sisii", $test_title, $academic_level_id, $test_subject, $test_duration, $test_year);
         $stmt->execute();
         $test_id = $stmt->insert_id;
         $stmt->close();

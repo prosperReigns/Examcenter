@@ -12,7 +12,21 @@ if (!$conn) {
 $_SESSION['csrf_token'] = $_SESSION['csrf_token'] ?? bin2hex(random_bytes(32));
 
 // Available classes
-$classes = ['JSS1', 'JSS2', 'JSS3', 'SS1', 'SS2', 'SS3'];
+$classes = [];
+$stmt = $conn->query("
+    SELECT c.id, al.level_code, s.stream_name 
+    FROM classes c
+    JOIN academic_levels al ON c.academic_level_id = al.id
+    JOIN streams s ON c.stream_id = s.id
+    WHERE c.is_active = 1
+    ORDER BY al.level_code, s.stream_name
+");
+while ($row = $stmt->fetch_assoc()) {
+    $classes[] = [
+        'id' => $row['id'],
+        'name' => $row['level_code'] . ' ' . $row['stream_name']
+    ];
+}
 
 // === 1. Fetch Academic Years from academic_years table ===
 $academic_years = [];
@@ -28,19 +42,27 @@ while ($row = $stmt->fetch_assoc()) {
     $unique_test_titles[] = $row['title'];
 }
 
-// === 3. Fetch subjects grouped by class level ===
+// === 3. Fetch subjects grouped by class level (NEW STRUCTURE) ===
 $jss_subjects = $ss_subjects = [];
-$stmt = $conn->prepare("SELECT subject_name, class_level FROM subjects ORDER BY subject_name");
+
+$stmt = $conn->prepare("
+    SELECT s.subject_name, sl.class_level
+    FROM subject_levels sl
+    JOIN subjects s ON sl.subject_id = s.id
+    ORDER BY s.subject_name
+");
 $stmt->execute();
 $result = $stmt->get_result();
+
 while ($row = $result->fetch_assoc()) {
-    if (strtoupper($row['class_level']) === 'JSS') {
+    if ($row['class_level'] === 'JSS') {
         $jss_subjects[] = $row['subject_name'];
-    } else {
+    } elseif ($row['class_level'] === 'SS') {
         $ss_subjects[] = $row['subject_name'];
     }
 }
 $stmt->close();
+
 
 // === 4. Get active subjects for today (optional security layer) ===
 $today = date('Y-m-d');
@@ -56,12 +78,26 @@ if ($stmt) {
     $stmt->close();
 }
 
+$jss = [];
+$ss  = [];
+
+$stmt = $conn->query("
+    SELECT s.id, s.subject_name, sl.class_level
+    FROM subject_levels sl
+    JOIN subjects s ON sl.subject_id = s.id
+");
+
+while ($r = $stmt->fetch_assoc()) {
+    if ($r['class_level'] === 'JSS') $jss[] = $r;
+    if ($r['class_level'] === 'SS')  $ss[]  = $r;
+}
+
 // Form values
 $name = $class = $subject = $test_title = $exam_year = '';
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $name       = trim($_POST['name'] ?? '');
     $class      = $_POST['class'] ?? '';
-    $subject    = trim($_POST['subject'] ?? '');
+    $subject    = (int)trim($_POST['subject_id'] ?? 0);
     $test_title = trim($_POST['test_title'] ?? '');
     $exam_year  = trim($_POST['exam_year'] ?? '');
 
@@ -75,7 +111,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     elseif (!preg_match("/^[a-zA-Z\s]+$/", $name)) {
         $error = "Name can only contain letters and spaces.";
     }
-    elseif (!in_array($class, $classes)) {
+    $class_ids = array_column($classes, 'id');
+    if (!in_array($class, $class_ids)) {
         $error = "Invalid class selected.";
     }
     elseif (!in_array($exam_year, $academic_years)) {
@@ -86,8 +123,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     else {
         // Final validation: does this exact test exist with class + subject + year?
-        $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND class = ? AND subject = ? AND year = ?");
-        $stmt->bind_param("ssss", $test_title, $class, $subject, $exam_year);
+        $stmt = $conn->prepare("SELECT t.id 
+            FROM tests t
+            JOIN academic_levels al ON t.academic_level_id = al.id
+            WHERE t.title = ? AND t.subject.id = ? AND t.year = ? AND al.id = (
+                SELECT academic_level_id FROM classes WHERE id = ?
+            )");
+        $stmt->bind_param("sisi", $test_title, $subject_id, $exam_year, $class);
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -101,7 +143,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['student_id']      = $conn->insert_id;
                 $_SESSION['student_name']    = $name;
                 $_SESSION['student_class']   = $class;
-                $_SESSION['student_subject'] = $subject;
+                $_SESSION['student_subject_id'] = $subject_id;
                 $_SESSION['test_title']      = $test_title;
                 $_SESSION['exam_year']       = $exam_year;
 
@@ -183,7 +225,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <select name="class" id="class" class="form-select" required onchange="updateSubjects()">
                                 <option value="">-- Select Class --</option>
                                 <?php foreach ($classes as $c): ?>
-                                    <option value="<?= $c ?>" <?= $class==$c?'selected':'' ?>><?= $c ?></option>
+                                    <option value="<?= $c['id'] ?>" <?= $class==$c['id']?'selected':'' ?>><?= htmlspecialchars($c['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -191,7 +233,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <!-- Subject -->
                         <div class="mb-3">
                             <label class="form-label">Subject <span class="text-danger">*</span></label>
-                            <select name="subject" id="subject" class="form-select" required>
+                            <select name="subject_id" id="subject" class="form-select" required>
                                 <option value="">-- Select Subject --</option>
                             </select>
                         </div>
@@ -206,8 +248,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <script>
 // Pass data to JavaScript
-const jssSubjects = <?= json_encode(array_map('strtolower', $jss_subjects)) ?>;
-const ssSubjects  = <?= json_encode(array_map('strtolower', $ss_subjects)) ?>;
+const jssSubjects = <?= json_encode($jss) ?>;
+const ssSubjects  = <?= json_encode($ss) ?>;
 const activeSubjects = <?= json_encode($active_subjects) ?>; // optional filter
 
 function updateSubjects() {
@@ -217,17 +259,15 @@ function updateSubjects() {
 
     if (!classVal) return;
 
-    const allowed = classVal.startsWith('JSS') ? jssSubjects : ssSubjects;
+    const allowed = classVal.includes('JSS') ? jssSubjects : ssSubjects;
 
     allowed.forEach(subj => {
-        // Optional: only show if active today
-        if (activeSubjects.length === 0 || activeSubjects.includes(subj.toLowerCase())) {
-            const opt = document.createElement('option');
-            opt.value = subj;
-            opt.textContent = subj.charAt(0).toUpperCase() + subj.slice(1);
-            subjectSelect.appendChild(opt);
-        }
+        const opt = document.createElement('option');
+        opt.value = subj.id;
+        opt.textContent = subj.subject_name;
+        subjectSelect.appendChild(opt);
     });
+
 
     if (subjectSelect.options.length === 1) {
         const opt = document.createElement('option');

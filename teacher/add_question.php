@@ -48,7 +48,15 @@ try {
     }
 
     // Fetch assigned subjects
-    $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
+    $stmt = $conn->prepare("
+        SELECT s.id, s.subject_name, sl.class_level
+        FROM teacher_subjects ts
+        JOIN subjects s ON ts.subject = s.subject_name
+        JOIN subject_levels sl ON s.id = sl.subject_id
+        WHERE ts.teacher_id = ?
+    ");
+
+
     if (!$stmt) {
         error_log("Prepare failed for assigned subjects: " . $conn->error);
         die("Database error");
@@ -58,7 +66,11 @@ try {
     $result = $stmt->get_result();
     $assigned_subjects = [];
     while ($row = $result->fetch_assoc()) {
-        $assigned_subjects[] = $row['subject'];
+        $assigned_subjects[] = [
+            'id' => (int)$row['id'],
+            'name' => $row['subject_name'],
+            'class_level' => $row['class_level']
+        ];
     }
     $stmt->close();
 
@@ -66,18 +78,22 @@ try {
         $error = "No subjects assigned to you. Contact your admin.";
     }
 
-// Define subjects by category by fetching from DB
-    $jss_subjects_stmt = $conn->prepare("SELECT subject_name FROM subjects WHERE class_level = 'JSS'");
-    $jss_subjects_stmt->execute();
-    $jss_subjects_result = $jss_subjects_stmt->get_result();
-    $jss_subjects = array_column($jss_subjects_result->fetch_all(MYSQLI_ASSOC), 'subject_name');
-    $jss_subjects_stmt->close();
-
-    $ss_subjects_stmt = $conn->prepare("SELECT subject_name FROM subjects WHERE class_level = 'SS'");
-    $ss_subjects_stmt->execute();
-    $ss_subjects_result = $ss_subjects_stmt->get_result();
-    $ss_subjects = array_column($ss_subjects_result->fetch_all(MYSQLI_ASSOC), 'subject_name');
-    $ss_subjects_stmt->close();
+    $class_subjects = [];
+    $stmt = $conn->prepare("
+        SELECT s.id, s.subject_name, sl.class_level
+        FROM subject_levels sl
+        JOIN subjects s ON sl.subject_id = s.id
+    ");
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $class_subjects[$row['class_level']][] = [
+            'id' => $row['id'],
+            'name' => $row['subject_name']
+        ];
+    }
+    
+    $stmt->close();
 
     // Initialize variables
     $error = $success = '';
@@ -89,23 +105,58 @@ try {
     // Fetch tests for assigned subjects
     if (!empty($assigned_subjects)) {
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-        $stmt = $conn->prepare("SELECT id, title, class, subject FROM tests WHERE subject IN ($placeholders) ORDER BY created_at DESC");
+        $subjectIds = array_column($assigned_subjects, 'id');
+        $placeholders = implode(',', array_fill(0, count($subjectIds), '?'));
+        $stmt = $conn->prepare("
+        SELECT t.id, t.title, c.class_name, s.subject_name
+            FROM tests t
+            JOIN classes c ON t.academic_level_id = c.academic_level_id
+            JOIN subjects s ON t.subject = s.subject_name
+            JOIN subject_levels sl ON s.id = sl.subject_id
+            WHERE s.id IN ($placeholders)
+            ORDER BY t.created_at DESC
+        "); 
+
+        $stmt->bind_param(str_repeat('i', count($subjectIds)), ...$subjectIds);
+
+
         if (!$stmt) {
             error_log("Prepare failed for tests: " . $conn->error);
             $error = "Error fetching tests.";
         } else {
-            $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
+            $stmt->bind_param(str_repeat('i', count($assigned_subjects)), ...$assigned_subjects);
             $stmt->execute();
             $tests = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $stmt->close();
         }
     }
 
+    // Fetch all classes with their level and name
+    $classQuery = $conn->query("
+    SELECT c.id, c.class_name, al.level_code
+    FROM classes c
+    JOIN academic_levels al ON c.academic_level_id = al.id
+    ORDER BY al.level_code, c.class_name
+    ");
+    $class_mapping = [];
+    while ($row = $classQuery->fetch_assoc()) {
+    $level = $row['level_code'];
+    $class_mapping[$level][] = $row['class_name'];
+    }
+
     // Load current test
     if (isset($_SESSION['current_test_id'])) {
         $test_id = (int)$_SESSION['current_test_id'];
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-        $stmt = $conn->prepare("SELECT id, title, class, subject, duration FROM tests WHERE id = ? AND subject IN ($placeholders)");
+        $stmt = $conn->prepare("
+            SELECT t.id, t.title, c.class_name, t.subject, t.duration
+            FROM tests t
+            JOIN academic_levels al ON t.academic_level_id = al.id
+            JOIN classes c ON c.academic_level_id = al.id
+            WHERE t.id = ? AND t.subject IN ($placeholders)
+        ");
+
+
         if (!$stmt) {
             error_log("Prepare failed for current test: " . $conn->error);
             $error = "Database error.";
@@ -164,6 +215,7 @@ try {
 
 } catch (Exception $e) {
     error_log("Add question error: " . $e->getMessage());
+    // echo "<pre>System error: " . $e->getMessage() . "</pre>"; 
     die("An unexpected error occurred. Please try again later.");
 }
 ?>
@@ -267,20 +319,20 @@ try {
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
-                                    <label class="form-label fw-bold">Class</label>
+                                    <label class="form-label fw-bold">Academic level</label>
                                     <select class="form-select" name="class" required id="classSelect">
-                                        <option value="">Select Class</option>
-                                        <option value="JSS1">JSS1</option>
-                                        <option value="JSS2">JSS2</option>
-                                        <option value="JSS3">JSS3</option>
-                                        <option value="SS1">SS1</option>
-                                        <option value="SS2">SS2</option>
-                                        <option value="SS3">SS3</option>
+                                    <?php
+                                        foreach ($class_mapping as $levelName => $classes) {
+                                            foreach ($classes as $className) {
+                                                echo '<option value="' . htmlspecialchars($className) . '">' . htmlspecialchars($className) . '</option>';
+                                            }
+                                        }                                        
+                                        ?>
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
                                     <label class="form-label fw-bold">Subject</label>
-                                    <select class="form-select" name="subject" required id="subjectSelect" disabled>
+                                    <select class="form-select" name="subject_id" required id="subjectSelect" disabled>
                                         <option value="">Select Class First</option>
                                     </select>
                                 </div>
@@ -497,12 +549,12 @@ document.getElementById("classSelect").addEventListener("change", function () {
     const subjectSelect = document.getElementById("subjectSelect");
     subjectSelect.innerHTML = `<option>Loading subjects...</option>`;
 
-    fetch("get_subjects.php?class=" + classLevel)
+    fetch("get_subjects.php?class_level=" + classLevel)
         .then(res => res.json())
         .then(data => {
             subjectSelect.innerHTML = `<option value="">Select Subject</option>`;
             data.forEach(sub => {
-                subjectSelect.innerHTML += `<option value="${sub}">${sub}</option>`;
+                subjectSelect.innerHTML += `<option value="${sub.id}" data-class="${sub.class_level}">${sub.subject_name}</option>`;
             });
             subjectSelect.disabled = false;
         })
@@ -672,14 +724,7 @@ document.getElementById("classSelect").addEventListener("change", function () {
             });
 
             // Class-subject mapping
-            const classSubjectMapping = {
-                'JSS1': <?php echo json_encode($jss_subjects); ?>,
-                'JSS2': <?php echo json_encode($jss_subjects); ?>,
-                'JSS3': <?php echo json_encode($jss_subjects); ?>,
-                'SS1': <?php echo json_encode($ss_subjects); ?>,
-                'SS2': <?php echo json_encode($ss_subjects); ?>,
-                'SS3': <?php echo json_encode($ss_subjects); ?>
-            };
+            const classSubjectMapping = <?php echo json_encode($class_mapping); ?>;
             const assignedSubjects = <?php echo json_encode($assigned_subjects); ?>;
 
             // Update subjects when class changes

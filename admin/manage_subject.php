@@ -37,20 +37,43 @@ $error = $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_subject'])) {
         $subject_name = trim($_POST['subject_name']);
-        $class_level = $_POST['class_level'];
+        $class_levels = $_POST['class_level'] ?? [];
 
-        if (!empty($subject_name) && !empty($class_level)) {
-            $stmt = $conn->prepare("INSERT INTO subjects (subject_name, class_level) VALUES (?, ?)");
-            $stmt->bind_param("ss", $subject_name, $class_level);
-            if ($stmt->execute()) {
-                $success = "Subject added successfully.";
+        if (!empty($subject_name) && !empty($class_levels)) {
+            // 1. Insert subject if it doesn't exist
+            $stmt = $conn->prepare("SELECT id FROM subjects WHERE subject_name = ?");
+            $stmt->bind_param("s", $subject_name);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows > 0) {
+                $subject_id = $result->fetch_assoc()['id'];
             } else {
-                $error = "Error adding subject. It might already exist for that class level.";
+                $stmt = $conn->prepare("INSERT INTO subjects (subject_name) VALUES (?)");
+                $stmt->bind_param("s", $subject_name);
+                $stmt->execute();
+                $subject_id = $stmt->insert_id;
             }
             $stmt->close();
+
+            // 2. Link subject to all selected class levels
+            $added = 0;
+            foreach ($class_levels as $level) {
+                $stmt = $conn->prepare("INSERT IGNORE INTO subject_levels (subject_id, class_level) VALUES (?, ?)");
+                $stmt->bind_param("is", $subject_id, $level);
+                if ($stmt->execute()) $added++;
+                $stmt->close();
+            }
+
+            if ($added > 0) {
+                $success = "Subject linked to selected class levels successfully.";
+            } else {
+                $error = "Subject already exists for the selected levels.";
+            }
         } else {
             $error = "Subject name and class level are required.";
         }
+
     }
 
     if (isset($_POST['delete_subject'])) {
@@ -66,8 +89,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$available_level = ["JSS", 'SS', "PRIMARY"];
 // Fetch all subjects
-$subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_name")->fetch_all(MYSQLI_ASSOC);
+$subjects = [];
+$result = $conn->query("
+   SELECT 
+        s.id,
+        s.subject_name,
+        GROUP_CONCAT(sl.class_level ORDER BY sl.class_level SEPARATOR ', ') AS class_levels
+    FROM subjects s
+    LEFT JOIN subject_levels sl ON s.id = sl.subject_id
+    GROUP BY s.id, s.subject_name
+    ORDER BY s.subject_name
+");
+
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $subjects[] = $row;
+    }
+}
+
+
+
 ?>
 
 <!DOCTYPE html>
@@ -137,12 +180,14 @@ $subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_n
                         </div>
                         <div class="mb-3">
                             <label for="class_level" class="form-label">Class Level</label>
-                            <select class="form-select" id="class_level" name="class_level" required>
-                                <option value="">Select Level</option>
-                                <option value="JSS">JSS</option>
-                                <option value="SS">SS</option>
+                            <select class="form-select" id="class_level" name="class_level[]" multiple required>
+                                <?php foreach($available_level as $cl): ?>
+                                    <option value="<?= htmlspecialchars($cl) ?>"><?= htmlspecialchars($cl) ?></option>
+                                <?php endforeach; ?>
                             </select>
+                            <small class="form-text text-muted">Hold Ctrl (Windows) or Cmd (Mac) to select multiple levels</small>
                         </div>
+
                         <button type="submit" name="add_subject" class="btn btn-primary">Add Subject</button>
                     </form>
                 </div>
@@ -158,7 +203,6 @@ $subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_n
                     <table class="table table-striped" id="subjectsTable">
                         <thead>
                             <tr>
-                                
                                 <th>Subject Name</th>
                                 <th>Class Level</th>
                                 <th>Action</th>
@@ -168,7 +212,7 @@ $subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_n
                             <?php foreach ($subjects as $subject): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($subject['subject_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($subject['class_level']); ?></td>
+                                    <td><?php echo htmlspecialchars($subject['class_levels'] ?? "not linked")?></td>
                                     <td>
                                         <form method="POST" action="" onsubmit="return confirm('Are you sure you want to delete this subject?');">
                                             <input type="hidden" name="subject_id" value="<?php echo (int)$subject['id']; ?>">

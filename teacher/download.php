@@ -7,7 +7,15 @@ $subject = $_GET['subject'];
 $title = $_GET['title'];
 
 // Fetch test
-$stmt = $conn->prepare("SELECT * FROM tests WHERE class=? AND subject=? AND title=? ORDER BY created_at DESC LIMIT 1");
+$stmt = $conn->prepare("
+    SELECT t.*, c.class_name, al.level_code 
+    FROM tests t
+    JOIN classes c ON t.academic_level_id = c.academic_level_id
+    JOIN academic_levels al ON t.academic_level_id = al.id
+    WHERE c.class_name = ? AND t.subject = ? AND t.title = ?
+    ORDER BY t.created_at DESC
+    LIMIT 1
+");
 $stmt->bind_param("sss", $class, $subject, $title);
 $stmt->execute();
 $test = $stmt->get_result()->fetch_assoc();
@@ -19,8 +27,9 @@ $test_id = $test['id'];
 
 // Fetch questions helper function
 function fetchQuestions($conn, $table, $columns, $test_id) {
-    $sql = "SELECT " . implode(", ", $columns) . " FROM $table t
-            JOIN new_questions n ON t.question_id = n.id
+    $sql = "SELECT " . implode(", ", $columns) . " 
+            FROM $table t
+            JOIN questions n ON t.question_id = n.id
             WHERE n.test_id = ?
             ORDER BY n.id ASC";
     $stmt = $conn->prepare($sql);
@@ -53,7 +62,7 @@ header("Content-Disposition: attachment; filename={$title}_{$subject}.doc");
 
 // Output test info
 echo "{$test['title']}\n";
-echo "Class: {$test['class']}\n";
+echo "Class: {$test['class_name']}\n";
 echo "Subject: {$test['subject']}\n";
 echo "Duration: {$test['duration']} mins\n\n";
 

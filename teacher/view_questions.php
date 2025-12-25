@@ -41,7 +41,6 @@ try {
         exit();
     }
 
-$assigned_subjects[] = "";
     // Fetch assigned subjects
     $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
     if (!$stmt) {
@@ -156,7 +155,7 @@ $assigned_subjects[] = "";
                     FROM new_questions q
                     JOIN tests t ON q.test_id = t.id
                     WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
-    $select_query = "SELECT q.*, t.title as test_title, t.class, t.subject, t.year 
+    $select_query = "SELECT q.*, t.title as test_title, q.class, t.subject, t.year 
                      FROM new_questions q
                      JOIN tests t ON q.test_id = t.id
                      WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
@@ -166,8 +165,8 @@ $assigned_subjects[] = "";
 
     // Apply filters
     if (!empty($class_filter)) {
-        $count_query .= " AND t.class = ?";
-        $select_query .= " AND t.class = ?";
+        $count_query .= " AND q.class = ?";
+        $select_query .= " AND q.class = ?";
         $params[] = $class_filter;
         $types .= 's';
     }
@@ -221,7 +220,7 @@ $assigned_subjects[] = "";
     }
 
     // Fetch questions for current page
-    $select_query .= " ORDER BY t.class, t.subject, q.id DESC LIMIT ? OFFSET ?";
+    $select_query .= " ORDER BY q.class, t.subject, q.id DESC LIMIT ? OFFSET ?";
     $params[] = $questions_per_page;
     $params[] = $offset;
     $types .= 'ii';
@@ -239,12 +238,17 @@ $assigned_subjects[] = "";
     $stmt->close();
 
    // Fetch filter options
-    $class_options_stmt = $conn->query("
-    SELECT DISTINCT class 
-    FROM tests 
-    WHERE subject IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') 
-    ORDER BY class
+   $escapedSubjects = array_map([$conn, 'real_escape_string'], $assigned_subjects);
+
+   $class_options_stmt = $conn->query("
+        SELECT DISTINCT q.class
+        FROM new_questions q
+        JOIN tests t ON q.test_id = t.id
+        WHERE t.subject IN ('" . implode("','", $escapedSubjects) . "')
+        ORDER BY q.class
     ");
+    
+
 
     $subject_options_stmt = $conn->query("
     SELECT subject_name AS subject 
@@ -581,15 +585,6 @@ $assigned_subjects[] = "";
                 $('.sidebar').toggleClass('active');
             });
 
-            // Class-subject mapping
-            const classSubjectMapping = {
-                'JSS1': <?php echo json_encode($jss_subjects); ?>,
-                'JSS2': <?php echo json_encode($jss_subjects); ?>,
-                'JSS3': <?php echo json_encode($jss_subjects); ?>,
-                'SS1': <?php echo json_encode($ss_subjects); ?>,
-                'SS2': <?php echo json_encode($ss_subjects); ?>,
-                'SS3': <?php echo json_encode($ss_subjects); ?>
-            };
             const assignedSubjects = <?php echo json_encode($assigned_subjects); ?>;
 
             // Update subjects when class changes
