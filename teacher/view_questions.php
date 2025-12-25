@@ -2,6 +2,9 @@
 session_start();
 require_once '../db.php';
 
+// 
+header('Content-Type: text/html; charset=UTF-8');
+
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'teacher') {
     error_log("Redirecting to login: No user_id or invalid role in session");
@@ -38,6 +41,7 @@ try {
         exit();
     }
 
+$assigned_subjects[] = "";
     // Fetch assigned subjects
     $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
     if (!$stmt) {
@@ -243,10 +247,10 @@ try {
     ");
 
     $subject_options_stmt = $conn->query("
-    SELECT name AS subject 
+    SELECT subject_name AS subject 
     FROM subjects 
-    WHERE name IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') 
-    ORDER BY name
+    WHERE subject_name IN ('" . implode("','", array_map([$conn, 'real_escape_string'], $assigned_subjects)) . "') 
+    ORDER BY subject_name
     ");
 
     $year_options_stmt = $conn->query("
@@ -517,9 +521,9 @@ try {
                             </form>
                         </div>
                     </div>
-                <?php endforeach; 
+                <?php endforeach; ?>
                 
-                <!-- Pagination -->
+                // <!-- Pagination -->
                 <?php if ($total_pages > 1): ?>
                     <nav aria-label="Page navigation">
                         <ul class="pagination justify-content-center">

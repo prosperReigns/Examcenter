@@ -99,6 +99,7 @@ $subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_n
         <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
         <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
         <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
+        <a href="manage_classes.php"><i class="fas fa-users"></i>Manage Classes</a>
         <a href="manage_session.php"><i class="fas fa-users"></i>Manage Session</a>
         <a href="manage_subject.php" class="active"><i class="fas fa-users"></i>Manage Subject</a>
         <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
@@ -157,7 +158,7 @@ $subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_n
                     <table class="table table-striped" id="subjectsTable">
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                
                                 <th>Subject Name</th>
                                 <th>Class Level</th>
                                 <th>Action</th>
@@ -166,7 +167,6 @@ $subjects = $conn->query("SELECT * FROM subjects ORDER BY class_level, subject_n
                         <tbody>
                             <?php foreach ($subjects as $subject): ?>
                                 <tr>
-                                    <td><?php echo (int)$subject['id']; ?></td>
                                     <td><?php echo htmlspecialchars($subject['subject_name']); ?></td>
                                     <td><?php echo htmlspecialchars($subject['class_level']); ?></td>
                                     <td>

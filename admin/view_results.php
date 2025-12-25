@@ -40,6 +40,13 @@ try {
         exit();
     }
 
+    $subjects = $conn->query("SELECT subject_name FROM subjects ORDER BY subject_name");
+    $available_subjects = [];
+    if ($subjects) {
+        while ($row = $subjects->fetch_assoc()) {
+            $available_subjects[] = $row['subject_name'];
+        }
+    }
     // The hardcoded subject arrays have been removed.
 
     // Pagination settings
@@ -296,6 +303,7 @@ $conn->close();
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php" class="active"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
+            <a href="manage_classes.php"><i class="fas fa-users"></i>Manage Classes</a>
             <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
             <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
             <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
@@ -342,11 +350,10 @@ $conn->close();
                             </select>
                         </div>
                         <div class="col-md-2 form-group-spacing">
-                            <label class="form-label fw-bold">Subject</label>
+                            <label class="form-label fw-bold">Subject</label>   
                             <select class="form-select" name="selected_subject" id="selectedSubject">
                                 <option value="">All Subjects</option>
                                 <?php
-                                $available_subjects = array_merge($jss_subjects, $ss_subjects); // Admin sees all subjects
                                 foreach ($available_subjects as $subject): ?>
                                     <option value="<?php echo htmlspecialchars($subject); ?>" <?php echo $subject_filter == $subject ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($subject); ?>
