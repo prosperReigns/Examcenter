@@ -101,7 +101,7 @@ function redirectByRole($role, $setupCompleted) {
     
     switch($role) {
         case 'super_admin':
-            if ($setupCompleted) {
+            if (!$setupCompleted) {
                 header("Location: $base_url/EXAMCENTER/super_admin/system_setup.php");
                 exit();
             }
@@ -142,8 +142,7 @@ if (isset($_SESSION['user_id']) && empty($error)) {
     if ($user = getUserRole($conn, $user_id)) {
         // Store role in session if not already set
         if (!isset($_SESSION['user_role'])) {
-            $role = strtolower(str_replace(' ', '_', $row['role']));
-            $_SESSION['user_role'] = $role;
+            $_SESSION['user_role'] = strtolower($user['role']);
         }
         
         // Check if we're already on the correct dashboard

@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $subject_id = $stmt->insert_id;
                 $stmt->close();
             }
-
+            
             // Link subject to level
             $stmt = $conn->prepare("
                 INSERT IGNORE INTO subject_levels (subject_id, class_level)
@@ -161,6 +161,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->bind_param("is", $subject_id, $class_level);
             $stmt->execute();
+            $stmt->close();
+        }
+
+        /* ---------- ADD ADMIN ---------- */
+        if (isset($_POST['add_admin'])) {
+            $admin_username = trim($_POST['admin_username']);
+            $admin_password = $_POST['admin_password'];
+
+            if ($admin_username === '' || $admin_password === '') {
+                throw new Exception("Admin username and password are required.");
+            }
+
+            // Check if username exists
+            $stmt = $conn->prepare("SELECT id FROM admins WHERE username = ?");
+            $stmt->bind_param("s", $admin_username);
+            $stmt->execute();
+            $stmt->store_result();
+
+            if ($stmt->num_rows === 0) {
+                $stmt->close();
+                $hashedPassword = password_hash($admin_password, PASSWORD_DEFAULT);
+
+                $stmt = $conn->prepare("INSERT INTO admins (username, password, role) VALUES (?, ?, 'admin')");
+                $stmt->bind_param("ss", $admin_username, $hashedPassword);
+                $stmt->execute();
+            }
             $stmt->close();
         }
 
@@ -267,13 +293,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" name="add_subject" class="btn btn-success">Finish Setup</button>
         </form>
     </div>
+
+    <!-- STEP 5: CREATE ADMIN -->
+    <div class="setup-step d-none" data-step="5">
+        <h5>Step 5: Create Admin Account</h5>
+        <form method="POST">
+            <input type="text" name="admin_username" class="form-control mb-3" placeholder="Admin Username" required>
+            <input type="password" name="admin_password" class="form-control mb-3" placeholder="Admin Password" required>
+            <button type="submit" name="add_admin" class="btn btn-success">Finish Setup</button>
+        </form>
+    </div>
+
 </div>
 
 
 <script src="../js/bootstrap.bundle.min.js"></script>
 <script>
     let currentStep = 1;
-    const totalSteps = 4;
+    const totalSteps = 5;
 
     function showStep(step) {
         document.querySelectorAll('.setup-step').forEach(el => {
