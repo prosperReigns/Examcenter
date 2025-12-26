@@ -195,11 +195,11 @@ while ($row = $result->fetch_assoc()) {
     </div>
     <div class="sidebar-menu mt-4">
         <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-        <a href="manage_admins.php" class="active"><i class="fas fa-users-cog"></i>Manage Admins</a>
+        <a href="manage_admins.php"><i class="fas fa-users-cog"></i>Manage Admins</a>
         <a href="manage_classes.php" class="active"><i class="fas fa-users-cog"></i>Manage Classes</a>
-        <a href="manage_session.php" class="active"><i class="fas fa-users-cog"></i>Manage Session</a>
-        <a href="manage_students.php" class="active"><i class="fas fa-users-cog"></i>Manage Students</a>
-        <a href="manage_subject.php" class="active"><i class="fas fa-users-cog"></i>Manage Subject</a>
+        <a href="manage_session.php"><i class="fas fa-users-cog"></i>Manage Session</a>
+        <a href="manage_students.php"><i class="fas fa-users-cog"></i>Manage Students</a>
+        <a href="manage_subject.php"><i class="fas fa-users-cog"></i>Manage Subject</a>
         <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
         <a href="../admin/logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
     </div>
