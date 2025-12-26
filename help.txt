@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS students (
     class VARCHAR(20),
     created_at DATETIME,
     role VARCHAR(50)
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;;
 
 -- 13. teacher_subjects
 CREATE TABLE IF NOT EXISTS teacher_subjects (
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS teacher_subjects (
     teacher_id INT,
     subject VARCHAR(100),
     FOREIGN KEY (teacher_id) REFERENCES teachers(id)
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;;
 
 -- 15. true_false_questions
 CREATE TABLE IF NOT EXISTS true_false_questions (
@@ -204,7 +204,7 @@ CREATE TABLE subject_levels (
     class_level ENUM('PRIMARY','JSS','SS') NOT NULL,
     UNIQUE(subject_id, class_level),
     FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;;
 
 --17. academic year
 CREATE TABLE IF NOT EXISTS academic_years (
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS academic_years (
   exam_title VARCHAR(50),
   status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;;
 
 -- 18. super_admins
 CREATE TABLE IF NOT EXISTS super_admins (
@@ -222,8 +222,7 @@ CREATE TABLE IF NOT EXISTS super_admins (
     username VARCHAR(100) UNIQUE,
     password VARCHAR(255),
     created_at DATETIME,
-    role VARCHAR(50),
-    
+    role VARCHAR(50)
 );
 
 --19. system_settings
@@ -260,4 +259,62 @@ CREATE TABLE schools (
     id INT AUTO_INCREMENT PRIMARY KEY,
     school_name VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS student_subject_scores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    student_id INT NOT NULL,
+    class_id INT NOT NULL,
+    subject_id INT NOT NULL,
+    academic_year_id INT NOT NULL,  -- THIS IS THE TERM
+
+    ca1 TINYINT UNSIGNED DEFAULT 0,
+    ca2 TINYINT UNSIGNED DEFAULT 0,
+    ca3 TINYINT UNSIGNED DEFAULT 0,
+    ca4 TINYINT UNSIGNED DEFAULT 0,
+    exam TINYINT UNSIGNED DEFAULT 0,
+
+    total TINYINT UNSIGNED DEFAULT 0,
+    grade CHAR(1) DEFAULT NULL,
+
+    updated_by INT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE (student_id, subject_id, academic_year_id),
+
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    FOREIGN KEY (class_id) REFERENCES classes(id),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id),
+    FOREIGN KEY (academic_year_id) REFERENCES academic_years(id)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS student_term_remarks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    student_id INT NOT NULL,
+    academic_year_id INT NOT NULL,
+    teacher_id INT NOT NULL,
+
+    remark TEXT NOT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (student_id, academic_year_id),
+
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    FOREIGN KEY (academic_year_id) REFERENCES academic_years(id),
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS grade_scales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    min_score TINYINT UNSIGNED NOT NULL,
+    max_score TINYINT UNSIGNED NOT NULL,
+    grade CHAR(1) NOT NULL,
+    remark VARCHAR(50),
+
+    UNIQUE (grade)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
