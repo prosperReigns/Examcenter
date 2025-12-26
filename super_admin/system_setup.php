@@ -290,7 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <option value="SS">SS</option>
             </select>
 
-            <button type="submit" name="add_subject" class="btn btn-success">Finish Setup</button>
+            <button type="submit" name="add_subject" class="btn btn-success">Save & Continue</button>
         </form>
     </div>
 
