@@ -55,7 +55,7 @@ CREATE TABLE classes (
     FOREIGN KEY (academic_level_id) REFERENCES academic_levels(id),
     FOREIGN KEY (stream_id) REFERENCES streams(id),
     UNIQUE (academic_level_id, stream_id)
-);
+)CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 14. tests
 CREATE TABLE tests (
@@ -195,8 +195,8 @@ CREATE TABLE IF NOT EXISTS subjects (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `subject_name` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `subject_name_class_level` (`subject_name`,`class_level`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  UNIQUE KEY `subject_name` (`subject_name`)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;;
 
 CREATE TABLE subject_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -255,3 +255,9 @@ CREATE TABLE teacher_classes (
     FOREIGN KEY (teacher_id) REFERENCES teachers(id),
     FOREIGN KEY (class_id) REFERENCES classes(id)
 );
+
+CREATE TABLE schools (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    school_name VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

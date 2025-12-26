@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../includes/system_guard.php';
 
 if (!isset($_SESSION['student_id']) || !isset($_SESSION['exam_questions']) || !isset($_SESSION['current_test_id'])) {
     header("Location: register.php");

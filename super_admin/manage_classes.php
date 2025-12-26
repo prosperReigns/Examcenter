@@ -7,32 +7,40 @@ require_once '../includes/system_guard.php';
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+ini_set('log_errors', 1);
+ini_set('error_log', '../logs/errors.log');
 
-// Check if user is logged in
+// Check super admin authentication
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+    header("Location: /EXAMCENTER/login.php?error=Not logged in");
     exit();
 }
 
-$database = Database::getInstance();
-$conn = $database->getConnection();
+try {
+    $database = Database::getInstance();
+    $conn = $database->getConnection();
 
-// Fetch admin info
-$admin_id = (int)$_SESSION['user_id'];
-$stmt = $conn->prepare("SELECT username, role FROM admins WHERE id=?");
-$stmt->bind_param("i", $admin_id);
-$stmt->execute();
-$admin = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+    $user_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username, role FROM super_admins WHERE id = ?");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $super_admin = $result->fetch_assoc();
+    $stmt->close();
 
-if (!$admin || strtolower($admin['role']) !== 'admin') {
-    session_destroy();
-    header("Location: /EXAMCENTER/login.php?error=Unauthorized");
-    exit();
+    if (!$super_admin || strtolower($super_admin['role']) !== 'super_admin') {
+        session_destroy();
+        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        exit();
+    }
+} catch (Exception $e) {
+    error_log("Page error: " . $e->getMessage());
+    die("System error");
 }
 
-$error = '';
+// Initialize messages
 $success = '';
+$errorMsg = '';
 
 // Fetch class groups dynamically from academic_levels
 // Fixed class groups (ENUM-backed)
@@ -162,14 +170,12 @@ while ($row = $result->fetch_assoc()) {
     $classes[] = $row;
 }
 ?>
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Subjects | Admin</title>
+    <title>Manage Admins | Super Admin</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
@@ -184,37 +190,32 @@ while ($row = $result->fetch_assoc()) {
         <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
         <div class="admin-info">
             <small>Welcome back,</small>
-            <h6><b><?php echo htmlspecialchars($admin['username']); ?></b></h6>
+            <h6><?php echo htmlspecialchars($super_admin['username']); ?></h6>
         </div>
     </div>
     <div class="sidebar-menu mt-4">
         <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-        <a href="add_question.php" style="text-decoration: line-through"><i class="fas fa-plus-circle"></i>Add Questions</a>
-        <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
-        <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
-        <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
-        <a href="manage_classes.php" class="active"><i class="fas fa-users"></i>Manage Classes</a>
-        <a href="manage_session.php"><i class="fas fa-users"></i>Manage Session</a>
-        <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
-        <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
-        <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
+        <a href="manage_admins.php" class="active"><i class="fas fa-users-cog"></i>Manage Admins</a>
+        <a href="manage_classes.php" class="active"><i class="fas fa-users-cog"></i>Manage Classes</a>
+        <a href="manage_session.php" class="active"><i class="fas fa-users-cog"></i>Manage Session</a>
+        <a href="manage_students.php" class="active"><i class="fas fa-users-cog"></i>Manage Students</a>
+        <a href="manage_subject.php" class="active"><i class="fas fa-users-cog"></i>Manage Subject</a>
         <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
-        <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
+        <a href="../admin/logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
     </div>
 </div>
 
-<div class="main-content">
-    <div class="header d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0">Manage Classes</h2>
-    <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+<!-- Main Content -->
+<div class="content container mt-5">
 
-    </div>
+    <h2 class="mb-4 fw-bold">Manage Admins</h2>
 
-    <?php if ($error): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
-    <?php endif; ?>
     <?php if ($success): ?>
-        <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+        <div class="alert alert-success"><?php echo $success; ?></div>
+    <?php endif; ?>
+
+    <?php if ($errorMsg): ?>
+        <div class="alert alert-danger"><?php echo $errorMsg; ?></div>
     <?php endif; ?>
 
     <div class="card mb-4">
@@ -288,13 +289,8 @@ while ($row = $result->fetch_assoc()) {
             </table>
         </div>
     </div>
-
 </div>
-    <script src="../js/jquery-3.7.0.min.js"></script>
-    <script src="../js/bootstrap.bundle.min.js"></script>
-    <script src="../js/dataTables.min.js"></script>
-    <script src="../js/dataTables.bootstrap5.min.js"></script>
-    <script src="../js/jquery.validate.min.js"></script>
+
 <script>
     $(document).ready(function() {
             // Sidebar toggle
@@ -319,6 +315,5 @@ while ($row = $result->fetch_assoc()) {
     });
 
 </script>
-
 </body>
 </html>

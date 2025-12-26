@@ -1,5 +1,6 @@
 <?php
 require '../db.php';
+require_once '../includes/system_guard.php';
 $conn = Database::getInstance()->getConnection();
 
 $class = $_GET['class'];
@@ -8,14 +9,25 @@ $title = $_GET['title'];
 
 // Fetch test
 $stmt = $conn->prepare("
-    SELECT t.*, c.class_name, al.level_code 
+    SELECT 
+        t.*, 
+        c.class_name, 
+        al.level_code,
+        s.subject_name
     FROM tests t
     JOIN classes c ON t.academic_level_id = c.academic_level_id
     JOIN academic_levels al ON t.academic_level_id = al.id
-    WHERE c.class_name = ? AND t.subject = ? AND t.title = ?
+    JOIN subjects s ON t.subject_id = s.id
+    JOIN subject_levels sl ON sl.subject_id = s.id
+    WHERE 
+        c.class_name = ?
+        AND s.subject_name = ?
+        AND sl.class_level = al.level_code
+        AND t.title = ?
     ORDER BY t.created_at DESC
     LIMIT 1
 ");
+
 $stmt->bind_param("sss", $class, $subject, $title);
 $stmt->execute();
 $test = $stmt->get_result()->fetch_assoc();
@@ -58,12 +70,12 @@ $questions = array_merge($single, $multiple, $tf, $fill);
 
 // Headers for Word download
 header("Content-Type: application/vnd.ms-word");
-header("Content-Disposition: attachment; filename={$title}_{$subject}.doc");
+header("Content-Disposition: attachment; filename={$title}_{$subject_name}.doc");
 
 // Output test info
 echo "{$test['title']}\n";
 echo "Class: {$test['class_name']}\n";
-echo "Subject: {$test['subject']}\n";
+echo "Subject: {$test['subject_name']}\n";
 echo "Duration: {$test['duration']} mins\n\n";
 
 // Output questions
