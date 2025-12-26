@@ -1,5 +1,6 @@
 <?php
 require '../db.php';
+require_once '../includes/system_guard.php';
 $conn = Database::getInstance()->getConnection();
 
 $class = $_GET['class'];

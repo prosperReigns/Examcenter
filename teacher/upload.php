@@ -1,5 +1,6 @@
 <?php
 require '../db.php';
+require_once '../includes/system_guard.php';
 require '../vendor/autoload.php'; // PhpWord autoload
 use PhpOffice\PhpWord\IOFactory;
 

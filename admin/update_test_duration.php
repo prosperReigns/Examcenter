@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../includes/system_guard.php';
 
 if (!isset($_SESSION['user_id']) || strtolower($_SESSION['user_role']) !== 'admin') {
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);

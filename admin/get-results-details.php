@@ -1,5 +1,6 @@
 <?php
 require_once '../db.php';
+require_once '../includes/system_guard.php';
 
 if(isset($_POST['student_id'])) {
     $database = Database::getInstance();
