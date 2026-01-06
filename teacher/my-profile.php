@@ -51,6 +51,20 @@ try {
     }
     $stmt->close();
 
+    // Fetch assigned class
+    $stmt = $conn->prepare("
+    SELECT c.class_name 
+    FROM teacher_classes tc
+    JOIN classes c ON tc.class_id = c.id
+    WHERE tc.teacher_id = ?
+    LIMIT 1
+    ");
+    $stmt->bind_param("i", $teacher_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $assigned_class = $result->fetch_assoc()['class_name'] ?? 'None';
+    $stmt->close();
+
     // Initialize variables for form handling
     $errors = [];
     $success = '';
@@ -364,6 +378,14 @@ $conn->close();
                             </ul>
                             <small class="text-muted">Contact your admin to update assigned subjects.</small>
                         <?php endif; ?>
+                    </div>
+                </div>
+                <div class="card bg-white border-0 shadow-sm mt-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-school me-2"></i>Assigned Class</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0"><?php echo htmlspecialchars($assigned_class); ?></p>
                     </div>
                 </div>
             </div>

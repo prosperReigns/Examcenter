@@ -27,11 +27,11 @@ if (
 /**
  * VALIDATE STUDENT ID
  */
-if (!isset($_GET['student_id']) || !is_numeric($_GET['student_id'])) {
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     die("Invalid student selected.");
 }
 
-$student_id = (int) $_GET['student_id'];
+$student_id = (int) $_GET['id'];
 
 try {
     /**
@@ -83,52 +83,34 @@ try {
     if (empty($assigned_class_ids)) {
         die("You are not assigned to any class.");
     }
+    
+// ===== FETCH STUDENT (John) =====
+$placeholders = implode(',', array_fill(0, count($assigned_class_ids), '?'));
+$types = str_repeat('i', count($assigned_class_ids));
 
-    /**
-     * PREPARE PLACEHOLDERS
-     */
-    $placeholders = implode(',', array_fill(0, count($assigned_class_ids), '?'));
-    $types = str_repeat('i', count($assigned_class_ids));
+$sql = "
+SELECT 
+    s.id,
+    s.name,
+    s.email,
+    s.class AS class_id,          -- s.class stores the numeric ID
+    c.class_name AS full_class_name
+FROM students s
+JOIN classes c ON c.id = s.class  -- join on IDs
+WHERE s.id = ?
+";
+$stmt = $conn->prepare($sql);
 
-    /**
-     * FETCH & AUTHORIZE STUDENT
-     */
-    // $stmt = $conn->prepare("
-    //     SELECT 
-    //         s.id,
-    //         s.name,
-    //         s.email,
-    //         s.class,
-    //         c.id AS class_id,
-    //         c.class_name
-    //     FROM students s
-    //     JOIN classes c ON c.class_name = s.class
-    //     WHERE s.id = ?
-    //       AND c.id IN ($placeholders)
-    // ");
+// Bind only student_id
+$stmt->bind_param("i", $student_id);
+$stmt->execute();
+$student = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-    $stmt = $conn->prepare("
-        SELECT 
-            s.id,
-            s.name,
-            s.email,
-            s.class AS class_id,
-            c.class_name
-        FROM students s
-        JOIN classes c ON c.id = s.class
-        WHERE s.id = ?
-        AND s.class IN ($placeholders)
-    ");
-
-    $stmt->bind_param(
-        "i" . $types,
-        $student_id,
-        ...$assigned_class_ids
-    );
-
-    $stmt->execute();
-    $student = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+// ===== CHECK IF TEACHER CAN ACCESS JOHN =====
+if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
+    die("You are not authorized to view this student.");
+}
 
     if (!$student) {
         die("You are not authorized to view this student.");
@@ -237,6 +219,7 @@ try {
 
 } catch (Exception $e) {
     error_log("Student profile error: " . $e->getMessage());
+    echo "<pre>System error: " . $e->getMessage() . "</pre>"; 
     die("System error occurred. Please try again later.");
 }
 ?>
@@ -328,12 +311,12 @@ try {
                 <img src="/EXAMCENTER/uploads/students/default.png" alt="Student Photo">
                 <div>
                     <h4><?= htmlspecialchars($student['name']) ?></h4>
-                    <p class="mb-1"><strong>Class:</strong> <?= htmlspecialchars($student['class_name']) ?></p>
-                    <p class="mb-1"><strong>Email:</strong> <?= htmlspecialchars($student['email']) ?></p>
+                    <p class="mb-1"><strong>Class:</strong> <?= htmlspecialchars($student['full_class_name']) ?></p>
+                    <p class="mb-1"><strong>Email:</strong> <?= htmlspecialchars($student['email'] ?? '') ?></p>
                     <p class="mb-0">
                         <strong>Academic Session:</strong>
-                        <?= htmlspecialchars($active_term['year']) ?> —
-                        <?= htmlspecialchars($active_term['session']) ?>
+                        <?= htmlspecialchars($active_term['year'] ?? '') ?> —
+                        <?= htmlspecialchars($active_term['session'] ?? '') ?>
                     </p>
                 </div>
             </div>
@@ -344,7 +327,7 @@ try {
             <label class="form-label"><strong>Select Term</strong></label>
             <!-- Replace existing select -->
             <select id="termSwitcher" class="form-select w-auto" data-student-id="<?= $student_id ?>">
-                <option value="<?= $active_term['id'] ?>"><?= htmlspecialchars($active_term['session']) ?></option>
+                <option value="<?= $active_term['id'] ?>"><?= htmlspecialchars($active_term['session'] ?? '') ?></option>
                 <!-- other terms will be dynamically loaded -->
             </select>
         </div>
