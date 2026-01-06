@@ -77,11 +77,10 @@ try {
     $types = str_repeat('i', count($assigned_class_ids));
 
     $sql = "SELECT s.id, s.name, s.class, c.class_name 
-        FROM students s
-        JOIN classes c ON s.class = c.class_name
-        WHERE s.class IN ($placeholders)
-        ORDER BY c.class_name, s.name";
-
+    FROM students s
+    JOIN classes c ON s.class = c.id
+    WHERE s.class IN ($placeholders)
+    ORDER BY c.class_name, s.name";
 
     $stmt = $conn->prepare($sql);
     $stmt->bind_param($types, ...$assigned_class_ids);
