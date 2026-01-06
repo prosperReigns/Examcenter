@@ -197,7 +197,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
         if (empty($question_text) || empty($question_type) || !in_array($question_type, ['multiple_choice_single', 'multiple_choice_multiple', 'true_false', 'fill_blanks'])) {
             $_SESSION['error'] = "Question text and valid type are required.";
         } else {
-            $stmt = $conn->prepare("SELECT class, subject FROM tests WHERE id = ?");
+            $stmt = $conn->prepare("
+                SELECT al.class_group, t.subject
+                FROM tests t
+                JOIN academic_levels al ON al.id = t.academic_level_id
+                WHERE t.id = ?
+            ");
+
             if (!$stmt) {
                 error_log("Prepare failed for test data: " . $conn->error);
                 $_SESSION['error'] = "Database error.";
@@ -211,7 +217,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
                     unset($_SESSION['current_test_id']);
                     $_SESSION['error'] = "Invalid test.";
                 } else {
-                    $class = $test_data['class'];
+                    $class = $test_data['class_group'];
                     $subject = $test_data['subject'];
 
                     // Handle image

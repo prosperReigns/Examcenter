@@ -17,9 +17,9 @@ if (!isset($_SESSION['user_id'])) {
 
 $database = Database::getInstance();
 $conn = $database->getConnection();
-
 $user_id = (int)$_SESSION['user_id'];
 
+// Verify super_admin role
 $stmt = $conn->prepare("SELECT role FROM super_admins WHERE id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -32,19 +32,19 @@ if (!$admin || strtolower($admin['role']) !== 'super_admin') {
     exit();
 }
 
+$class_groups = ['PRIMARY', 'JSS', 'SS'];
+$success = false;
+$error = '';
+
 /* ================= FORM HANDLING ================= */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
     try {
         $conn->begin_transaction();
 
-        /* ---------- ADD SCHOOL ---------- */
+        /* ---------- STEP 1: ADD SCHOOL ---------- */
         if (isset($_POST['add_school'])) {
             $school_name = trim($_POST['school_name']);
-
-            if ($school_name === '') {
-                throw new Exception("School name cannot be empty.");
-            }
+            if ($school_name === '') throw new Exception("School name cannot be empty.");
 
             $stmt = $conn->prepare("SELECT id FROM schools WHERE school_name = ?");
             $stmt->bind_param("s", $school_name);
@@ -53,22 +53,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($stmt->num_rows === 0) {
                 $stmt->close();
-
                 $stmt = $conn->prepare("INSERT INTO schools (school_name) VALUES (?)");
                 $stmt->bind_param("s", $school_name);
                 $stmt->execute();
             }
-
             $stmt->close();
+
+            $_SESSION['setup_step'] = 2;
+            $conn->commit();
+            $success = true;
         }
 
-        /* ---------- ADD ACADEMIC YEAR ---------- */
+        /* ---------- STEP 2: ADD ACADEMIC YEAR ---------- */
         if (isset($_POST['add_year'])) {
             $year = trim($_POST['new_year']);
-
-            if ($year === '') {
-                throw new Exception("Academic year cannot be empty.");
-            }
+            if ($year === '') throw new Exception("Academic year cannot be empty.");
 
             $stmt = $conn->prepare("SELECT id FROM academic_years WHERE year = ?");
             $stmt->bind_param("s", $year);
@@ -76,157 +75,156 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->store_result();
 
             if ($stmt->num_rows === 0) {
-                $status = 'inactive';
                 $stmt->close();
-
-                $stmt = $conn->prepare("
-                    INSERT INTO academic_years (year, session, exam_title, status)
-                    VALUES (?, NULL, NULL, ?)
-                ");
+                $status = 'inactive';
+                $stmt = $conn->prepare("INSERT INTO academic_years (year, status) VALUES (?, ?)");
                 $stmt->bind_param("ss", $year, $status);
                 $stmt->execute();
             }
             $stmt->close();
+
+            $_SESSION['setup_step'] = 3;
+            $conn->commit();
+            $success = true;
         }
 
-        /* ---------- ADD CLASS ---------- */
+        /* ---------- STEP 3: ADD CLASS ---------- */
         if (isset($_POST['add_class'])) {
-            $academic_level_id = (int)$_POST['academic_level_id'];
-            $stream_id         = (int)$_POST['stream_id'];
+            $class_group = strtoupper(trim($_POST['class_group'] ?? ''));
+            $level_code  = strtoupper(trim($_POST['level_code'] ?? ''));
+            $stream_name = ucfirst(strtolower(trim($_POST['stream_name'] ?? '')));
 
-            if (!$academic_level_id || !$stream_id) {
-                throw new Exception("Academic level and stream are required.");
+            if (!$class_group || !$level_code || !$stream_name) throw new Exception("All fields are required.");
+
+            // Validate level_code matches group
+            $valid = false;
+            if ($class_group === 'JSS' && str_starts_with($level_code, 'JSS')) $valid = true;
+            elseif ($class_group === 'SS' && str_starts_with($level_code, 'SS')) $valid = true;
+            elseif ($class_group === 'PRIMARY' && str_starts_with($level_code, 'PRY')) $valid = true;
+
+            if (!$valid) throw new Exception("Level Code '$level_code' does not match Class Group '$class_group'.");
+
+            // Academic Level
+            $stmt = $conn->prepare("SELECT id FROM academic_levels WHERE level_code=? AND class_group=?");
+            $stmt->bind_param("ss", $level_code, $class_group);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result->num_rows > 0) {
+                $academic_level_id = $result->fetch_assoc()['id'];
+            } else {
+                $stmt = $conn->prepare("INSERT INTO academic_levels(level_code,class_group) VALUES(?,?)");
+                $stmt->bind_param("ss", $level_code, $class_group);
+                $stmt->execute();
+                $academic_level_id = $stmt->insert_id;
             }
 
-            // Fetch level code (e.g JSS1)
-            $stmt = $conn->prepare("SELECT level_code FROM academic_levels WHERE id = ?");
-            $stmt->bind_param("i", $academic_level_id);
+            // Stream
+            $stmt = $conn->prepare("SELECT id FROM streams WHERE stream_name=?");
+            $stmt->bind_param("s", $stream_name);
             $stmt->execute();
-            $level = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-
-            // Fetch stream name
-            $stmt = $conn->prepare("SELECT stream_name FROM streams WHERE id = ?");
-            $stmt->bind_param("i", $stream_id);
-            $stmt->execute();
-            $stream = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-
-            if (!$level || !$stream) {
-                throw new Exception("Invalid academic level or stream.");
+            $result = $stmt->get_result();
+            if ($result->num_rows > 0) {
+                $stream_id = $result->fetch_assoc()['id'];
+            } else {
+                $stmt = $conn->prepare("INSERT INTO streams(stream_name) VALUES(?)");
+                $stmt->bind_param("s", $stream_name);
+                $stmt->execute();
+                $stream_id = $stmt->insert_id;
             }
 
-            $class_name = $level['level_code'] . ' ' . $stream['stream_name'];
-
-            $stmt = $conn->prepare("
-                INSERT INTO classes (academic_level_id, stream_id, class_name)
-                VALUES (?, ?, ?)
-            ");
-            $stmt->bind_param("iis", $academic_level_id, $stream_id, $class_name);
+            // Class
+            $class_name = $level_code . ' ' . $stream_name;
+            $stmt = $conn->prepare("SELECT id FROM classes WHERE academic_level_id=? AND stream_id=?");
+            $stmt->bind_param("ii", $academic_level_id, $stream_id);
             $stmt->execute();
-            $stmt->close();
+            $result = $stmt->get_result();
+            if ($result->num_rows > 0) throw new Exception("Class already exists.");
+            else {
+                $stmt = $conn->prepare("INSERT INTO classes(academic_level_id,stream_id,class_name) VALUES(?,?,?)");
+                $stmt->bind_param("iis", $academic_level_id, $stream_id, $class_name);
+                $stmt->execute();
+            }
+
+            $_SESSION['setup_step'] = 4;
+            $conn->commit();
+            $success = true;
         }
 
-        /* ---------- ADD SUBJECT ---------- */
+        /* ---------- STEP 4: ADD SUBJECT ---------- */
         if (isset($_POST['add_subject'])) {
             $subject_name = trim($_POST['subject_name']);
             $class_level  = $_POST['class_level'];
+            if ($subject_name === '' || $class_level === '') throw new Exception("Subject and class level required.");
 
-            if ($subject_name === '' || $class_level === '') {
-                throw new Exception("Subject name and class level are required.");
-            }
-
-            // Get or create subject
-            $stmt = $conn->prepare("SELECT id FROM subjects WHERE subject_name = ?");
+            $stmt = $conn->prepare("SELECT id FROM subjects WHERE subject_name=?");
             $stmt->bind_param("s", $subject_name);
             $stmt->execute();
             $result = $stmt->get_result();
             $subject = $result->fetch_assoc();
             $stmt->close();
 
-            if ($subject) {
-                $subject_id = $subject['id'];
-            } else {
+            if ($subject) $subject_id = $subject['id'];
+            else {
                 $stmt = $conn->prepare("INSERT INTO subjects (subject_name) VALUES (?)");
                 $stmt->bind_param("s", $subject_name);
                 $stmt->execute();
                 $subject_id = $stmt->insert_id;
                 $stmt->close();
             }
-            
-            // Link subject to level
-            $stmt = $conn->prepare("
-                INSERT IGNORE INTO subject_levels (subject_id, class_level)
-                VALUES (?, ?)
-            ");
+
+            // Link to level
+            $stmt = $conn->prepare("INSERT IGNORE INTO subject_levels(subject_id,class_level) VALUES(?,?)");
             $stmt->bind_param("is", $subject_id, $class_level);
             $stmt->execute();
             $stmt->close();
+
+            $_SESSION['setup_step'] = 5;
+            $conn->commit();
+            $success = true;
         }
 
-        /* ---------- ADD ADMIN ---------- */
+        /* ---------- STEP 5: ADD ADMIN & FINALIZE ---------- */
         if (isset($_POST['add_admin'])) {
             $admin_username = trim($_POST['admin_username']);
             $admin_password = $_POST['admin_password'];
+            if ($admin_username === '' || $admin_password === '') throw new Exception("Admin username and password required.");
 
-            if ($admin_username === '' || $admin_password === '') {
-                throw new Exception("Admin username and password are required.");
-            }
-
-            // Check if username exists
-            $stmt = $conn->prepare("SELECT id FROM admins WHERE username = ?");
+            // Admin insert
+            $stmt = $conn->prepare("SELECT id FROM admins WHERE username=?");
             $stmt->bind_param("s", $admin_username);
             $stmt->execute();
             $stmt->store_result();
-
             if ($stmt->num_rows === 0) {
                 $stmt->close();
                 $hashedPassword = password_hash($admin_password, PASSWORD_DEFAULT);
-
-                $stmt = $conn->prepare("INSERT INTO admins (username, password, role) VALUES (?, ?, 'admin')");
+                $stmt = $conn->prepare("INSERT INTO admins (username,password,role) VALUES(?,?,'admin')");
                 $stmt->bind_param("ss", $admin_username, $hashedPassword);
                 $stmt->execute();
+                $stmt->close();
+            } else {
+                $stmt->close();
             }
+
+            // System settings
+            $stmt = $conn->prepare("INSERT INTO system_settings(setup_completed,setup_completed_at,setup_by) VALUES(1,NOW(),?)");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
             $stmt->close();
+
+            $conn->commit();
+            unset($_SESSION['setup_step']);
+            header("Location: /EXAMCENTER/super_admin/dashboard.php");
+            exit();
         }
-
-        /* ---------- CHECK SETUP COMPLETION ---------- */
-        $checks = [
-            "schools",
-            "academic_years",
-            "classes",
-            "subjects"
-        ];
-
-        foreach ($checks as $table) {
-            $r = $conn->query("SELECT 1 FROM {$table} LIMIT 1");
-            if ($r->num_rows === 0) {
-                throw new Exception("System setup incomplete.");
-            }
-        }
-
-        // Mark setup completed
-        $stmt = $conn->prepare("
-            UPDATE system_settings
-            SET setup_completed = 1,
-                setup_completed_at = NOW(),
-                setup_by = ?
-            WHERE id = 1
-        ");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $stmt->close();
-
-        $conn->commit();
-        $success = "System setup updated successfully.";
 
     } catch (Exception $e) {
         $conn->rollback();
-        error_log($e->getMessage());
         $error = $e->getMessage();
+        error_log($error);
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -253,7 +251,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- STEP 1: SCHOOL -->
     <div class="setup-step" data-step="1">
         <h5>Step 1: Create School</h5>
-        <form method="POST">
+
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <form method="POST" action="system_setup.php">
             <input type="text" name="school_name" class="form-control mb-3" placeholder="School Name" required>
             <button type="submit" name="add_school" class="btn btn-primary">Save & Continue</button>
         </form>
@@ -262,7 +265,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- STEP 2: ACADEMIC YEAR -->
     <div class="setup-step d-none" data-step="2">
         <h5>Step 2: Add Academic Year</h5>
-        <form method="POST">
+
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <form method="POST" action="system_setup.php">
             <input type="text" name="new_year" class="form-control mb-3" placeholder="e.g. 2025/2026" required>
             <button type="submit" name="add_year" class="btn btn-primary">Save & Continue</button>
         </form>
@@ -271,8 +279,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- STEP 3: CLASS -->
     <div class="setup-step d-none" data-step="3">
         <h5>Step 3: Add Class</h5>
-        <form method="POST">
-            <input type="text" name="class_name" class="form-control mb-3" placeholder="e.g. JSS 1" required>
+
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <form method="POST" action="system_setup.php">
+        <div class="mb-3">
+                    <label>Class Group</label>
+                    <div class="input-group">
+                        <select id="class_group" name="class_group" class="form-control" required>
+                            <option value="">-- Select Group --</option>
+                            <?php foreach($class_groups as $cg): ?>
+                                <option value="<?= htmlspecialchars($cg) ?>"><?= htmlspecialchars($cg) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="button" class="btn btn-outline-primary" id="addGroupBtn" disabled>+</button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label>Level Code</label>
+                    <input type="text" id="level_code" name="level_code" class="form-control" placeholder="-- JSS1 --" required>
+                </div>
+
+                <div class="mb-3">
+                    <label>Stream Name</label>
+                    <input type="text" id="stream_name" name="stream_name" class="form-control" placeholder="-- Gold --" required>
+                </div>
             <button type="submit" name="add_class" class="btn btn-primary">Save & Continue</button>
         </form>
     </div>
@@ -280,7 +314,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- STEP 4: SUBJECT -->
     <div class="setup-step d-none" data-step="4">
         <h5>Step 4: Add Subject</h5>
-        <form method="POST">
+
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <form method="POST" action="system_setup.php">
             <input type="text" name="subject_name" class="form-control mb-3" placeholder="Subject Name" required>
 
             <select name="class_level" class="form-control mb-3" required>
@@ -297,7 +336,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- STEP 5: CREATE ADMIN -->
     <div class="setup-step d-none" data-step="5">
         <h5>Step 5: Create Admin Account</h5>
-        <form method="POST">
+
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <form method="POST" action="system_setup.php">
             <input type="text" name="admin_username" class="form-control mb-3" placeholder="Admin Username" required>
             <input type="password" name="admin_password" class="form-control mb-3" placeholder="Admin Password" required>
             <button type="submit" name="add_admin" class="btn btn-success">Finish Setup</button>
@@ -309,7 +353,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <script src="../js/bootstrap.bundle.min.js"></script>
 <script>
-    let currentStep = 1;
+    let currentStep = <?= (int)($_SESSION['setup_step'] ?? 1) ?>;
     const totalSteps = 5;
 
     function showStep(step) {
@@ -323,11 +367,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.getElementById('setupProgress').style.width =
             (step / totalSteps) * 100 + '%';
     }
-
-    // Auto-advance after POST success
-    <?php if (!empty($success)): ?>
-        currentStep++;
-    <?php endif; ?>
 
     showStep(currentStep);
 </script>

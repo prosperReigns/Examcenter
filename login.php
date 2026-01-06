@@ -31,7 +31,12 @@ try {
     $error = "System error";
 }
 
-$stmt = $conn->prepare("SELECT setup_completed FROM system_settings WHERE id = 1");
+$stmt = $conn->prepare("
+    SELECT setup_completed 
+    FROM system_settings 
+    ORDER BY id DESC 
+    LIMIT 1
+");
 if (!$stmt) {
     error_log("Prepare failed for system_settings - " . $conn->error);
     return false;
@@ -108,7 +113,7 @@ function redirectByRole($role, $setupCompleted) {
             $target = $base_url . '/EXAMCENTER/super_admin/dashboard.php';
             break;
         case 'admin':
-            if ($setupCompleted) {
+            if (!$setupCompleted) {
                 error_log("system setup incomplete, kindly contact super admin");
                 header("Location: $base_url/EXAMCENTER/login.php");
                 exit();
@@ -116,7 +121,7 @@ function redirectByRole($role, $setupCompleted) {
             $target = $base_url . '/EXAMCENTER/admin/dashboard.php';
             break;
         case 'teacher':
-            if ($setupCompleted) {
+            if (!$setupCompleted) {
                 error_log("system setup incomplete, kindly contact super admin");
                 header("Location: $base_url/EXAMCENTER/login.php");
                 exit();

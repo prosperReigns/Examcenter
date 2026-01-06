@@ -280,7 +280,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_year'])) {
         $errorMsg = "Academic year cannot be empty.";
     } else {
         // check distinct year already exists
-        $stmt = $conn->prepare("SELECT 1 FROM academic_years WHERE year = ? LIMIT 1");
+        $stmt = $conn->prepare("
+            SELECT year, session, exam_title 
+            FROM academic_years 
+            WHERE year = ?
+            AND status = 'active' 
+            AND session IS NOT NULL 
+            AND exam_title IS NOT NULL
+            LIMIT 1
+        ");
+
         $stmt->bind_param("s", $newYear);
         $stmt->execute();
         $r = $stmt->get_result();
@@ -328,6 +337,8 @@ $stmt = $conn->prepare("
     SELECT year, session, exam_title 
     FROM academic_years 
     WHERE status = 'active' 
+      AND session IS NOT NULL 
+      AND exam_title IS NOT NULL
     LIMIT 1
 ");
 $stmt->execute();
@@ -548,304 +559,304 @@ $stmt->close();
     });
 });
     </script>
-<script>
-const selectedYearEl = document.getElementById('selectedYear');
-const selectedSessionEl = document.getElementById('selectedSession');
-const selectedExamEl = document.getElementById('selectedExam');
-const openAddSessionBtn = document.getElementById('openAddSessionBtn');
-const openAddExamBtn = document.getElementById('openAddExamBtn');
-const saveBtn = document.getElementById('saveBtn');
+    <script>
+    const selectedYearEl = document.getElementById('selectedYear');
+    const selectedSessionEl = document.getElementById('selectedSession');
+    const selectedExamEl = document.getElementById('selectedExam');
+    const openAddSessionBtn = document.getElementById('openAddSessionBtn');
+    const openAddExamBtn = document.getElementById('openAddExamBtn');
+    const saveBtn = document.getElementById('saveBtn');
 
-let currentYear = null;
-let currentSession = null;
-let currentExam = null;
+    let currentYear = null;
+    let currentSession = null;
+    let currentExam = null;
 
-// Update UI + Save button
-function updateResultBox() {
-    selectedYearEl.textContent = currentYear || '—';
-    selectedSessionEl.textContent = currentSession || '—';
-    selectedExamEl.textContent = currentExam || '—';
-    saveBtn.disabled = !(currentYear && currentSession && currentExam);
-}
+    // Update UI + Save button
+    function updateResultBox() {
+        selectedYearEl.textContent = currentYear || '—';
+        selectedSessionEl.textContent = currentSession || '—';
+        selectedExamEl.textContent = currentExam || '—';
+        saveBtn.disabled = !(currentYear && currentSession && currentExam);
+    }
 
-// Refresh year list + restore full selection
-async function refreshYearList() {
-    const resp = await fetch('manage_session.php');
-    const text = await resp.text();
-    const doc = new DOMParser().parseFromString(text, 'text/html');
-    const newList = doc.getElementById('yearList');
-    if (newList) {
-        document.getElementById('yearList').innerHTML = newList.innerHTML;
-        attachEventListeners();
+    // Refresh year list + restore full selection
+    async function refreshYearList() {
+        const resp = await fetch('manage_session.php');
+        const text = await resp.text();
+        const doc = new DOMParser().parseFromString(text, 'text/html');
+        const newList = doc.getElementById('yearList');
+        if (newList) {
+            document.getElementById('yearList').innerHTML = newList.innerHTML;
+            attachEventListeners();
 
-        // CRITICAL: If a year was selected before toggle, KEEP IT SELECT SmashED
-        if (currentYear) {
-            selectedYearEl.textContent = currentYear;
-            openAddSessionBtn.disabled = false;
-            await loadSessions(currentYear); // Re-load sessions
+            // CRITICAL: If a year was selected before toggle, KEEP IT SELECT SmashED
+            if (currentYear) {
+                selectedYearEl.textContent = currentYear;
+                openAddSessionBtn.disabled = false;
+                await loadSessions(currentYear); // Re-load sessions
 
-            // Restore session if it was selected
-            if (currentSession) {
-                const sessionRadio = document.querySelector(`input[name="sessionRadio"][value="${currentSession.replace(/"/g, '\\"')}"]`);
-                if (sessionRadio) {
-                    sessionRadio.checked = true;
-                    openAddExamBtn.disabled = false;
-                    await loadExamsFor(currentYear, currentSession);
+                // Restore session if it was selected
+                if (currentSession) {
+                    const sessionRadio = document.querySelector(`input[name="sessionRadio"][value="${currentSession.replace(/"/g, '\\"')}"]`);
+                    if (sessionRadio) {
+                        sessionRadio.checked = true;
+                        openAddExamBtn.disabled = false;
+                        await loadExamsFor(currentYear, currentSession);
 
-                    if (currentExam) {
-                        const examRadio = document.querySelector(`input[name="examRadio"][value="${currentExam.replace(/"/g, '\\"')}"]`);
-                        if (examRadio) examRadio.checked = true;
+                        if (currentExam) {
+                            const examRadio = document.querySelector(`input[name="examRadio"][value="${currentExam.replace(/"/g, '\\"')}"]`);
+                            if (examRadio) examRadio.checked = true;
+                        }
                     }
                 }
+                updateResultBox();
             }
-            updateResultBox();
         }
     }
-}
 
-// Load sessions for a year
-async function loadSessions(year) {
-    try {
-        const resp = await fetch(`?action=get_sessions&year=${encodeURIComponent(year)}`);
-        const data = await resp.json();
+    // Load sessions for a year
+    async function loadSessions(year) {
+        try {
+            const resp = await fetch(`?action=get_sessions&year=${encodeURIComponent(year)}`);
+            const data = await resp.json();
 
-        const sessionsArea = document.getElementById('sessionsArea');
-        sessionsArea.innerHTML = '';
-        const wrapper = document.createElement('div');
-        wrapper.className = 'radio-list';
+            const sessionsArea = document.getElementById('sessionsArea');
+            sessionsArea.innerHTML = '';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'radio-list';
 
-        const defaults = ['First Term', 'Second Term', 'Third Term'];
-        new Set([...defaults, ...(data.sessions || [])]).forEach(s => {
-            const label = document.createElement('label');
-            label.innerHTML = `<input type="radio" name="sessionRadio" value="${s}" ${data.year_status !== 'active' ? 'disabled' : ''}> ${s}`;
-            wrapper.appendChild(label);
-        });
+            const defaults = ['First Term', 'Second Term', 'Third Term'];
+            new Set([...defaults, ...(data.sessions || [])]).forEach(s => {
+                const label = document.createElement('label');
+                label.innerHTML = `<input type="radio" name="sessionRadio" value="${s}" ${data.year_status !== 'active' ? 'disabled' : ''}> ${s}`;
+                wrapper.appendChild(label);
+            });
 
-        if (!data.sessions || data.sessions.length === 0) {
-            wrapper.appendChild(document.createTextNode('No sessions found. You can add one.'));
+            if (!data.sessions || data.sessions.length === 0) {
+                wrapper.appendChild(document.createTextNode('No sessions found. You can add one.'));
+            }
+            if (data.year_status !== 'active') {
+                wrapper.insertAdjacentHTML('beforeend', '<div class="small-muted mt-2">Year is inactive — cannot select sessions.</div>');
+            }
+
+            sessionsArea.appendChild(wrapper);
+
+            // Session change
+            document.querySelectorAll('input[name="sessionRadio"]').forEach(r => {
+                r.addEventListener('change', () => {
+                    currentSession = r.value;
+                    currentExam = null;
+                    updateResultBox();
+                    openAddExamBtn.disabled = false;
+                    loadExamsFor(year, currentSession);
+                });
+            });
+
+        } catch (e) {
+            document.getElementById('sessionsArea').innerHTML = '<div class="text-danger">Failed to load sessions</div>';
         }
-        if (data.year_status !== 'active') {
-            wrapper.insertAdjacentHTML('beforeend', '<div class="small-muted mt-2">Year is inactive — cannot select sessions.</div>');
+    }
+
+    // Load exam titles
+    async function loadExamsFor(year, session) {
+        try {
+            const resp = await fetch(`?action=get_exams&year=${encodeURIComponent(year)}&session=${encodeURIComponent(session)}`);
+            const data = await resp.json();
+
+            const examsArea = document.getElementById('examsArea');
+            examsArea.innerHTML = '';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'radio-list';
+
+            const defaults = ['Exam', 'Test', 'Mock'];
+            new Set([...defaults, ...(data.exams || [])]).forEach(e => {
+                const label = document.createElement('label');
+                label.innerHTML = `<input type="radio" name="examRadio" value="${e}"> ${e}`;
+                wrapper.appendChild(label);
+            });
+
+            if (!data.exams || data.exams.length === 0) {
+                wrapper.appendChild(document.createTextNode('No exam titles found. Add one.'));
+            }
+
+            examsArea.appendChild(wrapper);
+
+            document.querySelectorAll('input[name="examRadio"]').forEach(r => {
+                r.addEventListener('change', () => {
+                    currentExam = r.value;
+                    updateResultBox();
+                });
+            });
+
+        } catch (e) {
+            document.getElementById('examsArea').innerHTML = '<div class="text-danger">Failed to load exams</div>';
         }
+    }
 
-        sessionsArea.appendChild(wrapper);
-
-        // Session change
-        document.querySelectorAll('input[name="sessionRadio"]').forEach(r => {
-            r.addEventListener('change', () => {
-                currentSession = r.value;
-                currentExam = null;
+    // Re-attach all button listeners
+    function attachEventListeners() {
+        // Select year
+        document.querySelectorAll('.select-year-btn').forEach(btn => {
+            btn.onclick = () => {
+                currentYear = btn.dataset.year;
                 updateResultBox();
-                openAddExamBtn.disabled = false;
-                loadExamsFor(year, currentSession);
-            });
+                openAddSessionBtn.disabled = false;
+                loadSessions(currentYear);
+            };
         });
 
-    } catch (e) {
-        document.getElementById('sessionsArea').innerHTML = '<div class="text-danger">Failed to load sessions</div>';
+        // Toggle year (Activate/Deactivate)
+        document.querySelectorAll('.toggle-year-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const year = btn.dataset.year;
+                if (!confirm(`Change status for ${year}?`)) return;
+
+                const resp = await fetch('?action=toggle_year', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ year })
+                }).then(r => r.json());
+
+                alert(resp.message || 'Status updated!');
+
+                // Keep the year selected after toggle
+                currentYear = year;
+                await refreshYearList(); // This now preserves selection!
+            };
+        });
+
+        // Delete year
+        document.querySelectorAll('.delete-year-btn').forEach(btn => {
+            btn.onclick = async () => {
+                if (!confirm('Delete this year permanently?')) return;
+                await fetch('?action=delete_year', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ year: btn.dataset.year })
+                });
+                location.reload();
+            };
+        });
     }
-}
 
-// Load exam titles
-async function loadExamsFor(year, session) {
-    try {
-        const resp = await fetch(`?action=get_exams&year=${encodeURIComponent(year)}&session=${encodeURIComponent(session)}`);
-        const data = await resp.json();
+    // Add Session Modal
+    const addSessionModal = new bootstrap.Modal('#addSessionModal');
+    openAddSessionBtn.onclick = () => {
+        if (!currentYear) return alert('Select a year first');
+        document.getElementById('modalYearText').textContent = currentYear;
+        addSessionModal.show();
+    };
+    document.getElementById('addSessionForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const session = e.target.session.value.trim();
+        if (!session) return alert('Enter session name');
 
-        const examsArea = document.getElementById('examsArea');
-        examsArea.innerHTML = '';
-        const wrapper = document.createElement('div');
-        wrapper.className = 'radio-list';
+        const resp = await fetch('?action=add_session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ year: currentYear, session })
+        }).then(r => r.json());
 
-        const defaults = ['Exam', 'Test', 'Mock'];
-        new Set([...defaults, ...(data.exams || [])]).forEach(e => {
-            const label = document.createElement('label');
-            label.innerHTML = `<input type="radio" name="examRadio" value="${e}"> ${e}`;
-            wrapper.appendChild(label);
-        });
+        alert(resp.message);
+        addSessionModal.hide();
+        await loadSessions(currentYear);
+    };
 
-        if (!data.exams || data.exams.length === 0) {
-            wrapper.appendChild(document.createTextNode('No exam titles found. Add one.'));
-        }
+    // Add Exam Modal
+    const addExamModal = new bootstrap.Modal('#addExamModal');
+    openAddExamBtn.onclick = () => {
+        if (!currentSession) return alert('Select a session first');
+        document.getElementById('modalExamYearText').textContent = currentYear;
+        document.getElementById('modalExamSessionText').textContent = currentSession;
+        addExamModal.show();
+    };
+    document.getElementById('addExamForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const exam = e.target.exam.value.trim();
+        if (!exam) return alert('Enter exam title');
 
-        examsArea.appendChild(wrapper);
+        const resp = await fetch('?action=add_exam', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ year: currentYear, session: currentSession, exam })
+        }).then(r => r.json());
 
-        document.querySelectorAll('input[name="examRadio"]').forEach(r => {
-            r.addEventListener('change', () => {
-                currentExam = r.value;
-                updateResultBox();
-            });
-        });
+        alert(resp.message);
+        addExamModal.hide();
+        await loadExamsFor(currentYear, currentSession);
+    };
 
-    } catch (e) {
-        document.getElementById('examsArea').innerHTML = '<div class="text-danger">Failed to load exams</div>';
-    }
-}
+    // SAVE SELECTION
+    saveBtn.onclick = async () => {
+        if (!currentYear || !currentSession || !currentExam) return;
 
-// Re-attach all button listeners
-function attachEventListeners() {
-    // Select year
-    document.querySelectorAll('.select-year-btn').forEach(btn => {
-        btn.onclick = () => {
-            currentYear = btn.dataset.year;
-            updateResultBox();
-            openAddSessionBtn.disabled = false;
-            loadSessions(currentYear);
-        };
-    });
+        if (!confirm('Save this as the active academic session?')) return;
 
-    // Toggle year (Activate/Deactivate)
-    document.querySelectorAll('.toggle-year-btn').forEach(btn => {
-        btn.onclick = async () => {
-            const year = btn.dataset.year;
-            if (!confirm(`Change status for ${year}?`)) return;
+        const resp = await fetch('?action=save_selection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                year: currentYear,
+                session: currentSession,
+                exam: currentExam
+            })
+        }).then(r => r.json());
 
-            const resp = await fetch('?action=toggle_year', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ year })
-            }).then(r => r.json());
-
-            alert(resp.message || 'Status updated!');
-
-            // Keep the year selected after toggle
-            currentYear = year;
-            await refreshYearList(); // This now preserves selection!
-        };
-    });
-
-    // Delete year
-    document.querySelectorAll('.delete-year-btn').forEach(btn => {
-        btn.onclick = async () => {
-            if (!confirm('Delete this year permanently?')) return;
-            await fetch('?action=delete_year', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ year: btn.dataset.year })
-            });
+        if (resp.success) {
+            alert('Active session saved successfully!');
             location.reload();
-        };
-    });
-}
-
-// Add Session Modal
-const addSessionModal = new bootstrap.Modal('#addSessionModal');
-openAddSessionBtn.onclick = () => {
-    if (!currentYear) return alert('Select a year first');
-    document.getElementById('modalYearText').textContent = currentYear;
-    addSessionModal.show();
-};
-document.getElementById('addSessionForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const session = e.target.session.value.trim();
-    if (!session) return alert('Enter session name');
-
-    const resp = await fetch('?action=add_session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year: currentYear, session })
-    }).then(r => r.json());
-
-    alert(resp.message);
-    addSessionModal.hide();
-    await loadSessions(currentYear);
-};
-
-// Add Exam Modal
-const addExamModal = new bootstrap.Modal('#addExamModal');
-openAddExamBtn.onclick = () => {
-    if (!currentSession) return alert('Select a session first');
-    document.getElementById('modalExamYearText').textContent = currentYear;
-    document.getElementById('modalExamSessionText').textContent = currentSession;
-    addExamModal.show();
-};
-document.getElementById('addExamForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const exam = e.target.exam.value.trim();
-    if (!exam) return alert('Enter exam title');
-
-    const resp = await fetch('?action=add_exam', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year: currentYear, session: currentSession, exam })
-    }).then(r => r.json());
-
-    alert(resp.message);
-    addExamModal.hide();
-    await loadExamsFor(currentYear, currentSession);
-};
-
-// SAVE SELECTION
-saveBtn.onclick = async () => {
-    if (!currentYear || !currentSession || !currentExam) return;
-
-    if (!confirm('Save this as the active academic session?')) return;
-
-    const resp = await fetch('?action=save_selection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            year: currentYear,
-            session: currentSession,
-            exam: currentExam
-        })
-    }).then(r => r.json());
-
-    if (resp.success) {
-        alert('Active session saved successfully!');
-        location.reload();
-    } else {
-        alert('Save failed: ' + (resp.message || 'Unknown error'));
-    }
-};
-
-// INIT — Auto-load active session on page load
-openAddSessionBtn.disabled = true;
-openAddExamBtn.disabled = true;
-saveBtn.disabled = true;
-updateResultBox();
-attachEventListeners();
-
-// AUTO-SELECT CURRENT ACTIVE SESSION (if exists)
-if (ACTIVE_SESSION && ACTIVE_SESSION.year) {
-    currentYear = ACTIVE_SESSION.year;
-    currentSession = ACTIVE_SESSION.session;
-    currentExam = ACTIVE_SESSION.exam_title;
-
-    // Update UI
-    selectedYearEl.textContent = currentYear;
-    selectedSessionEl.textContent = currentSession || '—';
-    selectedExamEl.textContent = currentExam || '—';
-
-    // Enable buttons
-    openAddSessionBtn.disabled = false;
-    openAddExamBtn.disabled = false;
-    saveBtn.disabled = false; // All 3 are selected
-
-    // Load sessions → will auto-check the correct radio
-    loadSessions(currentYear).then(() => {
-        // After sessions load, check the correct session radio
-        const sessionRadio = document.querySelector(`input[name="sessionRadio"][value="${escapeQuotes(currentSession)}"]`);
-        if (sessionRadio) {
-            sessionRadio.checked = true;
-            // Now load exams and auto-check
-            loadExamsFor(currentYear, currentSession).then(() => {
-                const examRadio = document.querySelector(`input[name="examRadio"][value="${escapeQuotes(currentExam)}"]`);
-                if (examRadio) examRadio.checked = true;
-            });
+        } else {
+            alert('Save failed: ' + (resp.message || 'Unknown error'));
         }
-    });
-}
+    };
 
-// Helper: escape quotes for JS
-function escapeQuotes(str) {
-    if (!str) return '';
-    return str.replace(/"/g, '\\"').replace(/'/g, "\\'");
-}
-</script>
-<script>
-    const CURRENT_ACTIVE = <?php echo json_encode($active); ?>;
-    const ACTIVE_SESSION = <?php echo json_encode($activeSession); ?>;
-</script>
+    // INIT — Auto-load active session on page load
+    openAddSessionBtn.disabled = true;
+    openAddExamBtn.disabled = true;
+    saveBtn.disabled = true;
+    updateResultBox();
+    attachEventListeners();
+
+    // AUTO-SELECT CURRENT ACTIVE SESSION (if exists)
+    if (ACTIVE_SESSION && ACTIVE_SESSION.year) {
+        currentYear = ACTIVE_SESSION.year;
+        currentSession = ACTIVE_SESSION.session;
+        currentExam = ACTIVE_SESSION.exam_title;
+
+        // Update UI
+        selectedYearEl.textContent = currentYear;
+        selectedSessionEl.textContent = currentSession || '—';
+        selectedExamEl.textContent = currentExam || '—';
+
+        // Enable buttons
+        openAddSessionBtn.disabled = false;
+        openAddExamBtn.disabled = false;
+        saveBtn.disabled = false; // All 3 are selected
+
+        // Load sessions → will auto-check the correct radio
+        loadSessions(currentYear).then(() => {
+            // After sessions load, check the correct session radio
+            const sessionRadio = document.querySelector(`input[name="sessionRadio"][value="${escapeQuotes(currentSession)}"]`);
+            if (sessionRadio) {
+                sessionRadio.checked = true;
+                // Now load exams and auto-check
+                loadExamsFor(currentYear, currentSession).then(() => {
+                    const examRadio = document.querySelector(`input[name="examRadio"][value="${escapeQuotes(currentExam)}"]`);
+                    if (examRadio) examRadio.checked = true;
+                });
+            }
+        });
+    }
+
+    // Helper: escape quotes for JS
+    function escapeQuotes(str) {
+        if (!str) return '';
+        return str.replace(/"/g, '\\"').replace(/'/g, "\\'");
+    }
+    </script>
+    <script>
+        const CURRENT_ACTIVE = <?php echo json_encode($active); ?>;
+        const ACTIVE_SESSION = <?php echo json_encode($activeSession); ?>;
+    </script>
 </body>
 </html>  
