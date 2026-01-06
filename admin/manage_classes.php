@@ -230,7 +230,6 @@ while ($row = $result->fetch_assoc()) {
                                 <option value="<?= htmlspecialchars($cg) ?>"><?= htmlspecialchars($cg) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <button type="button" class="btn btn-outline-primary" id="addGroupBtn" disabled>+</button>
                     </div>
                 </div>
 

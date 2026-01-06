@@ -40,7 +40,7 @@ try {
 
 // Initialize messages
 $success = '';
-$errorMsg = '';
+$error = '';
 
 // Fetch class groups dynamically from academic_levels
 // Fixed class groups (ENUM-backed)
@@ -175,7 +175,7 @@ while ($row = $result->fetch_assoc()) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Admins | Super Admin</title>
+    <title>Manage Classes | Super Admin</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
@@ -208,13 +208,13 @@ while ($row = $result->fetch_assoc()) {
 <!-- Main Content -->
 <div class="content container mt-5">
 
-    <h2 class="mb-4 fw-bold">Manage Admins</h2>
+    <h2 class="mb-4 fw-bold">Manage Classes</h2>
 
     <?php if ($success): ?>
         <div class="alert alert-success"><?php echo $success; ?></div>
     <?php endif; ?>
 
-    <?php if ($errorMsg): ?>
+    <?php if ($error): ?>
         <div class="alert alert-danger"><?php echo $errorMsg; ?></div>
     <?php endif; ?>
 

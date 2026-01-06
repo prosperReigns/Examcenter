@@ -31,20 +31,34 @@ if ($conn->connect_error) {
 
 // Sanitize session inputs
 $user_id = (int)$_SESSION['student_id'];
-$class = $_SESSION['student_class'];
+$class_id = (int)$_SESSION['student_class'];
+
+$stmt = $conn->prepare("SELECT academic_level_id FROM classes WHERE id = ?");
+$stmt->bind_param("i", $class_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$class_row = $result->fetch_assoc();
+$stmt->close();
+
+if (!$class_row) {
+    die("Invalid class selected.");
+}
+
+$academic_level_id = (int)$class_row['academic_level_id'];
+
 $subject = $_SESSION['student_subject'];
 $test_title = $_SESSION['test_title'];
 
 // Debug session variables
-error_log("Session: user_id=$user_id, class=$class, subject=$subject, title=$test_title");
+error_log("Session: user_id=$user_id, academic_level=$academic_level_id, subject=$subject, title=$test_title");
 
 // Get test details including duration
-$stmt = $conn->prepare("SELECT id, duration FROM tests WHERE title = ? AND class = ? AND subject = ?");
+$stmt = $conn->prepare("SELECT id, duration FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ?");
 if ($stmt === false) {
     error_log("Prepare failed: SELECT id, duration FROM tests - " . $conn->error);
     die("Error preparing test query: " . $conn->error);
 }
-$stmt->bind_param("sss", $test_title, $class, $subject);
+$stmt->bind_param("sis", $test_title, $academic_level_id, $_SESSION['student_subject']);
 $stmt->execute();
 $test_result = $stmt->get_result();
 $test = $test_result->fetch_assoc();

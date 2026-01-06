@@ -153,9 +153,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error = "Invalid email format";
     } elseif (empty($selected_subjects)) {
         $error = "Please select at least one subject";
-    } elseif (empty($selected_classes)) {
-        $error = "Please assign the teacher to at least one class";
-    } else {
+    }else {
         try {
             // Check for duplicate email and username
             $id_check = $is_edit_mode ? $teacher_id : 0;
@@ -234,24 +232,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 // Insert subjects
                 foreach ($selected_subjects as $subject_level) {
+
+                    // subject_level comes like: 3_JSS
                     list($subject_id, $class_level) = explode('_', $subject_level);
                 
-                    // Validate subject-level exists
-                    $found = false;
+                    // get subject name from available subjects
+                    $subject_name = null;
                     foreach ($available_subjects as $sub) {
                         if ($sub['id'] == $subject_id && $sub['level'] == $class_level) {
-                            $found = true;
+                            $subject_name = $sub['name'] . " (" . $class_level . ")";
                             break;
                         }
                     }
-                    if (!$found) throw new Exception("Invalid subject or level: $subject_level");
                 
-                    $stmt = $conn->prepare("INSERT INTO teacher_subjects (teacher_id, subject_id, class_level) VALUES (?, ?, ?)");
-                    $stmt->bind_param("iis", $teacher_id, $subject_id, $class_level);
+                    if (!$subject_name) {
+                        throw new Exception("Invalid subject selected");
+                    }
+                
+                    $stmt = $conn->prepare("
+                        INSERT INTO teacher_subjects (teacher_id, subject)
+                        VALUES (?, ?)
+                    ");
+                    $stmt->bind_param("is", $teacher_id, $subject_name);
+                
                     if (!$stmt->execute()) {
                         throw new Exception("Insert subject failed: " . $stmt->error);
                     }
-                }
+                }                
                 
 
                 $conn->commit();
@@ -430,7 +437,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <input class="form-check-input subject-checkbox" type="checkbox" 
                                         name="subjects[]" value="<?= $subject['id'] ?>_<?= $subject['level'] ?>"
                                         id="subject-<?= $subject['id'] ?>-<?= strtolower($subject['level']) ?>"
-                                        <?= in_array($subject['id'].'_'.$subject['level'], $selected_subjects) ? 'checked' : '' ?>>
+                                        <?= in_array($subject['name'].'_'.$subject['level'], $selected_subjects) ? 'checked' : '' ?>>
                                     <label class="form-check-label" for="subject-<?= $subject['id'] ?>-<?= strtolower($subject['level']) ?>">
                                         <?= htmlspecialchars($subject['name'] . ' (' . $subject['level'] . ')') ?>
                                     </label>
@@ -502,8 +509,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         required: <?php echo $is_edit_mode ? 'false' : 'true'; ?>,
                         equalTo: '[name="password"]' 
                     },
-                    'subjects[]': { required: true },
-                    'classes[]': { required: true }
+                    'subjects[]': { required: true }
                 },
                 messages: {
                     first_name: "Please enter a first name (max 50 characters).",
@@ -512,8 +518,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     phone: "Phone number is too long (max 15 characters).",
                     password: "Password must be at least 8 characters long.",
                     confirm_password: "Passwords do not match.",
-                    'subjects[]': "Please select at least one subject.",
-                    'classes[]': "Please assign at least one class."
+                    'subjects[]': "Please select at least one subject."
                 },
                 errorElement: 'div',
                 errorClass: 'invalid-feedback',

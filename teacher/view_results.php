@@ -1,50 +1,50 @@
-    <?php
-    session_start();
-    require_once '../db.php';
-    require_once '../includes/system_guard.php';
-    require_once '../vendor/autoload.php'; // Adjust path if PHPWord is elsewhere
+<?php
+session_start();
+require_once '../db.php';
+require_once '../includes/system_guard.php';
+require_once '../vendor/autoload.php'; // Adjust path if PHPWord is elsewhere
 
-    use PhpOffice\PhpWord\PhpWord;
-    use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\IOFactory;
 
-    // Check if user is logged in
-    if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'teacher') {
-        error_log("Redirecting to login: No user_id or invalid role in session");
-        header("Location: /EXAMCENTER/login.php?error=Not logged in");
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'teacher') {
+    error_log("Redirecting to login: No user_id or invalid role in session");
+    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    exit();
+}
+
+// Initialize database connection
+try {
+    $database = Database::getInstance();
+    $conn = $database->getConnection();
+
+    if ($conn->connect_error) {
+        error_log("Database connection failed: " . $conn->connect_error);
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    // Fetch teacher profile and assigned subjects
+    $teacher_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username, last_name FROM teachers WHERE id = ?");
+    if (!$stmt) {
+        error_log("Prepare failed for teacher profile: " . $conn->error);
+        die("Database error");
+    }
+    $stmt->bind_param("i", $teacher_id);
+    $stmt->execute();
+    $teacher = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$teacher) {
+        error_log("No teacher found for user_id=$teacher_id");
+        session_destroy();
+        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
         exit();
     }
 
-    // Initialize database connection
-    try {
-        $database = Database::getInstance();
-        $conn = $database->getConnection();
-
-        if ($conn->connect_error) {
-            error_log("Database connection failed: " . $conn->connect_error);
-            die("Connection failed: " . $conn->connect_error);
-        }
-
-        // Fetch teacher profile and assigned subjects
-        $teacher_id = (int)$_SESSION['user_id'];
-        $stmt = $conn->prepare("SELECT username, last_name FROM teachers WHERE id = ?");
-        if (!$stmt) {
-            error_log("Prepare failed for teacher profile: " . $conn->error);
-            die("Database error");
-        }
-        $stmt->bind_param("i", $teacher_id);
-        $stmt->execute();
-        $teacher = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        if (!$teacher) {
-            error_log("No teacher found for user_id=$teacher_id");
-            session_destroy();
-            header("Location: /EXAMCENTER/login.php?error=Unauthorized");
-            exit();
-        }
-
-        // fetch classes dynamically
-        $stmt = $conn->prepare("
+    // fetch classes dynamically
+    $stmt = $conn->prepare("
     SELECT DISTINCT c.class_name, ts.subject
     FROM classes c
     JOIN academic_levels al ON al.id = c.academic_level_id
@@ -52,295 +52,290 @@
     JOIN subjects s ON s.id = sl.subject_id
     JOIN teacher_subjects ts ON ts.subject = s.subject_name
     WHERE ts.teacher_id = ?
-");
-
-
-
-        $stmt->bind_param("i", $teacher_id);
-        $stmt->execute();
-        $class_subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-        // Fetch assigned subjects
-        $stmt = $conn->prepare("
-        SELECT s.subject_name, sl.class_level
-        FROM teacher_subjects ts
-        JOIN subjects s ON ts.subject = s.subject_name
-        JOIN subject_levels sl ON s.id = sl.subject_id
-        WHERE ts.teacher_id = ?
     ");
 
-        if (!$stmt) {
-            error_log("Prepare failed for assigned subjects: " . $conn->error);
-            die("Database error");
-        }
-        $stmt->bind_param("i", $teacher_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $assigned_subjects = [];
-        while ($row = $result->fetch_assoc()) {
-            $assigned_subjects[] = $row['subject_name'];
-            // Build class-subject mapping for JS
-            $class_subjects[$row['class_level']][] = $row['subject_name'];
-        }
-        $stmt->close();
+    $stmt->bind_param("i", $teacher_id);
+    $stmt->execute();
+    $class_subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-        if (empty($assigned_subjects)) {
-            $error = "No subjects assigned to you. Contact your admin.";
-        }
-
-        // The hardcoded subject arrays have been removed.
-
-        // Pagination settings
-        $results_per_page = 10;
-        $current_page = isset($_GET['page']) && is_numeric($_GET['page']) ? intval($_GET['page']) : 1;
-        if ($current_page < 1) $current_page = 1;
-        $offset = ($current_page - 1) * $results_per_page;
-
-        // Initialize filter variables
-        $class_filter = trim($_GET['selected_class'] ?? '');
-        $subject_filter = trim($_GET['selected_subject'] ?? '');
-        $test_title_filter = trim($_GET['selected_title'] ?? '');
-        $year_filter = trim($_GET['selected_year'] ?? '');
-        $student_name_filter = trim($_GET['student_name'] ?? '');
-
-        // Initialize error/success messages
-        $error = $success = '';
-
-        // Handle export to Word
-        if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
-            try {
-                $export_query = "SELECT r.*, s.name AS student_name, c.class_name AS student_class, 
-                                t.subject, t.title AS test_title, t.year 
-                                FROM results r
-                                JOIN students s ON r.user_id = s.id
-                                JOIN classes c ON s.class_id = c.id
-                                JOIN academic_levels al ON c.academic_level_id = al.id
-                                JOIN tests t ON r.test_id = t.id
-                                WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
-                $export_params = $assigned_subjects;
-                $export_types = str_repeat('s', count($assigned_subjects));
-
-                if (!empty($test_title_filter)) {
-                    $export_query .= " AND t.title = ?";
-                    $export_params[] = $test_title_filter;
-                    $export_types .= 's';
-                }
-                if (!empty($class_filter)) {
-                    $export_query .= " AND s.class = ?";
-                    $export_params[] = $class_filter;
-                    $export_types .= 's';
-                }
-                if (!empty($subject_filter)) {
-                    $export_query .= " AND t.subject = ?";
-                    $export_params[] = $subject_filter;
-                    $export_types .= 's';
-                }
-                if (!empty($year_filter)) {
-                    $export_query .= " AND t.year = ?";
-                    $export_params[] = $year_filter;
-                    $export_types .= 's';
-                }
-                if (!empty($student_name_filter)) {
-                    $export_query .= " AND s.name LIKE ?";
-                    $export_params[] = "%$student_name_filter%";
-                    $export_types .= 's';
-                }
-
-                $stmt = $conn->prepare($export_query);
-                if (!$stmt) {
-                    throw new Exception("Prepare failed for export: " . $conn->error);
-                }
-                if (!empty($export_params)) {
-                    $stmt->bind_param($export_types, ...$export_params);
-                }
-                $stmt->execute();
-                $export_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-                $stmt->close();
-
-                // Create Word document
-                $phpWord = new PhpWord();
-                $section = $phpWord->addSection();
-                $section->addTitle('Exam Results Report', 1);
-                $section->addText('Generated on: ' . date('F j, Y g:i A'));
-                $section->addText('Teacher: ' . $teacher['last_name']);
-                if ($test_title_filter) $section->addText('Test: ' . $test_title_filter);
-                if ($class_filter) $section->addText('Class: ' . $class_filter);
-                if ($subject_filter) $section->addText('Subject: ' . $subject_filter);
-                if ($year_filter) $section->addText('Year: ' . $year_filter);
-                if ($student_name_filter) $section->addText('Student: ' . $student_name_filter);
-
-                $table = $section->addTable(['borderSize' => 1, 'borderColor' => '999999', 'cellMargin' => 80]);
-                $table->addRow();
-                $table->addCell(2000)->addText('Student', ['bold' => true]);
-                $table->addCell(1500)->addText('Class', ['bold' => true]);
-                $table->addCell(2000)->addText('Test Title', ['bold' => true]);
-                $table->addCell(1500)->addText('Subject', ['bold' => true]);
-                $table->addCell(1000)->addText('Score', ['bold' => true]);
-                $table->addCell(1000)->addText('Percentage', ['bold' => true]);
-                $table->addCell(1500)->addText('Date', ['bold' => true]);
-                $table->addCell(1000)->addText('Year', ['bold' => true]);
-
-                foreach ($export_results as $result) {
-                    $percentage = round(($result['score'] / $result['total_questions']) * 100, 2);
-                    $table->addRow();
-                    $table->addCell(2000)->addText(htmlspecialchars($result['student_name']));
-                    $table->addCell(1500)->addText(htmlspecialchars($result['student_class']));
-                    $table->addCell(2000)->addText(htmlspecialchars($result['test_title']));
-                    $table->addCell(1500)->addText(htmlspecialchars($result['subject']));
-                    $table->addCell(1000)->addText($result['score'] . '/' . $result['total_questions']);
-                    $table->addCell(1000)->addText($percentage . '%');
-                    $table->addCell(1500)->addText(date('M j, Y g:i A', strtotime($result['created_at'])));
-                    $table->addCell(1000)->addText(htmlspecialchars($result['year']));
-                }
-
-                // Save and download
-                $filename = 'Exam_Results_' . date('Ymd_His') . '.docx';
-                $temp_file = tempnam(sys_get_temp_dir(), 'phpword');
-                $writer = IOFactory::createWriter($phpWord, 'Word2007');
-                $writer->save($temp_file);
-
-                // Log activity
-                $ip_address = $_SERVER['REMOTE_ADDR'];
-                $user_agent = $_SERVER['HTTP_USER_AGENT'];
-                $activity = "Teacher {$teacher['username']} exported results for " . ($test_title_filter ?: 'all tests') . ($class_filter ? " in $class_filter" : '') . ($subject_filter ? " ($subject_filter)" : '') . ($year_filter ? " ($year_filter)" : '') . ($student_name_filter ? " for $student_name_filter" : '');
-                $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, teacher_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-                $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
-                $stmt_log->execute();
-                $stmt_log->close();
-
-                // Send file
-                header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-                header('Content-Disposition: attachment; filename="' . $filename . '"');
-                header('Content-Length: ' . filesize($temp_file));
-                readfile($temp_file);
-                unlink($temp_file);
-                exit;
-            } catch (Exception $e) {
-                error_log("Export error: " . $e->getMessage());
-                $error = "Error exporting results: " . $e->getMessage();
-            }
-        }
-
-        // Build queries for results
-        $count_query = "SELECT COUNT(*) as total 
-                        FROM results r
-                        JOIN students s ON r.user_id = s.id
-                        JOIN tests t ON r.test_id = t.id
-                        WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
-        $select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
-                                t.subject, t.title AS test_title, t.academic_level_id AS test_class, t.year 
-                        FROM results r
-                        JOIN students s ON r.user_id = s.id
-                        JOIN tests t ON r.test_id = t.id
-                        WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
-
-        $params = $assigned_subjects;
-        $types = str_repeat('s', count($assigned_subjects));
-
-        // Apply filters
-        if (!empty($test_title_filter)) {
-            $count_query .= " AND t.title = ?";
-            $select_query .= " AND t.title = ?";
-            $params[] = $test_title_filter;
-            $types .= 's';
-        }
-        if (!empty($class_filter)) {
-            $count_query .= " AND s.class = ?";
-            $select_query .= " AND s.class = ?";
-            $params[] = $class_filter;
-            $types .= 's';
-        }
-        if (!empty($subject_filter)) {
-            $count_query .= " AND t.subject = ?";
-            $select_query .= " AND t.subject = ?";
-            $params[] = $subject_filter;
-            $types .= 's';
-        }
-        if (!empty($year_filter)) {
-            $count_query .= " AND t.year = ?";
-            $select_query .= " AND t.year = ?";
-            $params[] = $year_filter;
-            $types .= 's';
-        }
-        if (!empty($student_name_filter)) {
-            $count_query .= " AND s.name LIKE ?";
-            $select_query .= " AND s.name LIKE ?";
-            $params[] = "%$student_name_filter%";
-            $types .= 's';
-        }
-
-        // Get total results
-        $stmt = $conn->prepare($count_query);
-        if (!$stmt) {
-            error_log("Prepare failed for count query: " . $conn->error);
-            die("Database error");
-        }
-        if (!empty($params)) {
-            $stmt->bind_param($types, ...$params);
-        }
-        $stmt->execute();
-        $total_results = $stmt->get_result()->fetch_assoc()['total'];
-        $stmt->close();
-
-        $total_pages = ceil($total_results / $results_per_page);
-        if ($current_page > $total_pages && $total_pages > 0) {
-            $current_page = $total_pages;
-            $offset = ($current_page - 1) * $results_per_page;
-        }
-
-        // Fetch results for current page
-        $select_query .= " ORDER BY r.created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $results_per_page;
-        $params[] = $offset;
-        $types .= 'ii';
-
-        $stmt = $conn->prepare($select_query);
-        if (!$stmt) {
-            error_log("Prepare failed for select query: " . $conn->error);
-            die("Database error");
-        }
-        if (!empty($params)) {
-            $stmt->bind_param($types, ...$params);
-        }
-        $stmt->execute();
-        $results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-
-        // Get unique classes, years, and test titles for filters (restricted to assigned subjects)
-        $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-        $stmt = $conn->prepare("
-            SELECT DISTINCT s.class AS class 
-            FROM students s 
-            JOIN results r ON s.id = r.user_id 
-            JOIN tests t ON r.test_id = t.id 
-            WHERE t.subject IN ($placeholders) 
-            ORDER BY s.class
-        ");
-        $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
-        $stmt->execute();
-        $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-
-        $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id JOIN classes c ON t.academic_level_id = c.academic_level_id WHERE t.subject IN ($placeholders) ORDER BY t.year DESC");
-        $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
-        $stmt->execute();
-        $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-
-        $stmt = $conn->prepare("SELECT DISTINCT t.title FROM tests t JOIN results r ON t.id = r.test_id WHERE t.subject IN ($placeholders) ORDER BY t.title");
-        $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
-        $stmt->execute();
-        $test_titles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-
-    } catch (Exception $e) {
-        error_log("View results error: " . $e->getMessage());
-        // echo "<pre>System error: " . $e->getMessage() . "</pre>"; // dev only
-        // die();
-        die("System error");
+    // Fetch assigned subjects
+    $stmt = $conn->prepare("
+        SELECT subject 
+        FROM teacher_subjects
+        WHERE teacher_id = ?
+    ");
+    if (!$stmt) {
+        error_log("Prepare failed for assigned subjects: " . $conn->error);
+        die("Database error");
     }
-    $conn->close();
-    ?>
+    $stmt->bind_param("i", $teacher_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $assigned_subjects = [];
+    while ($row = $result->fetch_assoc()) {
+        $assigned_subjects[] = $row['subject'];
+    }
+    $stmt->close();
+
+
+    if (empty($assigned_subjects)) {
+        $assigned_subjects = ['__no_subject__'];
+        $error = "No subjects assigned to you. Contact your admin.";
+    }
+
+    // The hardcoded subject arrays have been removed.
+
+    // Pagination settings
+    $results_per_page = 10;
+    $current_page = isset($_GET['page']) && is_numeric($_GET['page']) ? intval($_GET['page']) : 1;
+    if ($current_page < 1) $current_page = 1;
+    $offset = ($current_page - 1) * $results_per_page;
+
+    // Initialize filter variables
+    $class_filter = trim($_GET['selected_class'] ?? '');
+    $subject_filter = trim($_GET['selected_subject'] ?? '');
+    $test_title_filter = trim($_GET['selected_title'] ?? '');
+    $year_filter = trim($_GET['selected_year'] ?? '');
+    $student_name_filter = trim($_GET['student_name'] ?? '');
+
+    // Initialize error/success messages
+    $error = $success = '';
+
+    // Handle export to Word
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
+        try {
+            $export_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
+                            t.subject, t.title AS test_title, c.class_name AS test_class, t.year 
+                            FROM results r
+                            JOIN students s ON r.user_id = s.id
+                            JOIN tests t ON r.test_id = t.id
+                            JOIN classes c ON t.academic_level_id = c.academic_level_id
+                            WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
+            $export_params = $assigned_subjects;
+            $export_types = str_repeat('s', count($assigned_subjects));
+
+            if (!empty($test_title_filter)) {
+                $export_query .= " AND t.title = ?";
+                $export_params[] = $test_title_filter;
+                $export_types .= 's';
+            }
+            if (!empty($class_filter)) {
+                $export_query .= " AND s.class = ?";
+                $export_params[] = $class_filter;
+                $export_types .= 's';
+            }
+            if (!empty($subject_filter)) {
+                $export_query .= " AND t.subject = ?";
+                $export_params[] = $subject_filter;
+                $export_types .= 's';
+            }
+            if (!empty($year_filter)) {
+                $export_query .= " AND t.year = ?";
+                $export_params[] = $year_filter;
+                $export_types .= 's';
+            }
+            if (!empty($student_name_filter)) {
+                $export_query .= " AND s.name LIKE ?";
+                $export_params[] = "%$student_name_filter%";
+                $export_types .= 's';
+            }
+
+            $stmt = $conn->prepare($export_query);
+            if (!$stmt) {
+                throw new Exception("Prepare failed for export: " . $conn->error);
+            }
+            if (!empty($export_params)) {
+                $stmt->bind_param($export_types, ...$export_params);
+            }
+            $stmt->execute();
+            $export_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+
+            // Create Word document
+            $phpWord = new PhpWord();
+            $section = $phpWord->addSection();
+            $section->addTitle('Exam Results Report', 1);
+            $section->addText('Generated on: ' . date('F j, Y g:i A'));
+            $section->addText('Teacher: ' . $teacher['last_name']);
+            if ($test_title_filter) $section->addText('Test: ' . $test_title_filter);
+            if ($class_filter) $section->addText('Class: ' . $class_filter);
+            if ($subject_filter) $section->addText('Subject: ' . $subject_filter);
+            if ($year_filter) $section->addText('Year: ' . $year_filter);
+            if ($student_name_filter) $section->addText('Student: ' . $student_name_filter);
+
+            $table = $section->addTable(['borderSize' => 1, 'borderColor' => '999999', 'cellMargin' => 80]);
+            $table->addRow();
+            $table->addCell(2000)->addText('Student', ['bold' => true]);
+            $table->addCell(1500)->addText('Class', ['bold' => true]);
+            $table->addCell(2000)->addText('Test Title', ['bold' => true]);
+            $table->addCell(1500)->addText('Subject', ['bold' => true]);
+            $table->addCell(1000)->addText('Score', ['bold' => true]);
+            $table->addCell(1000)->addText('Percentage', ['bold' => true]);
+            $table->addCell(1500)->addText('Date', ['bold' => true]);
+            $table->addCell(1000)->addText('Year', ['bold' => true]);
+
+            foreach ($export_results as $result) {
+                $percentage = round(($result['score'] / $result['total_questions']) * 100, 2);
+                $table->addRow();
+                $table->addCell(2000)->addText(htmlspecialchars($result['student_name']));
+                $table->addCell(1500)->addText(htmlspecialchars($result['test_class']));
+                $table->addCell(2000)->addText(htmlspecialchars($result['test_title']));
+                $table->addCell(1500)->addText(htmlspecialchars($result['subject']));
+                $table->addCell(1000)->addText($result['score'] . '/' . $result['total_questions']);
+                $table->addCell(1000)->addText($percentage . '%');
+                $table->addCell(1500)->addText(date('M j, Y g:i A', strtotime($result['created_at'])));
+                $table->addCell(1000)->addText(htmlspecialchars($result['year']));
+            }
+
+            // Save and download
+            $filename = 'Exam_Results_' . date('Ymd_His') . '.docx';
+            $temp_file = tempnam(sys_get_temp_dir(), 'phpword');
+            $writer = IOFactory::createWriter($phpWord, 'Word2007');
+            $writer->save($temp_file);
+
+            // Log activity
+            $ip_address = $_SERVER['REMOTE_ADDR'];
+            $user_agent = $_SERVER['HTTP_USER_AGENT'];
+            $activity = "Teacher {$teacher['username']} exported results for " . ($test_title_filter ?: 'all tests') . ($class_filter ? " in $class_filter" : '') . ($subject_filter ? " ($subject_filter)" : '') . ($year_filter ? " ($year_filter)" : '') . ($student_name_filter ? " for $student_name_filter" : '');
+            $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, teacher_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
+            $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
+            $stmt_log->execute();
+            $stmt_log->close();
+
+            // Send file
+            header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . filesize($temp_file));
+            readfile($temp_file);
+            unlink($temp_file);
+            exit;
+        } catch (Exception $e) {
+            error_log("Export error: " . $e->getMessage());
+            $error = "Error exporting results: " . $e->getMessage();
+        }
+    }
+
+    // Build queries for results
+    $count_query = "SELECT COUNT(*) as total 
+                    FROM results r
+                    JOIN students s ON r.user_id = s.id
+                    JOIN tests t ON r.test_id = t.id
+                    WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
+    $select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
+                            t.subject, t.title AS test_title, c.class_name AS test_class, t.year 
+                    FROM results r
+                    JOIN students s ON r.user_id = s.id
+                    JOIN tests t ON r.test_id = t.id
+                    JOIN classes c ON t.academic_level_id = c.academic_level_id
+                    WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
+
+    $params = $assigned_subjects;
+    $types = str_repeat('s', count($assigned_subjects));
+
+    // Apply filters
+    if (!empty($test_title_filter)) {
+        $count_query .= " AND t.title = ?";
+        $select_query .= " AND t.title = ?";
+        $params[] = $test_title_filter;
+        $types .= 's';
+    }
+    if (!empty($class_filter)) {
+        $count_query .= " AND s.class = ?";
+        $select_query .= " AND s.class = ?";
+        $params[] = $class_filter;
+        $types .= 's';
+    }
+    if (!empty($subject_filter)) {
+        $count_query .= " AND t.subject = ?";
+        $select_query .= " AND t.subject = ?";
+        $params[] = $subject_filter;
+        $types .= 's';
+    }
+    if (!empty($year_filter)) {
+        $count_query .= " AND t.year = ?";
+        $select_query .= " AND t.year = ?";
+        $params[] = $year_filter;
+        $types .= 's';
+    }
+    if (!empty($student_name_filter)) {
+        $count_query .= " AND s.name LIKE ?";
+        $select_query .= " AND s.name LIKE ?";
+        $params[] = "%$student_name_filter%";
+        $types .= 's';
+    }
+
+    // Get total results
+    $stmt = $conn->prepare($count_query);
+    if (!$stmt) {
+        error_log("Prepare failed for count query: " . $conn->error);
+        die("Database error");
+    }
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
+    $stmt->execute();
+    $total_results = $stmt->get_result()->fetch_assoc()['total'];
+    $stmt->close();
+
+    $total_pages = ceil($total_results / $results_per_page);
+    if ($current_page > $total_pages && $total_pages > 0) {
+        $current_page = $total_pages;
+        $offset = ($current_page - 1) * $results_per_page;
+    }
+
+    // Fetch results for current page
+    $select_query .= " ORDER BY r.created_at DESC LIMIT ? OFFSET ?";
+    $params[] = $results_per_page;
+    $params[] = $offset;
+    $types .= 'ii';
+
+    $stmt = $conn->prepare($select_query);
+    if (!$stmt) {
+        error_log("Prepare failed for select query: " . $conn->error);
+        die("Database error");
+    }
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
+    $stmt->execute();
+    $results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    // Get unique classes, years, and test titles for filters (restricted to assigned subjects)
+    $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
+    $stmt = $conn->prepare("
+        SELECT DISTINCT c.class_name 
+        FROM classes c 
+        JOIN tests t ON c.academic_level_id = t.academic_level_id
+        JOIN results r ON t.id = r.test_id
+        WHERE t.subject IN ($placeholders) 
+        ORDER BY c.class_name
+    ");
+    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
+    $stmt->execute();
+    $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id JOIN classes c ON t.academic_level_id = c.academic_level_id WHERE t.subject IN ($placeholders) ORDER BY t.year DESC");
+    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
+    $stmt->execute();
+    $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT DISTINCT t.title FROM tests t JOIN results r ON t.id = r.test_id WHERE t.subject IN ($placeholders) ORDER BY t.title");
+    $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
+    $stmt->execute();
+    $test_titles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+} catch (Exception $e) {
+    error_log("View results error: " . $e->getMessage());
+    echo "<pre>System error: " . $e->getMessage() . "</pre>"; // dev only
+    // die();
+    die("System error");
+}
+$conn->close();
+?>
 
     <!DOCTYPE html>
     <html lang="en">
@@ -430,8 +425,9 @@
                                 <select class="form-select" name="selected_class" id="selectedClass">
                                     <option value="">All Classes</option>
                                     <?php foreach ($classes as $class): ?>
-                                        <option value="<?php echo htmlspecialchars($class['class_level']); ?>" <?php echo $class_filter == $class['class_level'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($class['class_level']); ?>
+                                        <option value="<?php echo htmlspecialchars($class['class_name']); ?>" 
+                                            <?php echo $class_filter == $class['class_name'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($class['class_name']); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -534,7 +530,7 @@
                                 ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($result['student_name']); ?></td>
-                                        <td><span class="badge bg-primary text-white"><?php echo htmlspecialchars($result['student_class']); ?></span></td>
+                                        <td><span class="badge bg-primary text-white"><?php echo htmlspecialchars($result['test_class']); ?></span></td>
                                         <td><?php echo htmlspecialchars($result['test_title']); ?></td>
                                         <td><span class="badge bg-secondary text-white"><?php echo htmlspecialchars($result['subject']); ?></span></td>
                                         <td><?php echo $result['score']; ?> / <?php echo $result['total_questions']; ?></td>

@@ -1,10 +1,6 @@
 <?php
 session_start();
 require_once '../db.php';
-require_once '../includes/system_guard.php';
-
-// 
-header('Content-Type: text/html; charset=UTF-8');
 
 // Enable error reporting for debugging
 ini_set('display_errors', 1);
@@ -49,15 +45,7 @@ try {
     }
 
     // Fetch assigned subjects
-    $stmt = $conn->prepare("
-        SELECT s.id, s.subject_name, sl.class_level
-        FROM teacher_subjects ts
-        JOIN subjects s ON ts.subject = s.subject_name
-        JOIN subject_levels sl ON s.id = sl.subject_id
-        WHERE ts.teacher_id = ?
-    ");
-
-
+    $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
     if (!$stmt) {
         error_log("Prepare failed for assigned subjects: " . $conn->error);
         die("Database error");
@@ -67,11 +55,7 @@ try {
     $result = $stmt->get_result();
     $assigned_subjects = [];
     while ($row = $result->fetch_assoc()) {
-        $assigned_subjects[] = [
-            'id' => (int)$row['id'],
-            'name' => $row['subject_name'],
-            'class_level' => $row['class_level']
-        ];
+        $assigned_subjects[] = $row['subject'];
     }
     $stmt->close();
 
@@ -79,22 +63,34 @@ try {
         $error = "No subjects assigned to you. Contact your admin.";
     }
 
-    $class_subjects = [];
-    $stmt = $conn->prepare("
-        SELECT s.id, s.subject_name, sl.class_level
-        FROM subject_levels sl
-        JOIN subjects s ON sl.subject_id = s.id
+    // Fetch academic level
+    $levels = [];
+    $result = $conn->query("SELECT id, level_code FROM academic_levels ORDER BY level_code ASC");
+    while ($row = $result->fetch_assoc()) {
+        $levels[] = $row;
+    }
+
+    // Fetch test titles
+    $test_titles = [];
+    $result = $conn->query("
+        SELECT CONCAT_WS(' ', session, exam_title) AS title
+        FROM academic_years
+        WHERE status = 'active'
+        AND session IS NOT NULL
+        AND exam_title IS NOT NULL
     ");
-    $stmt->execute();
-    $res = $stmt->get_result();
-    while ($row = $res->fetch_assoc()) {
-        $class_subjects[$row['class_level']][] = [
-            'id' => $row['id'],
-            'name' => $row['subject_name']
-        ];
+    while ($row = $result->fetch_assoc()) {
+        if (!empty($row['title'])) {
+            $test_titles[] = $row['title'];
+        }
     }
     
-    $stmt->close();
+    // Fetch academic years
+    $academic_years = [];
+    $result = $conn->query("SELECT DISTINCT year FROM academic_years ORDER BY year DESC");
+    while ($row = $result->fetch_assoc()) {
+        $academic_years[] = $row['year'];
+    }
 
     // Initialize variables
     $error = $success = '';
@@ -106,43 +102,25 @@ try {
     // Fetch tests for assigned subjects
     if (!empty($assigned_subjects)) {
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-        $subjectIds = array_column($assigned_subjects, 'id');
-        $placeholders = implode(',', array_fill(0, count($subjectIds), '?'));
-        $stmt = $conn->prepare("
-        SELECT t.id, t.title, c.class_name, s.subject_name
-            FROM tests t
-            JOIN classes c ON t.academic_level_id = c.academic_level_id
-            JOIN subjects s ON t.subject = s.subject_name
-            JOIN subject_levels sl ON s.id = sl.subject_id
-            WHERE s.id IN ($placeholders)
-            ORDER BY t.created_at DESC
-        "); 
-
-        $stmt->bind_param(str_repeat('i', count($subjectIds)), ...$subjectIds);
-
-
+        $stmt = $conn->prepare("SELECT 
+    t.id,
+    t.title,
+    t.subject,
+    al.level_code
+FROM tests t
+JOIN academic_levels al ON al.id = t.academic_level_id
+WHERE t.subject IN ($placeholders)
+ORDER BY t.created_at DESC
+");
         if (!$stmt) {
             error_log("Prepare failed for tests: " . $conn->error);
             $error = "Error fetching tests.";
         } else {
-            $stmt->bind_param(str_repeat('i', count($assigned_subjects)), ...$assigned_subjects);
+            $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
             $stmt->execute();
             $tests = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $stmt->close();
         }
-    }
-
-    // Fetch all classes with their level and name
-    $classQuery = $conn->query("
-    SELECT c.id, c.class_name, al.level_code
-    FROM classes c
-    JOIN academic_levels al ON c.academic_level_id = al.id
-    ORDER BY al.level_code, c.class_name
-    ");
-    $class_mapping = [];
-    while ($row = $classQuery->fetch_assoc()) {
-    $level = $row['level_code'];
-    $class_mapping[$level][] = $row['class_name'];
     }
 
     // Load current test
@@ -150,13 +128,18 @@ try {
         $test_id = (int)$_SESSION['current_test_id'];
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
         $stmt = $conn->prepare("
-            SELECT t.id, t.title, c.class_name, t.subject, t.duration
+            SELECT 
+                t.id,
+                t.title,
+                t.subject,
+                t.year,
+                t.duration,
+                al.level_code,
+                al.class_group
             FROM tests t
-            JOIN academic_levels al ON t.academic_level_id = al.id
-            JOIN classes c ON c.academic_level_id = al.id
+            JOIN academic_levels al ON al.id = t.academic_level_id
             WHERE t.id = ? AND t.subject IN ($placeholders)
         ");
-
 
         if (!$stmt) {
             error_log("Prepare failed for current test: " . $conn->error);
@@ -216,7 +199,7 @@ try {
 
 } catch (Exception $e) {
     error_log("Add question error: " . $e->getMessage());
-    // echo "<pre>System error: " . $e->getMessage() . "</pre>"; 
+    echo "<pre>System error: " . $e->getMessage() . "</pre>"; 
     die("An unexpected error occurred. Please try again later.");
 }
 ?>
@@ -296,45 +279,45 @@ try {
                                     <label class="form-label fw-bold" for="year">Academic Year:</label>
                                     <select class="form-select" name="year" id="year" required>
                                         <option value="">Select Academic Year</option>
-                                        <?php
-                                             $yearQuery = $conn->query("SELECT DISTINCT year FROM academic_years ORDER BY year ASC");
-                                            while ($row = $yearQuery->fetch_assoc()) {
-                                                echo '<option value="' . htmlspecialchars($row['year']) . '">' . htmlspecialchars($row['year']) . '</option>';
-                                            }
-                                        ?>
+                                        <?php foreach ($academic_years as $year): ?>
+                                            <option value="<?= htmlspecialchars($year) ?>">
+                                                <?= htmlspecialchars($year) ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-3 form-group-spacing">
                                     <label class="form-label fw-bold">Test Title</label>
                                     <select class="form-select" name="test_title" required>
                                         <option value="">Select Test Title</option>
-                                        <?php
-                                        // Fetch sessions + exam titles from academic_years table
-                                        $ayQuery = $conn->query("SELECT DISTINCT session, exam_title FROM academic_years ORDER BY session ASC");
-                                        while ($row = $ayQuery->fetch_assoc()) {
-                                            // Combine session + exam_title without dash or year
-                                            $combinedTitle = htmlspecialchars($row['session'] . ' ' . $row['exam_title']);
-                                            echo '<option value="' . $combinedTitle . '">' . $combinedTitle . '</option>';
-                                        }
-                                        ?>
+                                        <?php foreach ($test_titles as $title): ?>
+                                            <option value="<?= htmlspecialchars($title) ?>">
+                                                <?= htmlspecialchars($title) ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
-                                    <label class="form-label fw-bold">Academic level</label>
-                                    <select class="form-select" name="class" required id="classSelect">
-                                    <?php
-                                        foreach ($class_mapping as $levelName => $classes) {
-                                            foreach ($classes as $className) {
-                                                echo '<option value="' . htmlspecialchars($className) . '">' . htmlspecialchars($className) . '</option>';
-                                            }
-                                        }                                        
-                                        ?>
+                                    <label class="form-label fw-bold">Class</label>
+                                    <select class="form-select" name="academic_level_id" required id="classSelect">
+                                        <option value="">Select Class</option>
+                                        <?php foreach ($levels as $level): ?>
+    <option value="<?= (int)$level['id'] ?>">
+        <?= htmlspecialchars($level['level_code']) ?>
+    </option>
+<?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
                                     <label class="form-label fw-bold">Subject</label>
-                                    <select class="form-select" name="subject_id" required id="subjectSelect" disabled>
-                                        <option value="">Select Class First</option>
+                                    <select class="form-select" name="subject" required id="subjectSelect">
+                                        <option value="">Select Subject</option>
+                                        <?php foreach ($assigned_subjects as $subject): ?>
+                                            <option value="<?php echo htmlspecialchars($subject); ?>">
+                                                <?php echo htmlspecialchars($subject); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
@@ -351,12 +334,12 @@ try {
                                 <label class="form-label fw-bold" for="year">Academic Year:</label>
                                 <select class="form-select" name="year" id="year" required>
                                     <option value="">Select Academic Year</option>
-                                    <?php
-                                        $yearQuery = $conn->query("SELECT year FROM academic_years ORDER BY year ASC");
-                                        while ($row = $yearQuery->fetch_assoc()) {
-                                            echo '<option value="' . htmlspecialchars($row['year']) . '">' . htmlspecialchars($row['year']) . '</option>';
-                                        }
-                                    ?>
+                                    <?php foreach ($academic_years as $year): ?>
+                                        <option value="<?= htmlspecialchars($year) ?>">
+                                            <?= htmlspecialchars($year) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>   
                                 </select>
                                 <br><br>
                                 <label class="form-label fw-bold">Select Test File (.docx):</label>
@@ -376,7 +359,7 @@ try {
                                         <option value="">Select a Test</option>
                                         <?php foreach ($tests as $test): ?>
                                             <option value="<?php echo (int)$test['id']; ?>">
-                                                <?php echo htmlspecialchars($test['title'] . ' (' . $test['class'] . ' - ' . $test['subject'] . ')'); ?>
+                                                <?php echo htmlspecialchars($test['title'] . ' (' . $test['level_code'] . ' - ' . $test['subject'] . ')'); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -399,7 +382,7 @@ try {
                             </div>
                             <div class="form-group-spacing">
                                 <label class="form-label fw-bold">Question Text</label>
-                                <textarea class="form-control" name="question" rows="4" placeholder="Enter your question here..." required><?php echo nl2br(htmlspecialchars($edit_question['question_text'] ?? '')); ?></textarea>
+                                <textarea class="form-control" name="question" rows="4" placeholder="Enter your question here..." required><?php echo htmlspecialchars($edit_question['question_text'] ?? ''); ?></textarea>
                             </div>
                             <div id="optionsContainer" class="form-group-spacing"></div>
                             <div class="d-flex justify-content-end gap-3 mt-4">
@@ -418,7 +401,7 @@ try {
                     <?php if ($current_test): ?>
                         <div class="alert alert-primary">
                             <strong><?php echo htmlspecialchars($current_test['title']); ?></strong><br>
-                            <span class="text-muted"><?php echo htmlspecialchars($current_test['class'] . ' - ' . $current_test['subject']); ?></span><br>
+                            <span class="text-muted"><?php echo htmlspecialchars($current_test['level_code'] . ' - ' . $current_test['subject']); ?></span><br>
                             <small>Duration: <?php echo (int)$current_test['duration']; ?> minutes</small>
                         </div>
                         <div class="d-flex justify-content-between mb-3">
@@ -448,13 +431,13 @@ try {
                 </div>
                 <div class="modal-body modal-preview">
                     <?php if ($current_test && !empty($questions)): ?>
-                        <h6><?php echo htmlspecialchars($current_test['title']); ?> (<?php echo htmlspecialchars($current_test['class'] . ' - ' . $current_test['subject']); ?>)</h6>
+                        <h6><?php echo htmlspecialchars($current_test['title']); ?> (<?php echo htmlspecialchars($current_test['level_code'] . ' - ' . $current_test['subject']); ?>)</h6>
                         <p><small>Duration: <?php echo (int)$current_test['duration']; ?> minutes</small></p>
                         <hr>
                         <?php foreach ($questions as $index => $question): ?>
                             <div class="mb-4">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <strong>Question <?php echo $index + 1; ?>: <?php echo nl2br(htmlspecialchars($question['question_text'])); ?></strong>
+                                    <strong>Question <?php echo $index + 1; ?>: <?php echo htmlspecialchars($question['question_text']); ?></strong>
                                     <div class="action-buttons">
                                         <form method="POST" style="display: inline;" action="handle_question.php">
                                             <input type="hidden" name="question_id" value="<?php echo (int)$question['id']; ?>">
@@ -543,27 +526,6 @@ try {
     <script src="../js/bootstrap.bundle.min.js"></script>
     <script src="../js/jquery.validate.min.js"></script>
     <!-- <script src="../js/questionType.js"></script> -->
-    <script>
-document.getElementById("classSelect").addEventListener("change", function () {
-    let classLevel = this.value;
-
-    const subjectSelect = document.getElementById("subjectSelect");
-    subjectSelect.innerHTML = `<option>Loading subjects...</option>`;
-
-    fetch("get_subjects.php?class_level=" + classLevel)
-        .then(res => res.json())
-        .then(data => {
-            subjectSelect.innerHTML = `<option value="">Select Subject</option>`;
-            data.forEach(sub => {
-                subjectSelect.innerHTML += `<option value="${sub.id}" data-class="${sub.class_level}">${sub.subject_name}</option>`;
-            });
-            subjectSelect.disabled = false;
-        })
-        .catch(() => {
-            subjectSelect.innerHTML = `<option>Error loading subjects</option>`;
-        });
-    });
-    </script>
     <script>
         const editData = <?php echo json_encode($edit_data); ?>;
         const questionTemplates = {
@@ -724,32 +686,11 @@ document.getElementById("classSelect").addEventListener("change", function () {
                 }
             });
 
-            // Class-subject mapping
-            const classSubjectMapping = <?php echo json_encode($class_mapping); ?>;
-            const assignedSubjects = <?php echo json_encode($assigned_subjects); ?>;
-
-            // Update subjects when class changes
-            $('#classSelect').on('change', function() {
-                const selectedClass = this.value;
-                const subjectSelect = document.getElementById('subjectSelect');
-                if (subjectSelect) {
-                    subjectSelect.innerHTML = '<option value="">Select Subject</option>';
-                    if (selectedClass && classSubjectMapping[selectedClass]) {
-                        classSubjectMapping[selectedClass].filter(subject => assignedSubjects.includes(subject)).forEach(subject => {
-                            const option = document.createElement('option');
-                            option.value = subject;
-                            option.textContent = subject;
-                            subjectSelect.appendChild(option);
-                        });
-                    }
-                }
-            });
-
             // Form validation for Test Creation Form
             $('#testForm').validate({
                 rules: {
                     test_title: { required: true },
-                    class: { required: true },
+                    academic_level_id: { required: true },
                     subject: { required: true },
                     duration: { required: true, number: true, min: 1 }
                 },
