@@ -95,6 +95,20 @@ if (empty($error)) {
     }
 }
 
+// Fetch students grouped by class
+$students_by_class = [];
+if (empty($error)) {
+    $stmt = $conn->prepare("SELECT id, full_name, class FROM students WHERE class IS NOT NULL ORDER BY full_name ASC");
+    if ($stmt) {
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $students_by_class[$row['class']][] = $row['full_name'];
+        }
+        $stmt->close();
+    }
+}
+
 // Initialize form values
 $name = $class = $subject = $test_title = $exam_year = '';
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -156,7 +170,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             $error = "No test available for this combination";
                         } else {
                             // Insert into students table
-                            $stmt = $conn->prepare("INSERT INTO students (name, class) VALUES (?, ?)");
+                            $stmt = $conn->prepare("INSERT INTO students (full_name, class) VALUES (?, ?)");
                             if ($stmt) {
                                 $stmt->bind_param("ss", $name, $class);
                                 if ($stmt->execute()) {
@@ -228,11 +242,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <option value="">Select Exam</option>
                                 </select>
                             </div>
-                            
-                            <div class="mb-3">
-                                <label for="name" class="form-label">Full Name</label>
-                                <input type="text" class="form-control" id="name" name="name" pattern="[A-Za-z\s]+" value="<?php echo htmlspecialchars($name); ?>" required>
-                            </div>
                             <div class="mb-3">
                                 <label for="class" class="form-label">Class</label>
                                 <select class="form-select" id="class" name="class" required onchange="updateSubjects()">
@@ -243,6 +252,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Full Name</label>
+                                <input list="student_names" class="form-control" id="name" name="name" pattern="[A-Za-z\s]+" value="<?php echo htmlspecialchars($name); ?>" required>
+                                <datalist id="student_names"></datalist>
                             </div>
                             <div class="mb-3">
                                 <label for="subject" class="form-label">Subject</label>
@@ -297,6 +311,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
+const studentsByClass = <?php echo json_encode($students_by_class); ?>;
+
+function updateStudentNames() {
+    const classSelect = document.getElementById('class');
+    const nameInput = document.getElementById('name');
+    const datalist = document.getElementById('student_names');
+
+    const selectedClassId = classSelect.value;
+    datalist.innerHTML = '';
+
+    if (!selectedClassId || !studentsByClass[selectedClassId]) return;
+
+    studentsByClass[selectedClassId].forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        datalist.appendChild(option);
+    });
+}
+
+document.getElementById('class').addEventListener('change', updateStudentNames);
+
+// Populate on page load if a class is pre-selected
+document.addEventListener('DOMContentLoaded', updateStudentNames);
 
     document.addEventListener('DOMContentLoaded', function() {
         updateSubjects();

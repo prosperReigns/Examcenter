@@ -243,7 +243,7 @@ if ($action === "save_selection") {
         $conn->begin_transaction(); // Start transaction for atomicity
 
         // Step 1: Deactivate ALL rows (set status = 'inactive')
-        $conn->query("UPDATE academic_years SET status = 'inactive'");
+        $conn->query("UPDATE academic_years SET status = 'inactive' WHERE status = 'active' ");
 
         // Step 2: Check if exact combo (year + session + exam_title) already exists
         $stmt = $conn->prepare("SELECT id FROM academic_years WHERE year = ? AND session = ? AND exam_title = ?");
@@ -560,6 +560,9 @@ $stmt->close();
 });
     </script>
     <script>
+        const ACTIVE_SESSION = <?php echo json_encode($activeSession); ?>;
+    </script>
+    <script>
     const selectedYearEl = document.getElementById('selectedYear');
     const selectedSessionEl = document.getElementById('selectedSession');
     const selectedExamEl = document.getElementById('selectedExam');
@@ -854,9 +857,6 @@ $stmt->close();
         return str.replace(/"/g, '\\"').replace(/'/g, "\\'");
     }
     </script>
-    <script>
-        const CURRENT_ACTIVE = <?php echo json_encode($active); ?>;
-        const ACTIVE_SESSION = <?php echo json_encode($activeSession); ?>;
-    </script>
+    
 </body>
 </html>  
