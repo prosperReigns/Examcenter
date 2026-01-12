@@ -122,7 +122,7 @@ try {
 
     // Get recent exam results
     $recent_results = [];
-    $stmt = $conn->prepare("SELECT r.user_id, s.name, r.created_at, (r.score / r.total_questions * 100) as score, 
+    $stmt = $conn->prepare("SELECT r.user_id, s.full_name, r.created_at, (r.score / r.total_questions * 100) as score, 
                                    s.class, r.status 
                             FROM results r 
                             JOIN students s ON r.user_id = s.id 
@@ -432,7 +432,7 @@ function time_ago($datetime) {
                         <?php foreach ($recent_results as $result): ?>
                             <tr>
                                 <td><?php echo htmlspecialchars($result['user_id']); ?></td>
-                                <td><?php echo htmlspecialchars($result['name']); ?></td>
+                                <td><?php echo htmlspecialchars($result['full_name']); ?></td>
                                 <td><?php echo date('M j, Y', strtotime($result['created_at'])); ?></td>
                                 <td><?php echo round($result['score'], 1); ?>%</td>
                                 <td><?php echo htmlspecialchars($result['class']); ?></td>

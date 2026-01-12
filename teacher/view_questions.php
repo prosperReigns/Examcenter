@@ -322,7 +322,7 @@ try {
             <a href="view_questions.php" class="active"><i class="fas fa-list"></i>View Questions</a>
             <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
-            <a href="manage_students.php" style="text-decoration: line-through"><i class="fas fa-users"></i>Manage Students</a>
+            <a href="manage_students.php"><i class="fas fa-users"></i>Manage Students</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="my-profile.php"><i class="fas fa-user"></i>My Profile</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>

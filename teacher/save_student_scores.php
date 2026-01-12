@@ -26,14 +26,23 @@ try {
     // Save each score
     $stmt = $db->prepare("
         INSERT INTO student_subject_scores
-        (student_id, subject_id, academic_year_id, ca1, ca2, ca3, ca4, exam_score)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE ca1 = VALUES(ca1), ca2 = VALUES(ca2), ca3 = VALUES(ca3), ca4 = VALUES(ca4), exam_score = VALUES(exam_score)
+        (student_id, subject_id, academic_year_id, ca1, ca2, ca3, ca4, exam, class_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE ca1 = VALUES(ca1), ca2 = VALUES(ca2), ca3 = VALUES(ca3), ca4 = VALUES(ca4), exam = VALUES(exam)
     ");
+
+    // Fetch the student’s class first
+    $stmt_class = $db->prepare("SELECT class FROM students WHERE id = ?");
+    $stmt_class->bind_param('i', $student_id);
+    $stmt_class->execute();
+    $student_row = $stmt_class->get_result()->fetch_assoc();
+    $stmt_class->close();
+
+    $class_id = $student_row['class']; // this is the numeric ID
 
     foreach ($scores as $row) {
         $stmt->bind_param(
-            'iiiiiiii',
+            'iiiiiiiii',
             $student_id,
             $row['subject_id'],
             $academic_year_id,
@@ -41,18 +50,20 @@ try {
             $row['ca2'],
             $row['ca3'],
             $row['ca4'],
-            $row['exam']
+            $row['exam'],
+            $class_id
         );
         $stmt->execute();
     }
 
+    $teacher_id = (int) $_SESSION['user_id'];
     // Save teacher remark
     $stmt2 = $db->prepare("
-        INSERT INTO student_remarks (student_id, academic_year_id, remark)
-        VALUES (?, ?, ?)
+        INSERT INTO student_term_remarks (student_id, academic_year_id, teacher_id, remark)
+        VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE remark = VALUES(remark)
     ");
-    $stmt2->bind_param('iis', $student_id, $academic_year_id, $remark);
+    $stmt2->bind_param('iiis', $student_id, $academic_year_id, $teacher_id, $remark);
     $stmt2->execute();
 
     echo json_encode(['status' => 'success', 'message' => 'Results saved successfully.']);

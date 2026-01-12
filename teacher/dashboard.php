@@ -196,7 +196,7 @@ if ($result) {
 $recent_results = [];
 $query = "SELECT 
             r.user_id, 
-            s.name, 
+            s.full_name, 
             r.created_at, 
             r.score, 
             s.class,
@@ -291,7 +291,8 @@ $conn->close();
                 <i class="fas fa-chart-bar"></i>
                 Exam Results
             </a>
-            <a href="manage_students.php" style="text-decoration: line-through">
+            <a href="manage_classroom.php"><i class="fas fa-users"></i>Manage Classroom</a>
+            <a href="manage_students.php">
                 <i class="fas fa-users"></i>
                 Manage Students
             </a>
@@ -454,7 +455,7 @@ $conn->close();
                         <?php foreach ($recent_results as $result): ?>
                         <tr>
                             <td><?php echo htmlspecialchars($result['user_id']); ?></td>
-                            <td><?php echo htmlspecialchars($result['name']); ?></td>
+                            <td><?php echo htmlspecialchars($result['full_name']); ?></td>
                             <td><?php echo date('M j, Y', strtotime($result['created_at'])); ?></td>
                             <td><?php echo $result['score']; ?>%</td>
                             <td><?php echo htmlspecialchars($result['class']); ?></td>

@@ -104,7 +104,7 @@ try {
     // Handle export to Word
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
         try {
-            $export_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
+            $export_query = "SELECT r.*, s.full_name AS student_name, s.class AS student_class, 
                             t.subject, t.title AS test_title, c.class_name AS test_class, t.year 
                             FROM results r
                             JOIN students s ON r.user_id = s.id
@@ -135,7 +135,7 @@ try {
                 $export_types .= 's';
             }
             if (!empty($student_name_filter)) {
-                $export_query .= " AND s.name LIKE ?";
+                $export_query .= " AND s.full_name LIKE ?";
                 $export_params[] = "%$student_name_filter%";
                 $export_types .= 's';
             }
@@ -221,7 +221,7 @@ try {
                     JOIN students s ON r.user_id = s.id
                     JOIN tests t ON r.test_id = t.id
                     WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
-    $select_query = "SELECT r.*, s.name AS student_name, s.class AS student_class, 
+    $select_query = "SELECT r.*, s.full_name AS student_name, s.class AS student_class, 
                             t.subject, t.title AS test_title, c.class_name AS test_class, t.year 
                     FROM results r
                     JOIN students s ON r.user_id = s.id
@@ -258,8 +258,8 @@ try {
         $types .= 's';
     }
     if (!empty($student_name_filter)) {
-        $count_query .= " AND s.name LIKE ?";
-        $select_query .= " AND s.name LIKE ?";
+        $count_query .= " AND s.full_name LIKE ?";
+        $select_query .= " AND s.full_name LIKE ?";
         $params[] = "%$student_name_filter%";
         $types .= 's';
     }
@@ -375,7 +375,7 @@ $conn->close();
                 <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
                 <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
                 <a href="view_results.php" class="active"><i class="fas fa-chart-bar"></i>Exam Results</a>
-                <a href="manage_students.php" style="text-decoration: line-through"><i class="fas fa-users"></i>Manage Students</a>
+                <a href="manage_students.php"><i class="fas fa-users"></i>Manage Students</a>
                 <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
                 <a href="my-profile.php"><i class="fas fa-user"></i>My Profile</a>
                 <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>

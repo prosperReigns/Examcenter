@@ -91,8 +91,10 @@ $types = str_repeat('i', count($assigned_class_ids));
 $sql = "
 SELECT 
     s.id,
-    s.name,
+    s.full_name,
     s.email,
+    s.phone,
+    s.address,
     s.class AS class_id,          -- s.class stores the numeric ID
     c.class_name AS full_class_name
 FROM students s
@@ -120,9 +122,10 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
      * FETCH ACTIVE ACADEMIC YEAR / TERM
      */
     $stmt = $conn->prepare("
-        SELECT id, year, session
+        SELECT id, year, session, exam_title
         FROM academic_years
-        WHERE status = 'active'
+        WHERE status = 'active' AND session IS NOT NULL
+        ORDER BY id DESC
         LIMIT 1
     ");
     $stmt->execute();
@@ -190,7 +193,7 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
                     'ca2' => (int)$row['ca2'],
                     'ca3' => (int)$row['ca3'],
                     'ca4' => (int)$row['ca4'],
-                    'exam' => (int)$row['exam_score']
+                    'exam' => (int)$row['exam']
                 ];
             }
         }
@@ -277,7 +280,8 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
             <a href="view_results.php" class="active"><i class="fas fa-chart-bar"></i>Exam Results</a>
-            <a href="manage_students.php" style="text-decoration: line-through"><i class="fas fa-users"></i>Manage Students</a>
+            <a href="manage_classroom.php"><i class="fas fa-users"></i>Manage Classroom</a>
+            <a href="manage_students.php"><i class="fas fa-users"></i>Manage Students</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="my-profile.php"><i class="fas fa-user"></i>My Profile</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
@@ -310,9 +314,11 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
             <div class="card-body d-flex align-items-center gap-4">
                 <img src="/EXAMCENTER/uploads/students/default.png" alt="Student Photo">
                 <div>
-                    <h4><?= htmlspecialchars($student['name']) ?></h4>
+                    <h4><?= htmlspecialchars($student['full_name']) ?></h4>
                     <p class="mb-1"><strong>Class:</strong> <?= htmlspecialchars($student['full_class_name']) ?></p>
-                    <p class="mb-1"><strong>Email:</strong> <?= htmlspecialchars($student['email'] ?? '') ?></p>
+                    <p class="mb-1"><strong>Parent Email:</strong> <?= htmlspecialchars($student['email'] ?? '') ?></p>
+                    <p class="mb-1"><strong>Parent Phone:</strong> <?= htmlspecialchars($student['phone'] ?? '') ?></p>
+                    <p class="mb-1"><strong>Address:</strong> <?= htmlspecialchars($student['address'] ?? '') ?></p>
                     <p class="mb-0">
                         <strong>Academic Session:</strong>
                         <?= htmlspecialchars($active_term['year'] ?? '') ?> —
@@ -511,7 +517,7 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
                 const remark = document.querySelector('textarea').value;
                 const termId = termSwitcher.value;
 
-                fetch('/EXAMCENTER/ajax/save_student_scores.php', {
+                fetch('/EXAMCENTER/teacher/save_student_scores.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ student_id: studentId, academic_year_id: termId, scores, remark })
@@ -546,11 +552,11 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
 
             // ======== DOWNLOAD / EMAIL BUTTONS ========
             document.getElementById('downloadReportBtn').addEventListener('click', () => {
-                window.location.href = `/EXAMCENTER/ajax/download_student_report.php?student_id=${studentId}&academic_year_id=${termSwitcher.value}`;
+                window.location.href = `/EXAMCENTER/teacher/download_student_report.php?student_id=${studentId}&academic_year_id=${termSwitcher.value}`;
             });
 
             document.getElementById('emailReportBtn').addEventListener('click', () => {
-                fetch(`/EXAMCENTER/ajax/email_student_report.php`, {
+                fetch(`/EXAMCENTER/teacher/email_student_report.php`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ student_id: studentId, academic_year_id: termSwitcher.value })

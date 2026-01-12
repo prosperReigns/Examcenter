@@ -90,7 +90,7 @@ try {
 
     // Export to Word
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['export_results'])) {
-        $export_query = "SELECT r.*, s.name AS student_name, c.class_name AS student_class,
+        $export_query = "SELECT r.*, s.full_name AS student_name, c.class_name AS student_class,
                  t.subject, t.title AS test_title, al.level_code AS test_class, t.year
                  FROM results r
                  JOIN students s ON r.user_id = s.id
@@ -123,7 +123,7 @@ try {
             $export_types .= 's';
         }
         if (!empty($student_name_filter)) {
-            $export_query .= " AND s.name LIKE ?";
+            $export_query .= " AND s.full_name LIKE ?";
             $export_params[] = "%$student_name_filter%";
             $export_types .= 's';
         }
@@ -192,7 +192,7 @@ try {
                 JOIN academic_levels al ON t.academic_level_id = al.id
                 WHERE 1=1";
 
-    $select_query = "SELECT r.*, s.name AS student_name, c.class_name AS student_class,
+    $select_query = "SELECT r.*, s.full_name AS student_name, c.class_name AS student_class,
                     t.subject, t.title AS test_title, al.level_code AS test_class, t.year
                     FROM results r
                     JOIN students s ON r.user_id = s.id
@@ -229,8 +229,8 @@ try {
         $types .= 's';
     }
     if (!empty($student_name_filter)) {
-        $count_query .= " AND s.name LIKE ?";
-        $select_query .= " AND s.name LIKE ?";
+        $count_query .= " AND s.full_name LIKE ?";
+        $select_query .= " AND s.full_name LIKE ?";
         $params[] = "%$student_name_filter%";
         $types .= 's';
     }

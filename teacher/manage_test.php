@@ -126,7 +126,7 @@ $conn->close();
                 <i class="fas fa-chart-bar"></i>
                 Exam Results
             </a>
-            <a href="manage_students.php" style="text-decoration: line-through">
+            <a href="manage_students.php">
                 <i class="fas fa-users"></i>
                 Manage Students
             </a>
