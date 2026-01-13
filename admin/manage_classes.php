@@ -196,6 +196,7 @@ while ($row = $result->fetch_assoc()) {
         <a href="manage_classes.php" class="active"><i class="fas fa-users"></i>Manage Classes</a>
         <a href="manage_session.php"><i class="fas fa-users"></i>Manage Session</a>
         <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
+        <a href="manage_students.php"><i class="fas fa-users"></i>Manage Student</a>
         <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
         <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
         <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>

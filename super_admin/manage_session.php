@@ -368,7 +368,10 @@ $stmt->close();
 <!-- Main Content -->
 <div class="content container mt-5">
 
-    <h2 class="mb-4 fw-bold">Manage Session</h2>
+    <div class="header d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Manage Academic Sessions</h2>
+        <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
 
     <?php if ($success): ?>
         <div class="alert alert-success"><?php echo $success; ?></div>

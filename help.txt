@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS admins (
     role VARCHAR(50)
 );
 
--- 12. teachers
+-- 4. teachers
 CREATE TABLE IF NOT EXISTS teachers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(100),
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS teachers (
     role VARCHAR(50)
 );
 
---20. classes
+-- 5. classes
 CREATE TABLE IF NOT EXISTS classes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     academic_level_id INT NOT NULL,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS classes (
     UNIQUE (academic_level_id, stream_id)
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 14. tests
+-- 6. tests
 CREATE TABLE IF NOT EXISTS tests (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS new_questions (
     FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 4. fill_blank_questions
+-- 8. fill_blank_questions
 CREATE TABLE IF NOT EXISTS ill_blank_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS ill_blank_questions (
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 5. image_questions
+-- 9. image_questions
 CREATE TABLE IF NOT EXISTS image_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS image_questions (
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
--- 6. multiple_choice_questions
+-- 10. multiple_choice_questions
 CREATE TABLE IF NOT EXISTS multiple_choice_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS multiple_choice_questions (
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 8. results
+-- 11. results
 CREATE TABLE IF NOT EXISTS results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -125,14 +125,14 @@ CREATE TABLE IF NOT EXISTS results (
     FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
 );
 
--- 9. settings
+-- 12. settings
 CREATE TABLE IF NOT EXISTS settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     setting_name VARCHAR(100),
     setting_value TEXT
 );
 
--- 10. single_choice_questions
+-- 13. single_choice_questions
 CREATE TABLE IF NOT EXISTS single_choice_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
@@ -145,31 +145,23 @@ CREATE TABLE IF NOT EXISTS single_choice_questions (
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 11. students
+-- 14. students
 CREATE TABLE IF NOT EXISTS students (
     id INT AUTO_INCREMENT PRIMARY KEY,
-
-    -- Core identity
     full_name VARCHAR(150) NOT NULL,
     reg_no VARCHAR(50) UNIQUE NULL,
-
-    -- Class relationship (string for now, can evolve later)
     class VARCHAR(50) NOT NULL,
-
-    -- Contact / profile (optional, editable later)
     email VARCHAR(100) NULL,
     phone VARCHAR(20) NULL,
     photo VARCHAR(255) NULL,
     address TEXT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'student',
-
-    -- Status & metadata
     created_via ENUM('exam','class_management') DEFAULT 'exam',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 13. teacher_subjects
+-- 15. teacher_subjects
 CREATE TABLE IF NOT EXISTS teacher_subjects (
     id INT AUTO_INCREMENT PRIMARY KEY,
     teacher_id INT,
@@ -177,7 +169,7 @@ CREATE TABLE IF NOT EXISTS teacher_subjects (
     FOREIGN KEY (teacher_id) REFERENCES teachers(id)
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 15. true_false_questions
+-- 16. true_false_questions
 CREATE TABLE IF NOT EXISTS true_false_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT,
@@ -185,7 +177,7 @@ CREATE TABLE IF NOT EXISTS true_false_questions (
     FOREIGN KEY (question_id) REFERENCES new_questions(id) ON DELETE CASCADE
 );
 
--- 15. exam_attempts
+-- 17. exam_attempts
 CREATE TABLE IF NOT EXISTS exam_attempts (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -204,7 +196,7 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
 
 UPDATE settings SET setting_value = '1' WHERE setting_name = 'show_results_immediately';
 
--- 16. subjects
+-- 18. subjects
 CREATE TABLE IF NOT EXISTS subjects (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `subject_name` varchar(255) NOT NULL,
@@ -212,7 +204,7 @@ CREATE TABLE IF NOT EXISTS subjects (
   UNIQUE KEY `subject_name` (`subject_name`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---20. subject_levels
+-- 19. subject_levels
 CREATE TABLE IF NOT EXISTS subject_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
     subject_id INT NOT NULL,
@@ -221,7 +213,7 @@ CREATE TABLE IF NOT EXISTS subject_levels (
     FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---17. academic year
+-- 20. academic year
 CREATE TABLE IF NOT EXISTS academic_years (
   id INT AUTO_INCREMENT PRIMARY KEY,
   year VARCHAR(9) NOT NULL,
@@ -231,7 +223,7 @@ CREATE TABLE IF NOT EXISTS academic_years (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 18. super_admins
+-- 21. super_admins
 CREATE TABLE IF NOT EXISTS super_admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(100) UNIQUE,
@@ -240,7 +232,7 @@ CREATE TABLE IF NOT EXISTS super_admins (
     role VARCHAR(50)
 );
 
---19. system_settings
+-- 22. system_settings
 CREATE TABLE IF NOT EXISTS system_settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     setup_completed TINYINT(1) DEFAULT 0,
@@ -249,20 +241,20 @@ CREATE TABLE IF NOT EXISTS system_settings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
---19. streams
+-- 23. streams
 CREATE TABLE IF NOT EXISTS streams (
     id INT AUTO_INCREMENT PRIMARY KEY,
     stream_name VARCHAR(50) UNIQUE
 );
 
---19. academic_levels
+-- 24. academic_levels
 CREATE TABLE IF NOT EXISTS academic_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
     level_code VARCHAR(10) UNIQUE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,   -- JSS1, JSS2, SS1
     class_group ENUM('JSS','SS') NOT NULL
 )CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
---19. teacher_classes
+-- 25. teacher_classes
 CREATE TABLE IF NOT EXISTS teacher_classes (
     teacher_id INT NOT NULL,
     class_id INT NOT NULL,
@@ -271,14 +263,14 @@ CREATE TABLE IF NOT EXISTS teacher_classes (
     FOREIGN KEY (class_id) REFERENCES classes(id)
 );
 
---19. schools
+-- 26. schools
 CREATE TABLE IF NOT EXISTS schools (
     id INT AUTO_INCREMENT PRIMARY KEY,
     school_name VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--19. student_subject_scores
+-- 27. student_subject_scores
 CREATE TABLE IF NOT EXISTS student_subject_scores (
     id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT NOT NULL,
@@ -301,7 +293,7 @@ CREATE TABLE IF NOT EXISTS student_subject_scores (
     FOREIGN KEY (academic_year_id) REFERENCES academic_years(id)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;-
 
---19. student_term_remarks 
+-- 28. student_term_remarks 
 CREATE TABLE IF NOT EXISTS student_term_remarks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT NOT NULL,
@@ -315,7 +307,7 @@ CREATE TABLE IF NOT EXISTS student_term_remarks (
     FOREIGN KEY (teacher_id) REFERENCES teachers(id)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---19. grade_scales 
+-- 29. grade_scales 
 CREATE TABLE IF NOT EXISTS grade_scales (
     id INT AUTO_INCREMENT PRIMARY KEY,
     min_score TINYINT UNSIGNED NOT NULL,
@@ -324,3 +316,13 @@ CREATE TABLE IF NOT EXISTS grade_scales (
     remark VARCHAR(50),
     UNIQUE (grade)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 30. reattempt_schedule 
+CREATE TABLE IF NOT EXISTS reattempt_schedule (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT,
+    test_id INT,
+    scheduled_at DATETIME,
+    created_by INT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
