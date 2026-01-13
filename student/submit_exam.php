@@ -148,6 +148,30 @@ $stmt->bind_param("iiii", $student_id, $test_id, $score, $total_questions);
 $stmt->execute();
 $stmt->close();
 
+// =====================================
+// STEP 3: RESET REATTEMPT APPROVAL
+// =====================================
+$stmt = $conn->prepare("
+    UPDATE results
+    SET 
+        reattempt_approved = 0,
+        status = 'completed'
+    WHERE user_id = ? 
+      AND test_id = ?
+      AND reattempt_approved = 1
+");
+$stmt->bind_param("ii", $student_id, $test_id);
+$stmt->execute();
+$stmt->close();
+
+$stmt = $conn->prepare("
+    DELETE FROM exam_attempts 
+    WHERE user_id = ? AND test_id = ?
+");
+$stmt->bind_param("ii", $student_id, $test_id);
+$stmt->execute();
+$stmt->close();
+
 // Store score in session for result page
 $_SESSION['exam_score'] = $score;
 $_SESSION['total_questions'] = $total_questions;
@@ -158,3 +182,4 @@ unset($_SESSION['current_test_id']);
 
 header("Location: result.php");
 exit();
+?>

@@ -24,10 +24,17 @@ if (empty($error)) {
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
+            $stmt2 = $conn->prepare("SELECT class_group FROM academic_levels WHERE id = ?");
+            $stmt2->bind_param("i", $row['academic_level_id']);
+            $stmt2->execute();
+            $level = $stmt2->get_result()->fetch_assoc();
+            $stmt2->close();
+            
             $classes[$row['id']] = [
                 'name' => $row['class_name'],
-                'level_id' => $row['academic_level_id']
-            ];
+                'level_id' => $row['academic_level_id'],
+                'class_group' => $level['class_group']
+            ];            
         }
         $stmt->close();
     }
@@ -103,7 +110,10 @@ if (empty($error)) {
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
-            $students_by_class[$row['class']][] = $row['full_name'];
+            $students_by_class[$row['class']][] = [
+                'id' => $row['id'],
+                'name' => $row['full_name']
+            ];            
         }
         $stmt->close();
     }
@@ -169,24 +179,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         if ($result->num_rows === 0) {
                             $error = "No test available for this combination";
                         } else {
-                            // Insert into students table
-                            $stmt = $conn->prepare("INSERT INTO students (full_name, class) VALUES (?, ?)");
-                            if ($stmt) {
-                                $stmt->bind_param("ss", $name, $class);
-                                if ($stmt->execute()) {
-                                    $_SESSION['student_id'] = $conn->insert_id;
+                           $student_id = $_POST['student_id'] ?? null;
+
+                            if (!$student_id) {
+                                $error = "Please select a valid student from the list.";
+                            } else {
+                                // Verify student exists
+                                $stmt = $conn->prepare("SELECT id FROM students WHERE id = ? AND class = ?");
+                                $stmt->bind_param("ii", $student_id, $class);
+                                $stmt->execute();
+                                $student = $stmt->get_result()->fetch_assoc();
+                                $stmt->close();
+
+                                if (!$student) {
+                                    $error = "Invalid student selected.";
+                                } else {
+                                    // ✅ USE EXISTING STUDENT
+                                    $_SESSION['student_id'] = $student_id;
                                     $_SESSION['student_name'] = $name;
                                     $_SESSION['student_class'] = $class;
                                     $_SESSION['student_subject'] = $final_subject;
                                     $_SESSION['test_title'] = $test_title;
                                     $_SESSION['exam_year'] = $exam_year;
+
                                     header("Location: take_exam.php");
                                     exit();
-                                } else {
-                                    $error = "Registration failed. Please try again.";
                                 }
-                                $stmt->close();
                             }
+
                         }
                     }
             }
@@ -221,7 +241,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <?php endif; ?>
                         <form method="POST" action="">
                             <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                            
+
                             <!-- Year dropdown -->
                             <div class="mb-3">
                                 <label for="exam_year" class="form-label">Select Exam Year</label>
@@ -257,6 +277,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <label for="name" class="form-label">Full Name</label>
                                 <input list="student_names" class="form-control" id="name" name="name" pattern="[A-Za-z\s]+" value="<?php echo htmlspecialchars($name); ?>" required>
                                 <datalist id="student_names"></datalist>
+                                <input type="hidden" name="student_id" id="student_id">
                             </div>
                             <div class="mb-3">
                                 <label for="subject" class="form-label">Subject</label>
@@ -291,7 +312,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (!selectedClass) return;
 
     // Determine class group (JSS / SS)
-    const classGroup = selectedClass.name.startsWith('JSS') ? 'JSS' : 'SS';
+    const classGroup = selectedClass.class_group;
 
     const allowedSubjects = subjectsByClassGroup[classGroup] || [];
 
@@ -315,20 +336,34 @@ const studentsByClass = <?php echo json_encode($students_by_class); ?>;
 
 function updateStudentNames() {
     const classSelect = document.getElementById('class');
-    const nameInput = document.getElementById('name');
     const datalist = document.getElementById('student_names');
-
-    const selectedClassId = classSelect.value;
     datalist.innerHTML = '';
 
+    const selectedClassId = classSelect.value;
     if (!selectedClassId || !studentsByClass[selectedClassId]) return;
 
-    studentsByClass[selectedClassId].forEach(name => {
+    studentsByClass[selectedClassId].forEach(student => {
         const option = document.createElement('option');
-        option.value = name;
+        option.value = student.name;
+        option.dataset.id = student.id;
         datalist.appendChild(option);
     });
 }
+
+document.getElementById('name').addEventListener('input', function () {
+    const value = this.value;
+    const options = document.querySelectorAll('#student_names option');
+    const hiddenIdInput = document.getElementById('student_id');
+
+    hiddenIdInput.value = ''; // reset
+
+    options.forEach(option => {
+        if (option.value === value) {
+            hiddenIdInput.value = option.dataset.id;
+        }
+    });
+});
+
 
 document.getElementById('class').addEventListener('change', updateStudentNames);
 

@@ -69,25 +69,57 @@ if (!$test) {
     die("No test available for this combination of test title, class, and subject.");
 }
 
+
 $test_id = $test['id'];
 $_SESSION['current_test_id'] = $test_id;
 $exam_duration = isset($test['duration']) ? (int)$test['duration'] * 60 : 3600; // Convert minutes to seconds, default 60 minutes
 
-// Check for duplicate exam attempt
-$stmt = $conn->prepare("SELECT id, reattempt_approved FROM results WHERE user_id = ? AND test_id = ?");
-if ($stmt === false) {
-    error_log("Prepare failed: SELECT id, reattempt_approved FROM results - " . $conn->error);
-    die("Error preparing attempt check: " . $conn->error);
-}
+// ===============================
+// CHECK RESULT & REATTEMPT STATUS
+// ===============================
+$stmt = $conn->prepare("
+    SELECT id, reattempt_approved 
+    FROM results 
+    WHERE user_id = ? AND test_id = ?
+    LIMIT 1
+");
 $stmt->bind_param("ii", $user_id, $test_id);
 $stmt->execute();
-$attempt_result = $stmt->get_result();
-$attempt = $attempt_result->fetch_assoc();
+$result_row = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if ($result_row) {
+    // Result exists but reattempt not approved
+    if ((int)$result_row['reattempt_approved'] === 0) {
+        die("You have already taken this exam. Reattempt not approved.");
+    }
+
+    // Reattempt approved → clean previous attempt state
+    $stmt = $conn->prepare("
+        DELETE FROM exam_attempts 
+        WHERE user_id = ? AND test_id = ?
+    ");
+    $stmt->bind_param("ii", $user_id, $test_id);
+    $stmt->execute();
+    $stmt->close();
+}
+
+// Allow reattempt ONLY if explicitly approved
+$stmt = $conn->prepare("
+    SELECT reattempt_approved 
+    FROM results 
+    WHERE user_id = ? AND test_id = ?
+    LIMIT 1
+");
+$stmt->bind_param("ii", $user_id, $test_id);
+$stmt->execute();
+$attempt = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if ($attempt && !$attempt['reattempt_approved']) {
-    die("You have already taken this exam. Contact your administrator to retake it.");
+    die("You have already taken this exam.");
 }
+
 
 // Initialize exam attempt
 $stmt = $conn->prepare("SELECT time_left, current_index FROM exam_attempts WHERE user_id = ? AND test_id = ? LIMIT 1");

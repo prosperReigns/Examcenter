@@ -27,7 +27,7 @@ try {
         die("Database error");
     }
     
- $stmt->bind_param("i", $super_admin_id);
+$stmt->bind_param("i", $super_admin_id);
 $stmt->execute();
 $user_data = $stmt->get_result()->fetch_assoc();
 $stmt->close();
@@ -129,7 +129,7 @@ $stmt->close();
 
     // Get recent exam results
     $recent_results = [];
-    $stmt = $conn->prepare("SELECT r.user_id, s.name, r.created_at, (r.score / r.total_questions * 100) as score, 
+    $stmt = $conn->prepare("SELECT r.user_id, s.full_name, r.created_at, (r.score / r.total_questions * 100) as score, 
                                    s.class, r.status 
                             FROM results r 
                             JOIN students s ON r.user_id = s.id 
