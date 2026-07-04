@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+        <h1 class="h3 mb-3">Licenses</h1>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>School</th>
+                        <th>Type</th>
+                        <th>Fingerprint</th>
+                        <th>Status</th>
+                        <th>Expiry</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for license in licenses %}
+                        <tr>
+                            <td>{{ license.school.name if license.school else '-' }}</td>
+                            <td>{{ license.license_type }}</td>
+                            <td class="text-truncate" style="max-width: 260px;">{{ license.machine_fingerprint }}</td>
+                            <td>{{ license.status }}</td>
+                            <td>{{ license.expiry_at or '-' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-muted">No licenses found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

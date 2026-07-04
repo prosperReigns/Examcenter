@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+        <h1 class="h3 mb-3">Settings</h1>
+        <form method="post" action="/settings" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="key">Key</label>
+                <input class="form-control" id="key" name="key" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="value">Value</label>
+                <input class="form-control" id="value" name="value" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="category">Category</label>
+                <input class="form-control" id="category" name="category">
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="description">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+            </div>
+            <div class="col-12 form-check ms-3">
+                <input class="form-check-input" type="checkbox" id="is_system" name="is_system" value="1">
+                <label class="form-check-label" for="is_system">System setting</label>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit">Save setting</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+        <h2 class="h5 mb-3">Existing Settings</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th>Category</th>
+                        <th>System</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for setting in settings_list %}
+                        <tr>
+                            <td>{{ setting.key }}</td>
+                            <td>{{ setting.value }}</td>
+                            <td>{{ setting.category or '-' }}</td>
+                            <td>{{ 'Yes' if setting.is_system else 'No' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-muted">No settings saved yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

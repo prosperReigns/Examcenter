@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+        <h1 class="h3 mb-3">Activations</h1>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>License</th>
+                        <th>School</th>
+                        <th>Machine</th>
+                        <th>Computer</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for activation in activations %}
+                        <tr>
+                            <td>{{ activation.license_id }}</td>
+                            <td>{{ activation.school.name if activation.school else '-' }}</td>
+                            <td>{{ activation.machine_id }}</td>
+                            <td>{{ activation.computer_name or '-' }}</td>
+                            <td>{{ activation.status }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-muted">No activations found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

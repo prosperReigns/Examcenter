@@ -1,0 +1,17 @@
+:root {
+    --app-bg: #0f172a;
+    --app-card: #111827;
+}
+
+body.app-shell {
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    min-height: 100vh;
+}
+
+.min-vh-75 {
+    min-height: 75vh;
+}
+
+.card {
+    border-radius: 1rem;
+}

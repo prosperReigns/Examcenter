@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+        <h1 class="h3 mb-3">Payments</h1>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Reference</th>
+                        <th>Customer</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                        <tr>
+                            <td>{{ payment.flutterwave_tx_ref }}</td>
+                            <td>{{ payment.customer.name if payment.customer else '-' }}</td>
+                            <td>{{ payment.payment_type }}</td>
+                            <td>{{ payment.currency }} {{ payment.amount }}</td>
+                            <td>{{ payment.status }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-muted">No payments found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
