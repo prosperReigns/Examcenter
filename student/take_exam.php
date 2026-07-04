@@ -152,7 +152,8 @@ $stmt->execute();
 $questions_result = $stmt->get_result();
 
 $questions = [];
-$base_url = 'http://127.0.0.1/Examcenter';
+$base_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/Examcenter';
+
 while ($row = $questions_result->fetch_assoc()) {
     $question_id = $row['id'];
     $type = $row['question_type'];

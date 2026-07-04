@@ -56,7 +56,13 @@ try {
 
     $stmt->bind_param("i", $teacher_id);
     $stmt->execute();
-    $class_subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $temp = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $class_subjects = [];
+
+    foreach ($temp as $row) {
+        $class_subjects[$row['class_name']][] = $row['subject'];
+    }
 
     // Fetch assigned subjects
     $stmt = $conn->prepare("
@@ -109,8 +115,9 @@ try {
                             FROM results r
                             JOIN students s ON r.user_id = s.id
                             JOIN tests t ON r.test_id = t.id
-                            JOIN classes c ON t.academic_level_id = c.academic_level_id
-                            WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
+                            JOIN academic_levels al ON al.id = t.academic_level_id
+JOIN classes c ON c.academic_level_id = al.id
+                            WHERE (" . implode(' OR ', array_fill(0, count($assigned_subjects), 't.subject LIKE CONCAT(?, "%")')) . ")";
             $export_params = $assigned_subjects;
             $export_types = str_repeat('s', count($assigned_subjects));
 
@@ -120,7 +127,7 @@ try {
                 $export_types .= 's';
             }
             if (!empty($class_filter)) {
-                $export_query .= " AND s.class = ?";
+                $export_query .= " AND c.class_name = ?";
                 $export_params[] = $class_filter;
                 $export_types .= 's';
             }
@@ -220,14 +227,15 @@ try {
                     FROM results r
                     JOIN students s ON r.user_id = s.id
                     JOIN tests t ON r.test_id = t.id
-                    WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
+                    WHERE (" . implode(' OR ', array_fill(0, count($assigned_subjects), 't.subject LIKE CONCAT(?, "%")')) . ")";
     $select_query = "SELECT r.*, s.full_name AS student_name, s.class AS student_class, 
                             t.subject, t.title AS test_title, c.class_name AS test_class, t.year 
                     FROM results r
                     JOIN students s ON r.user_id = s.id
                     JOIN tests t ON r.test_id = t.id
-                    JOIN classes c ON t.academic_level_id = c.academic_level_id
-                    WHERE t.subject IN (" . implode(',', array_fill(0, count($assigned_subjects), '?')) . ")";
+                    JOIN academic_levels al ON al.id = t.academic_level_id
+JOIN classes c ON c.academic_level_id = al.id
+                    WHERE (" . implode(' OR ', array_fill(0, count($assigned_subjects), 't.subject LIKE CONCAT(?, "%")')) . ")";
 
     $params = $assigned_subjects;
     $types = str_repeat('s', count($assigned_subjects));
@@ -240,8 +248,8 @@ try {
         $types .= 's';
     }
     if (!empty($class_filter)) {
-        $count_query .= " AND s.class = ?";
-        $select_query .= " AND s.class = ?";
+        $count_query .= " AND c.class_name = ?";
+        $select_query .= " AND c.class_name = ?";
         $params[] = $class_filter;
         $types .= 's';
     }
@@ -302,13 +310,14 @@ try {
     $stmt->close();
 
     // Get unique classes, years, and test titles for filters (restricted to assigned subjects)
-    $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
+    $placeholders = implode(' OR ', array_fill(0, count($assigned_subjects), 't.subject LIKE CONCAT(?, "%")'));
+
     $stmt = $conn->prepare("
         SELECT DISTINCT c.class_name 
         FROM classes c 
         JOIN tests t ON c.academic_level_id = t.academic_level_id
         JOIN results r ON t.id = r.test_id
-        WHERE t.subject IN ($placeholders) 
+        WHERE ($placeholders) 
         ORDER BY c.class_name
     ");
     $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
@@ -316,13 +325,14 @@ try {
     $classes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id JOIN classes c ON t.academic_level_id = c.academic_level_id WHERE t.subject IN ($placeholders) ORDER BY t.year DESC");
+    $stmt = $conn->prepare("SELECT DISTINCT t.year FROM tests t JOIN results r ON t.id = r.test_id JOIN academic_levels al ON al.id = t.academic_level_id
+JOIN classes c ON c.academic_level_id = al.id WHERE ($placeholders) ORDER BY t.year DESC");
     $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
     $stmt->execute();
     $years = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT DISTINCT t.title FROM tests t JOIN results r ON t.id = r.test_id WHERE t.subject IN ($placeholders) ORDER BY t.title");
+    $stmt = $conn->prepare("SELECT DISTINCT t.title FROM tests t JOIN results r ON t.id = r.test_id WHERE ($placeholders) ORDER BY t.title");
     $stmt->bind_param(str_repeat('s', count($assigned_subjects)), ...$assigned_subjects);
     $stmt->execute();
     $test_titles = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

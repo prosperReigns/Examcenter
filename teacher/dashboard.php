@@ -296,6 +296,10 @@ $conn->close();
                 <i class="fas fa-users"></i>
                 Manage Students
             </a>
+            <a href="bank.php">
+                <i class="fas fa-database"></i>
+                Question Bank
+            </a>
             <a href="settings.php">
                 <i class="fas fa-cog"></i>
                 Settings

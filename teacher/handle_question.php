@@ -3,6 +3,7 @@ session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
 
+$isBankMode = isset($_POST['bank_mode']) && $_POST['bank_mode'] == "1";
 // Initialize database connection
 $database = Database::getInstance();
 $conn = $database->getConnection();
@@ -186,7 +187,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['edit_question'])) {
 
 // Handle question submission
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
-    if (!isset($_SESSION['current_test_id'])) {
+    if (!$isBankMode && !isset($_SESSION['current_test_id'])) {
         $_SESSION['error'] = "Please create or select a test first.";
     } else {
         $test_id = (int)$_SESSION['current_test_id'];
@@ -197,12 +198,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
         if (empty($question_text) || empty($question_type) || !in_array($question_type, ['multiple_choice_single', 'multiple_choice_multiple', 'true_false', 'fill_blanks'])) {
             $_SESSION['error'] = "Question text and valid type are required.";
         } else {
-            $stmt = $conn->prepare("
-                SELECT al.class_group, t.subject
-                FROM tests t
-                JOIN academic_levels al ON al.id = t.academic_level_id
-                WHERE t.id = ?
-            ");
+            if($isBankMode){
+                $academic_level_id=(int)$_POST['academic_level_id'];
+                $stmt=$conn->prepare("
+                    SELECT level_code
+                    FROM academic_levels
+                    WHERE id=?
+                ");
+                $stmt->bind_param("i",$academic_level_id);
+                $stmt->execute();
+                $level=$stmt->get_result()->fetch_assoc();
+                $stmt->close();
+                $class=$level['level_code'];
+
+                if(count($assigned_subjects)==1){
+                    $subject=$assigned_subjects[0];
+                }else{
+                    $subject=$_POST['subject'];
+                }
+            }
 
             if (!$stmt) {
                 error_log("Prepare failed for test data: " . $conn->error);
@@ -248,8 +262,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
                                 $stmt = $conn->prepare("UPDATE new_questions SET question_text = ?, question_type = ? WHERE id = ?");
                                 $stmt->bind_param("ssi", $question_text, $question_type, $question_id);
                             } else {
-                                $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, class, subject, question_type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                                if($isBankMode){
+                                    $stmt = $conn->prepare("INSERT INTO question_bank (question_text, test_id, class, subject, question_type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
                                 $stmt->bind_param("sisss", $question_text, $test_id, $class, $subject, $question_type);
+                                }
+                                else{
+                                    $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, class, subject, question_type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                                $stmt->bind_param("sisss", $question_text, $test_id, $class, $subject, $question_type);
+                                }
                             }
                             if (!$stmt->execute()) {
                                 throw new Exception("Error saving question: " . $stmt->error);
@@ -357,8 +377,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['question'])) {
             }
         }
     }
-    header("Location: add_question.php");
-    exit();
+   if($isBankMode){
+        header("Location:bank.php");
+    }
+    else{
+        header("Location:add_question.php");
+    }
+        exit();
 }
 
 $conn->close();

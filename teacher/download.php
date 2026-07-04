@@ -17,12 +17,10 @@ $stmt = $conn->prepare("
     FROM tests t
     JOIN classes c ON t.academic_level_id = c.academic_level_id
     JOIN academic_levels al ON t.academic_level_id = al.id
-    JOIN subjects s ON t.subject_id = s.id
-    JOIN subject_levels sl ON sl.subject_id = s.id
+    JOIN subjects s ON LOWER(TRIM(t.subject)) LIKE CONCAT(LOWER(TRIM(s.subject_name)), '%')
     WHERE 
         c.class_name = ?
         AND s.subject_name = ?
-        AND sl.class_level = al.level_code
         AND t.title = ?
     ORDER BY t.created_at DESC
     LIMIT 1
@@ -41,7 +39,7 @@ $test_id = $test['id'];
 function fetchQuestions($conn, $table, $columns, $test_id) {
     $sql = "SELECT " . implode(", ", $columns) . " 
             FROM $table t
-            JOIN questions n ON t.question_id = n.id
+            JOIN new_questions n ON t.question_id = n.id
             WHERE n.test_id = ?
             ORDER BY n.id ASC";
     $stmt = $conn->prepare($sql);
@@ -54,23 +52,37 @@ function fetchQuestions($conn, $table, $columns, $test_id) {
 }
 
 // Single choice
-$single = fetchQuestions($conn, 'single_choice_questions', ['n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answer'], $test_id);
+$single = fetchQuestions($conn, 'single_choice_questions', ['n.id','n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answer'], $test_id);
 
 // Multiple choice (multiple answers)
-$multiple = fetchQuestions($conn, 'multiple_choice_questions', ['n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answers', 't.image_path'], $test_id);
+$multiple = fetchQuestions($conn, 'multiple_choice_questions', ['n.id','n.question_text', 't.option1', 't.option2', 't.option3', 't.option4', 't.correct_answers', 't.image_path'], $test_id);
 
 // True/False
-$tf = fetchQuestions($conn, 'true_false_questions', ['n.question_text', 't.correct_answer', 't.image_path'], $test_id);
+$tf = fetchQuestions(
+    $conn,
+    'true_false_questions',
+    ['n.question_text', 't.correct_answer'],
+    $test_id
+);
 
 // Fill in the blank
-$fill = fetchQuestions($conn, 'fill_blank_questions', ['n.question_text', 't.correct_answer'], $test_id);
+$fill = fetchQuestions($conn, 'fill_blank_questions', ['n.id','n.question_text', 't.correct_answer'], $test_id);
 
 // Merge all questions in order: single -> multiple -> true/false -> fill
-$questions = array_merge($single, $multiple, $tf, $fill);
+$questions = array_merge(
+    $single,
+    $multiple,
+    $tf,
+    $fill
+);
+
+usort($questions, function ($a, $b) {
+    return $a['id'] <=> $b['id'];
+});
 
 // Headers for Word download
 header("Content-Type: application/vnd.ms-word");
-header("Content-Disposition: attachment; filename={$title}_{$subject_name}.doc");
+header("Content-Disposition: attachment; filename={$title}_{$test['subject_name']}.doc");
 
 // Output test info
 echo "{$test['title']}\n";

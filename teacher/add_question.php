@@ -2,6 +2,9 @@
 session_start();
 require_once '../db.php';
 
+// Determine page mode
+$isBankMode = isset($_GET['mode']) && $_GET['mode'] === 'bank';
+
 // Enable error reporting for debugging
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -271,7 +274,7 @@ ORDER BY t.created_at DESC
             <!-- Question Form -->
             <div class="col-lg-8">
                 <div class="question-card">
-                    <?php if (!$current_test): ?>
+                    <?php if (!$current_test && !$isBankMode): ?>
                         <h5 class="mb-3">Test Setup</h5>
                         <form method="POST" id="testForm" action="handle_test.php">
                             <div class="row g-4">
@@ -367,11 +370,44 @@ ORDER BY t.created_at DESC
                                 <button type="submit" name="select_test" class="btn btn-primary"><i class="fas fa-check me-2"></i>Select Test</button>
                             </form>
                         <?php endif; ?>
-                    <?php else: ?>
+                    <?php elseif ($current_test || $isBankMode): ?>
                         <h5 class="mb-3"><?php echo $edit_question ? 'Edit Question' : 'Add Question'; ?></h5>
                         <form method="POST" id="questionForm" enctype="multipart/form-data" action="handle_question.php">
+                            <input type="hidden"
+                                name="bank_mode"
+                                value="<?= $isBankMode ? 1 : 0 ?>">
                             <input type="hidden" name="question_id" value="<?php echo (int)($edit_question['id'] ?? ''); ?>">
                             <div class="form-group-spacing">
+                                <?php if($isBankMode): ?>
+                                <div class="row">
+                                <div class="col-md-6">
+                                <label class="form-label fw-bold">
+                                Class
+                                </label>
+                                <select
+                                class="form-select"
+                                name="academic_level_id"
+                                required>
+                                <?php foreach($levels as $level): ?>
+                                <option value="<?= $level['id']; ?>">
+                                <?= htmlspecialchars($level['level_code']); ?>
+                                </option>
+                                <?php endforeach; ?>
+                                </select>
+                                </div>
+                                <div class="col-md-6">
+                                <label class="form-label fw-bold">
+                                Topic (Optional)
+                                </label>
+                                <input
+                                type="text"
+                                class="form-control"
+                                name="topic"
+                                placeholder="e.g Algebra">
+                                </div>
+                                </div>
+                                <hr>
+                                <?php endif; ?>
                                 <label class="form-label fw-bold">Question Type</label>
                                 <select class="form-select form-select-lg" name="question_type" id="questionType" required>
                                     <option value="multiple_choice_single" <?php echo (!$edit_question || !$edit_question['question_type'] || $edit_question['question_type'] == 'multiple_choice_single') ? 'selected' : ''; ?>>Single Choice Question</option>
@@ -395,9 +431,21 @@ ORDER BY t.created_at DESC
             </div>
 
             <!-- Test Overview -->
+             <?php if(!$isBankMode): ?>
             <div class="col-lg-4">
                 <div class="question-card">
                     <h5 class="mb-3">Test Overview</h5>
+                    <?php if ($isBankMode): ?>
+
+                        <div class="alert alert-info">
+
+                        <strong>Question Bank Mode</strong><br>
+
+                        This question will be saved to the Question Bank and can later be reused in multiple tests.
+
+                        </div>
+
+                        <?php endif; ?>
                     <?php if ($current_test): ?>
                         <div class="alert alert-primary">
                             <strong><?php echo htmlspecialchars($current_test['title']); ?></strong><br>
@@ -418,6 +466,7 @@ ORDER BY t.created_at DESC
                     <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
     </div>
 

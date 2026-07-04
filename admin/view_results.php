@@ -197,7 +197,7 @@ try {
                     FROM results r
                     JOIN students s ON r.user_id = s.id
                     JOIN tests t ON r.test_id = t.id
-                    JOIN classes c ON t.academic_level_id = c.academic_level_id
+                    JOIN classes c ON s.class = c.id
                     JOIN academic_levels al ON t.academic_level_id = al.id
                     WHERE 1=1";
 

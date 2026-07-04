@@ -26,6 +26,8 @@ try {
         error_log("Database connection failed: " . ($conn ? $conn->connect_error : 'No connection'));
         $error = "Database connection failed. Please try again later.";
     }
+
+    
 } catch (Exception $e) {
     error_log("DB init error: " . $e->getMessage());
     $error = "System error";
