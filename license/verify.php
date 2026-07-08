@@ -27,11 +27,7 @@ class LicenseVerifier
             throw new Exception("Invalid public key.");
         }
     }
-
-    /**
-     * Verify License
-     */
-    public function activate($licenseText)
+    private function parseAndVerifyLicense(string $licenseText): array
     {
         $decoded = json_decode(base64_decode($licenseText), true);
 
@@ -40,26 +36,21 @@ class LicenseVerifier
         }
 
         if (
-            !isset($decoded['payload']) ||
-            !isset($decoded['signature'])
+            !isset($decoded["payload"]) ||
+            !isset($decoded["signature"])
         ) {
             throw new Exception("Corrupted license.");
         }
 
-        $payload = $decoded['payload'];
+        $payload = $decoded["payload"];
 
-        $signature = base64_decode($decoded['signature']);
+        $signature = base64_decode($decoded["signature"]);
 
         $ok = openssl_verify(
-
             $payload,
-
             $signature,
-
             $this->publicKey,
-
             OPENSSL_ALGO_SHA256
-
         );
 
         if ($ok !== 1) {
@@ -69,70 +60,100 @@ class LicenseVerifier
         $license = json_decode($payload, true);
 
         if (!$license) {
-            throw new Exception("License payload invalid.");
+            throw new Exception("Invalid license payload.");
         }
 
         $machine = MachineFingerprint::generate();
 
-        if ($license['machine'] !== $machine) {
-            throw new Exception("License belongs to another computer.");
+        if ($machine !== $license["machine"]) {
+            throw new Exception(
+                "This license belongs to another computer."
+            );
         }
 
-        $stmt = $this->db->prepare("DELETE FROM licenses");
-        $stmt->execute();
+        return [
+            "license" => $license,
+            "machine" => $machine
+        ];
+    }
+    /**
+     * Verify License
+     */
+    public function activate($licenseText)
+    {
+        $data = $this->parseAndVerifyLicense($licenseText);
 
+        $license = $data["license"];
+
+        $machine = $data["machine"];
+        $this->db->query("DELETE FROM licenses");
         $stmt = $this->db->prepare("
 
-            INSERT INTO licenses(
+        INSERT INTO licenses(
 
-                school_name,
+        school_name,
 
-                license_key,
+        license_key,
 
-                machine_fingerprint,
+        machine_fingerprint,
 
-                license_type,
+        license_signature,
 
-                activation_date,
+        activation_date,
 
-                expiry_date,
+        expiry_date,
 
-                status,
+        status,
 
-                last_verified,
+        last_verified,
 
-                last_system_time
+        last_system_time
 
-            )
+        )
 
-            VALUES(
+        VALUES(
 
-                ?,?,?,?,?,?,
-                'active',
-                NOW(),
-                NOW()
+        ?,?,?,?,?,
 
-            )
+        ?,
+
+        'active',
+
+        NOW(),
+
+        NOW()
+
+        )
 
         ");
 
         $now = date('Y-m-d H:i:s');
+        $signature = generateLicenseSignature([
 
+        "school_name" => $license["school"],
+
+        "machine_fingerprint" => $machine,
+
+        "expiry_date" => $license["expiry"],
+
+        "status" => "active"
+
+    ]);
         $stmt->bind_param(
 
-            "ssssss",
+        "ssssss",
 
-            $license['school'],
+        $license["school"],
 
-            $licenseText,
+        $licenseText,
 
-            $machine,
+        $machine,
 
-            $license['type'],
+        $signature,
 
-            $now,
+        $now,
 
-            $license['expiry']
+        $license["expiry"]
 
         );
 
@@ -140,4 +161,57 @@ class LicenseVerifier
 
         return true;
     }
+    public function renew($licenseText)
+    {
+        $data = $this->parseAndVerifyLicense($licenseText);
+
+        $license = $data["license"];
+
+        $machine = $data["machine"];
+        $signature = generateLicenseSignature([
+
+            "school_name"=>$license["school"],
+
+            "machine_fingerprint"=>$machine,
+
+            "expiry_date"=>$license["expiry"],
+
+            "status"=>"active"
+
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Existing License
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt = $this->db->prepare("
+            UPDATE licenses
+            SET
+            school_name=?,
+            license_key=?,
+            machine_fingerprint=?,
+            license_signature=?,
+            expiry_date=?,
+            status='active',
+            last_verified=NOW(),
+            last_system_time=NOW()
+            LIMIT 1
+        ");
+
+        $stmt->bind_param(
+        "sssss",
+        $license["school"],
+        $licenseText,
+        $machine,
+        $signature,
+        $license["expiry"]
+        );
+
+        $stmt->execute();
+
+        return true;
+    }
 }
+?>

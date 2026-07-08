@@ -1,20 +1,60 @@
 <?php
 
 require_once "config.php";
+define(
+    'BACKUP_DIRECTORY',
+    __DIR__ . DIRECTORY_SEPARATOR . 'backups'
+);
+
+if (!is_dir(BACKUP_DIRECTORY)) {
+
+    if (!mkdir(BACKUP_DIRECTORY, 0755, true)) {
+
+        throw new RuntimeException(
+            "Unable to create backup directory."
+        );
+
+    }
+
+}
+
+if (!is_writable(BACKUP_DIRECTORY)) {
+    throw new RuntimeException(
+        "Backup directory is not writable."
+    );
+}
+
+function getBackupConfig(): array
+{
+    return [
+        'dbHost'      => $GLOBALS['dbHost'],
+        'dbUser'      => $GLOBALS['dbUser'],
+        'dbPass'      => $GLOBALS['dbPass'],
+        'dbName'      => $GLOBALS['dbName'],
+        'mysqldump'   => $GLOBALS['mysqldump'],
+        'mysql'       => $GLOBALS['mysql'],
+        'backupDir'   => BACKUP_DIRECTORY
+    ];
+}
+
 
 /**
  * Generate backup filename
  */
-function generateBackupFilename()
+function generateBackupFilename(): string
 {
-    return "cbt_backup_" . date("Y-m-d_H-i-s") . ".sql";
+   return sprintf(
+        "%s_backup_%s.sql",
+        $GLOBALS['dbName'],
+        date("Y-m-d_H-i-s")
+    );
 }
 
 
 /**
  * Convert bytes to readable format
  */
-function formatFileSize($bytes)
+function formatFileSize(int $bytes): string
 {
     if ($bytes >= 1073741824)
         return number_format($bytes / 1073741824, 2) . " GB";
@@ -32,8 +72,12 @@ function formatFileSize($bytes)
 /**
  * Generate SHA256 checksum
  */
-function generateChecksum($file)
+function generateChecksum(string $file): string
 {
+    if (!file_exists($file)) {
+        return "";
+    }
+
     return hash_file("sha256", $file);
 }
 
@@ -41,9 +85,16 @@ function generateChecksum($file)
 /**
  * Verify backup integrity
  */
-function verifyBackup($file, $checksum)
+function verifyBackup(string $file, string $checksum): bool
 {
-    return hash_file("sha256", $file) === $checksum;
+    if (!file_exists($file)) {
+        return false;
+    }
+
+    return hash_equals(
+        $checksum,
+        hash_file("sha256",$file)
+    );
 }
 
 
@@ -57,7 +108,7 @@ function saveBackupRecord(
     $filesize,
     $checksum,
     $createdBy
-)
+): bool
 {
     $stmt = $conn->prepare("
         INSERT INTO backups
@@ -81,33 +132,40 @@ function saveBackupRecord(
         $createdBy
     );
 
-    return $stmt->execute();
+    $result = $stmt->execute();
+    $stmt->close();
+
+    return $result;
 }
 
 
 /**
  * Get backup by ID
  */
-function getBackup(mysqli $conn, $id)
+function getBackup(mysqli $conn, int $id): ?array
 {
     $stmt = $conn->prepare("
         SELECT *
         FROM backups
-        WHERE id=?
+        WHERE id = ?
     ");
 
     $stmt->bind_param("i", $id);
-
     $stmt->execute();
 
-    return $stmt->get_result()->fetch_assoc();
+    $result = $stmt->get_result();
+    $backup = $result->fetch_assoc();
+
+    $stmt->close();
+
+    return $backup ?: null;
 }
 
 
 /**
  * Delete backup record
  */
-function deleteBackupRecord(mysqli $conn, $id)
+function deleteBackupRecord(mysqli $conn, $id): bool
 {
     $stmt = $conn->prepare("
         DELETE
@@ -117,20 +175,24 @@ function deleteBackupRecord(mysqli $conn, $id)
 
     $stmt->bind_param("i", $id);
 
-    return $stmt->execute();
+    $result = $stmt->execute();
+
+    $stmt->close();
+
+    return $result;
 }
 
 
 /**
  * Get all backups
  */
-function getAllBackups(mysqli $conn)
+function getAllBackups(mysqli $conn): mysqli_result|false
 {
     return $conn
         ->query("
             SELECT
                 backups.*,
-                admins.full_name
+                admins.username
             FROM backups
 
             LEFT JOIN admins
@@ -144,81 +206,141 @@ function getAllBackups(mysqli $conn)
 /**
  * Execute mysqldump
  */
-function createDatabaseBackup()
-{
-    global
-        $dbHost,
-        $dbUser,
-        $dbPass,
-        $dbName,
-        $backupDirectory,
-        $mysqldump;
+function createDatabaseBackup():string|false{
+        try{
+            $config = getBackupConfig();
 
-    if (!file_exists($mysqldump)) {
-        return false;
+            extract($config);
+
+            if (!file_exists($mysqldump)) {
+                return false;
+            }
+
+            $filename = generateBackupFilename();
+
+            $filepath = BACKUP_DIRECTORY . DIRECTORY_SEPARATOR . $filename;
+
+            $command  = escapeshellarg($mysqldump) . " ";
+            $command .= "--host=" . escapeshellarg($dbHost) . " ";
+            $command .= "--user=" . escapeshellarg($dbUser) . " ";
+
+            if (!empty($dbPass)) {
+                $command .= "--password=" . escapeshellarg($dbPass) . " ";
+            }
+
+            $command .= "--routines --triggers --events ";
+            $command .= "--single-transaction ";
+            $command .= "--databases " . escapeshellarg($dbName) . " ";
+            $command .= "> " . escapeshellarg($filepath);
+
+            $lock = fopen(
+            BACKUP_DIRECTORY . "/backup.lock",
+                "c"
+            );
+
+            if ($lock === false) {
+                return false;
+            }
+
+            if (!flock($lock, LOCK_EX | LOCK_NB)) {
+                fclose($lock);
+                return false;
+            }
+
+            exec($command, $output, $returnCode);
+
+            if ($returnCode !== 0) {
+                error_log(
+                    implode(PHP_EOL, $output)
+                );
+            }
+
+            flock($lock, LOCK_UN);
+
+            fclose($lock);
+
+            if ($returnCode !== 0) {
+                return false;
+            }
+
+            if (!file_exists($filepath) || filesize($filepath) === 0) {
+                return false;
+            }
+
+            return $filepath;
+        }catch(Throwable $e) {
+            error_log($e->getMessage());
+            return false;
+        }
+        
     }
 
-    $filename = generateBackupFilename();
-
-    $filepath = $backupDirectory . DIRECTORY_SEPARATOR . $filename;
-
-    $command = "\"{$mysqldump}\" "
-        . "--host=\"{$dbHost}\" "
-        . "--user=\"{$dbUser}\" ";
-
-    if (!empty($dbPass)) {
-        $command .= "--password=\"{$dbPass}\" ";
-    }
-
-    $command .= "--routines --triggers --events ";
-    $command .= "--single-transaction ";
-    $command .= "--databases \"{$dbName}\" ";
-    $command .= "> \"{$filepath}\"";
-
-    exec($command, $output, $returnCode);
-
-    if ($returnCode !== 0) {
-        return false;
-    }
-
-    if (!file_exists($filepath) || filesize($filepath) == 0) {
-        return false;
-    }
-
-    return $filepath;
-}
 
 
 /**
  * Restore a backup using the mysql client.
  */
-function restoreDatabaseBackup($backupFile)
-{
-    global $dbHost,
-           $dbUser,
-           $dbPass,
-           $dbName,
-           $mysql;
+function restoreDatabaseBackup(string $backupFile):bool
+    {
+        try{
+            $config = getBackupConfig();
 
-    if (!file_exists($mysql)) {
-        return false;
+        extract($config);
+
+        if (!file_exists($mysql)) {
+            return false;
+        }
+
+        if (!file_exists($backupFile)) {
+            return false;
+        }
+
+        if (filesize($backupFile) === 0) {
+            return false;
+        }
+
+        if (
+            strtolower(pathinfo(
+                $backupFile,
+                PATHINFO_EXTENSION
+            )) !== "sql"
+        ) {
+            return false;
+        }
+        $command = escapeshellarg($mysql) . " ";
+        $command .= "--host=" . escapeshellarg($dbHost) . " ";
+        $command .= "--user=" . escapeshellarg($dbUser) . " ";
+
+        if (!empty($dbPass)) {
+            $command .= "--password=" . escapeshellarg($dbPass) . " ";
+        }
+
+        $command .= escapeshellarg($dbName) . " < " . escapeshellarg($backupFile);
+
+        $lock = fopen(
+        BACKUP_DIRECTORY . "/backup.lock",
+            "c"
+        );
+
+        if ($lock === false) {
+            return false;
+        }
+
+        if (!flock($lock, LOCK_EX | LOCK_NB)) {
+            fclose($lock);
+            return false;
+        }
+
+        exec($command, $output, $returnCode);
+
+        flock($lock, LOCK_UN);
+
+        fclose($lock);
+
+        return ($returnCode === 0);
+        }catch (Throwable $e){
+            error_log($e->getMessage());
+            return false;
+        }
+        
     }
-
-    if (!file_exists($backupFile)) {
-        return false;
-    }
-
-    $command = "\"{$mysql}\" ";
-    $command .= "--host=\"{$dbHost}\" ";
-    $command .= "--user=\"{$dbUser}\" ";
-
-    if (!empty($dbPass)) {
-        $command .= "--password=\"{$dbPass}\" ";
-    }
-
-    $command .= "\"{$dbName}\" < \"{$backupFile}\"";
-
-    exec($command, $output, $returnCode);
-
-    return ($returnCode === 0);
-}

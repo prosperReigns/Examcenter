@@ -2,7 +2,7 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once '../includes/license_guard.php';
+require_once '../license/license_guard.php';
 
 // Enable error reporting
 ini_set('display_errors', 1);

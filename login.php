@@ -7,6 +7,8 @@ error_reporting(E_ALL);
 ini_set('log_errors', 1);
 ini_set('error_log', '../logs/errors.log');
 
+require_once __DIR__ . '/includes/audit.php';
+
 // Define base path
 define('BASE_PATH', dirname(dirname(__FILE__)));
 try {
@@ -208,13 +210,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
                         $_SESSION['user_username'] = $row['username'];
                         $_SESSION['user_role'] = strtolower($row['role']);
 
-                        Logger::log("Successful login for username=$username, role={$row['role']} table=$table from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+                        logAudit(
+                            $conn,
+                            $row['id'],
+                            "Authentication",
+                            "Successful login for username={$row['username']}",
+                            "LOGIN"
+                        );
 
                         redirectByRole($_SESSION['user_role'], $setupCompleted);
                         exit;
                     } else {
                         $error = "Invalid login credentials";
-                        Logger::log("Failed login attempt for username=$username: Invalid password table=$table from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+                        logAudit(
+                        $conn,
+                        null,
+                        "Authentication",
+                        "Failed login attempt for username={$username}",
+                        "FAILED LOGIN"
+                    );
                         $loggedIn = true;
                         break;
                     }
@@ -224,7 +238,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
 
             if (!$loggedIn && empty($error)) {
                 $error = "Invalid login credentials";
-                Logger::log("Failed login attempt: Username=$username not found from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+                logAudit(
+                    $conn,
+                    null,
+                    "Authentication",
+                    "Unknown username attempted: {$username}",
+                    "FAILED LOGIN"
+                );
             }
         }
     } catch (Exception $e) {

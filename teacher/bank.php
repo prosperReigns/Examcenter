@@ -2,7 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once '../vendor/autoload.php'; // Adjust path if PHPWord is elsewhere
+require_once __DIR__ . '/../license/license_guard.php';
+require_once '../vendor/autoload.php';
 
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\IOFactory;
@@ -195,11 +196,46 @@ while($row = $result->fetch_assoc()){
         </div>
 
             <!-- Header -->
-            <div class="header d-flex justify-content-between align-items-center mb-4">
+            <div class="header d-flex justify-content-between align-items-center mb-4 bg-white">
                 <h2 class="mb-0">Question Bank</h2>
                 <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
             </div>
 
+            <div class="row mb-4">
+
+            <div class="col-md-3">
+
+            <div class="card shadow-sm border-0">
+
+            <div class="card-body">
+
+            <h6>Total Questions</h6>
+
+            <h2><?= $result ? $result->num_rows : 0 ?></h2>
+
+            </div>
+
+            </div>
+
+            </div>
+
+            <div class="col-md-3">
+
+            <div class="card shadow-sm border-0">
+
+            <div class="card-body">
+
+            <h6>Subjects</h6>
+
+            <h2><?= count($assigned_subjects) ?></h2>
+
+            </div>
+
+            </div>
+
+            </div>
+
+            </div>
             <div class="card mb-3">
                 <div class="card-body">
                 <form method="GET">
@@ -287,80 +323,97 @@ value="<?= htmlspecialchars($level['level_code']); ?>">
                 <h5>Question Bank</h5>
                 <h6>Store reusable questions that can later be added to any test.</h6>
 
-                <a href="add_question.php?mode=bank" class="btn btn-primary">
-                    <i class="fas fa-plus"></i>
+                <a href="add_question.php?mode=bank" class="btn btn-success">
+                    <i class="fas fa-plus-circle"></i>
                     Add Question
                 </a>
             </div>
 
             <div class="card-body">
                 <form action="add_questions_to_test.php" method="POST" id="bankForm">
-                <table class="table table-bordered table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th width="40">
-                            <input
-                            type="checkbox"
-                            id="masterCheckbox">
-                            </th>
-                            <th>#</th>
-                            <th>Question</th>
-                            <th>Class</th>
-                            <th>Subject</th>
-                            <th>Type</th>
-                            <th>Date Added</th>
-                            <th>Used In</th>
-                            <th>Action</th>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle ">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th width="40">
+                                    <input
+                                    type="checkbox"
+                                    id="masterCheckbox">
+                                    </th>
+                                    <th>#</th>
+                                    <th>Question</th>
+                                    <th>Class</th>
+                                    <th>Subject</th>
+                                    <th>Type</th>
+                                    <th>Date Added</th>
+                                    <th>Used In</th>
+                                    <th>Action</th>
 
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php
-                    if($result && $result->num_rows > 0):
-                        $sn = 1;
-                        while($row = $result->fetch_assoc()):
-                    ?>
-                        <tr>
-                            <td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php
+                            if($result && $result->num_rows > 0):
+                                $sn = 1;
+                                while($row = $result->fetch_assoc()):
+                            ?>
+                                <tr>
+                                    <td>
 
-                            <input
-                            type="checkbox"
-                            name="questions[]"
-                            value="<?= $row['id']; ?>"
-                            class="questionCheckbox">
+                                    <input
+                                    type="checkbox"
+                                    name="questions[]"
+                                    value="<?= $row['id']; ?>"
+                                    class="questionCheckbox">
 
-                            </td>
-                            <td><?= $sn++; ?></td>
-                            <td><?= htmlspecialchars($row['question_text']); ?></td>
-                            <td><?= htmlspecialchars($row['class']); ?></td>
-                            <td><?= htmlspecialchars($row['subject']); ?></td>
-                            <td><?= ucwords(str_replace("_"," ",$row['question_type'])); ?></td>
-                            <td><?= date("d M Y", strtotime($row['created_at'])); ?></td>
-                            <td>Not Used</td>
-                            <td>
-                                <a href="view_question.php?id=<?= $row['id']; ?>" class="btn btn-sm btn-info">
-                                    View
-                                </a>
-                                <a href="edit_question.php?id=<?= $row['id']; ?>" class="btn btn-sm btn-warning">
-                                    Edit
-                                </a>
-                                <a href="delete_question.php?id=<?= $row['id']; ?>" class="btn btn-sm btn-danger">
-                                    Delete
-                                </a>
-                            </td>
-                        </tr>
-                    <?php
-                        endwhile;
-                    else:
-                    ?>
-                        <tr>
-                            <td colspan="9" class="text-center">
-                                No questions found.
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
+                                    </td>
+                                    <td><?= $sn++; ?></td>
+                                    <td><?= htmlspecialchars($row['question_text']); ?></td>
+                                    <td><?= htmlspecialchars($row['class']); ?></td>
+                                    <td><?= htmlspecialchars($row['subject']); ?></td>
+                                    <td><?= ucwords(str_replace("_"," ",$row['question_type'])); ?></td>
+                                    <td><?= date("d M Y", strtotime($row['created_at'])); ?></td>
+                                    <td>Not Used</td>
+                                    <td>
+                                    <a
+                                            href="view_question.php?id=<?= $row['id']; ?>"
+                                            class="btn btn-sm btn-outline-primary">
+
+                                            <i class="fas fa-eye"></i>
+                                                view
+                                            </a>
+
+                                            <a
+                                            href="edit_question.php?id=<?= $row['id']; ?>"
+                                            class="btn btn-sm btn-outline-warning">
+
+                                            <i class="fas fa-edit"></i>
+                                                edit
+                                            </a>
+
+                                            <a
+                                            href="delete_question.php?id=<?= $row['id']; ?>"
+                                            class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Delete this question?')">
+
+                                            <i class="fas fa-trash"></i>
+                                                delete
+                                            </a>
+                                    </td>
+                                </tr>
+                            <?php
+                                endwhile;
+                            else:
+                            ?>
+                                <tr>
+                                    <td colspan="9" class="text-center">
+                                        No questions found.
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 <div class="mt-3 d-flex justify-content-between align-items-center">
 
                     <div>
@@ -372,10 +425,9 @@ value="<?= htmlspecialchars($level['level_code']); ?>">
                             Select All
                         </button>
 
-                        <span class="ms-3 fw-bold text-primary">
+                        <span class="badge bg-primary ms-3 fs-6 px-3 py-2">
                             Selected:
                             <span id="selectedCount">0</span>
-                            question(s)
                         </span>
                     </div>
                     <?php if(isset($_SESSION['current_test_id'])): ?>
@@ -416,40 +468,44 @@ value="<?= htmlspecialchars($level['level_code']); ?>">
         const checkboxes = document.querySelectorAll(".questionCheckbox");
         const selectedCount = document.getElementById("selectedCount");
 
-        function updateSelectedCount() {
-
+        function updateSelectedCount(){
             let count = 0;
 
-            checkboxes.forEach(box => {
+            checkboxes.forEach(box=>{
                 if(box.checked){
                     count++;
                 }
             });
-
             selectedCount.textContent = count;
-        }
-                master.addEventListener("change", function(){
+            const badge = selectedCount.parentElement;
 
+            if(count > 0){
+                badge.classList.remove("bg-secondary");
+                badge.classList.add("bg-success");
+            }else{
+                badge.classList.remove("bg-success");
+                badge.classList.add("bg-secondary");
+            }
+        }
+
+        master.addEventListener("change", function(){
             checkboxes.forEach(box=>{
                 box.checked = master.checked;
             });
-
             updateSelectedCount();
-
         });
 
         document.getElementById("selectAllBtn")
         .addEventListener("click", function(){
-            let allSelected = true;
+
+            const selectAll = [...checkboxes].some(box => !box.checked);
+
             checkboxes.forEach(box=>{
-                if(!box.checked){
-                    allSelected = false;
-                }
+                box.checked = selectAll;
             });
-            checkboxes.forEach(box=>{
-                box.checked = !allSelected;
-            });
-            master.checked = !allSelected;
+
+            master.checked = selectAll;
+
             updateSelectedCount();
 
         });
@@ -457,21 +513,23 @@ value="<?= htmlspecialchars($level['level_code']); ?>">
         checkboxes.forEach(box => {
             box.addEventListener("change", function(){
                 let checked = 0;
-                checkboxes.forEach(c=>{
+
+                checkboxes.forEach(c => {
                     if(c.checked){
                         checked++;
                     }
                 });
-                master.checked = checked === checkboxes.length;
+
+                master.checked = (checked === checkboxes.length && checkboxes.length > 0);
+
                 updateSelectedCount();
             });
-
         });
 
         updateSelectedCount();
         </script>
-                    </body>
-                    </html>
-                    <?php
-                    $conn->close();
-                    ?>
+    </body>
+</html>
+<?php
+$conn->close();
+?>

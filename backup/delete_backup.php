@@ -6,19 +6,22 @@ require_once "backup_functions.php";
 
 require_once "../includes/audit.php";
 
+$conn = Database::connection();
+$conn->begin_transaction();
+
 // Ensure admin is logged in
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../login.php");
     exit;
 }
 
-if (!isset($_POST['id']) || !is_numeric($_GET['id'])) {
+if (!isset($_POST['id']) || !is_numeric($_POST['id'])) {
     $_SESSION['error'] = "Invalid backup selected.";
     header("Location: backup_list.php");
     exit;
 }
 
-$id = (int) $_GET['id'];
+$id = (int) $_POST['id'];
 
 $backup = getBackup($conn, $id);
 
@@ -28,13 +31,23 @@ if (!$backup) {
     exit;
 }
 
-$file = $backupDirectory . DIRECTORY_SEPARATOR . $backup['filename'];
+$file = BACKUP_DIRECTORY. DIRECTORY_SEPARATOR . $backup['filename'];
 
 // Verify the file path is inside the backup directory
-$realBackupDir = realpath($backupDirectory);
+$realBackupDir = realpath(BACKUP_DIRECTORY);
+
+if (!is_dir(BACKUP_DIRECTORY)) {
+    $_SESSION['error'] = "Backup directory does not exist.";
+    header("Location: backup_list.php");
+    exit;
+}
+
 $realFile = file_exists($file) ? realpath($file) : null;
 
-if ($realFile !== null && strpos($realFile, $realBackupDir) !== 0) {
+if (
+    $realFile !== null &&
+    strncmp($realFile, $realBackupDir, strlen($realBackupDir)) !== 0
+) {
     $_SESSION['error'] = "Invalid backup path.";
     header("Location: backup_list.php");
     exit;
@@ -66,15 +79,19 @@ try {
         logAudit(
             $conn,
             $_SESSION['user_id'],
-            "Delete Backup",
-            "Deleted backup: " . $backup['filename']
+            "Backups",
+            "Deleted backup '{$backup['filename']}'",
+            "DELETE"
         );
 
     }
 
     $_SESSION['success'] = "Backup deleted successfully.";
+    $conn->commit();
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+
+    $conn->rollback();
 
     $_SESSION['error'] = $e->getMessage();
 

@@ -6,6 +6,9 @@ require_once "backup_functions.php";
 
 require_once "../includes/audit.php";
 
+$conn = Database::connection();
+$conn->begin_transaction();
+
 // Ensure admin is logged in
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../login.php");
@@ -54,17 +57,26 @@ try {
         logAudit(
             $conn,
             $adminId,
-            "Create Backup",
-            "Created backup: {$filename}"
+            "Backups",
+            "Created backup: {$filename}",
+            "CREATE"
         );
     }
+    $conn->commit();
 
     $_SESSION['success'] = "Database backup created successfully.";
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+
+    if ($conn->errno === 0) {
+        $conn->rollback();
+    }
+
+    if (isset($backupPath) && file_exists($backupPath)) {
+        @unlink($backupPath);
+    }
 
     $_SESSION['error'] = $e->getMessage();
-
 }
 
 header("Location: backup_list.php");

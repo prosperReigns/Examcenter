@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once __DIR__ . '/../license/license_guard.php';
 
 // Determine page mode
 $isBankMode = isset($_GET['mode']) && $_GET['mode'] === 'bank';

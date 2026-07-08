@@ -1,6 +1,7 @@
 <?php
 require '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 $conn = Database::getInstance()->getConnection();
 
 $class = $_GET['class'];

@@ -4,6 +4,7 @@ session_start();
 require_once "../db.php";
 require_once "../includes/audit.php";
 
+$conn = Database::connection();
 //------------------------------------------------------
 // Authentication
 //------------------------------------------------------

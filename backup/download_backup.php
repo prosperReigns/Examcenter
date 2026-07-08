@@ -6,6 +6,8 @@ require_once "backup_functions.php";
 
 require_once "../includes/audit.php";
 
+$conn = Database::connection();
+
 // Ensure admin is logged in
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../login.php");
@@ -28,7 +30,16 @@ if (!$backup) {
     exit;
 }
 
-$file = $backupDirectory . DIRECTORY_SEPARATOR . $backup['filename'];
+$file = BACKUP_DIRECTORY . DIRECTORY_SEPARATOR . $backup['filename'];
+
+$realBackupDir = realpath(BACKUP_DIRECTORY);
+$realFile = file_exists($file) ? realpath($file) : null;
+
+if ($realFile === false || strncmp($realFile, $realBackupDir, strlen($realBackupDir)) !== 0) {
+    $_SESSION['error'] = "Invalid backup path.";
+    header("Location: backup_list.php");
+    exit;
+}
 
 if (!file_exists($file)) {
     $_SESSION['error'] = "Backup file no longer exists.";
@@ -52,8 +63,9 @@ if (function_exists('logAudit')) {
     logAudit(
         $conn,
         $_SESSION['user_id'],
-        "Download Backup",
-        "Downloaded backup: " . $backup['filename']
+        "Backups",
+        "Downloaded backup '{$backup['filename']}'",
+        "DOWNLOAD"
     );
 }
 
@@ -70,5 +82,12 @@ header('Cache-Control: no-cache');
 header('Pragma: public');
 header('Expires: 0');
 
-readfile($file);
+$handle = fopen($file, "rb");
+
+while (!feof($handle)) {
+    echo fread($handle, 8192);
+    flush();
+}
+
+fclose($handle);
 exit;

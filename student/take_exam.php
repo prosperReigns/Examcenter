@@ -2,6 +2,7 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);

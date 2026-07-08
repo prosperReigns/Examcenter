@@ -2,6 +2,7 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 
 header('Content-Type: text/html; charset=UTF-8');
 
@@ -139,87 +140,109 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
     $academic_year_id = (int) $active_term['id'];
 
     /**
-     * FETCH SUBJECTS FOR STUDENT CLASS
+     * FETCH TESTS FOR THIS CLASS
+     * (Only tests that already exist)
      */
+
     $stmt = $conn->prepare("
-        SELECT s.id, s.subject_name
-        FROM subjects s
-        JOIN subject_levels sl ON sl.subject_id = s.id
-        JOIN academic_levels al ON al.class_group = sl.class_level
-        JOIN classes c ON c.academic_level_id = al.id
-        WHERE c.id = ?
-        ORDER BY s.subject_name
+    SELECT
+        t.id,
+        t.title,
+        t.subject
+    FROM tests t
+    JOIN classes c
+        ON c.academic_level_id = t.academic_level_id
+    WHERE c.id = ?
+    AND t.year = ?
+    ORDER BY t.created_at
     ");
-    $stmt->bind_param("i", $student['class_id']);
+
+    $stmt->bind_param(
+        "is",
+        $student['class_id'],
+        $active_term['year']
+    );
+
     $stmt->execute();
-    $subjects = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    /**
-     * FETCH EXISTING SCORES
-     */
     $stmt = $conn->prepare("
-        SELECT *
-        FROM student_subject_scores
-        WHERE student_id = ?
-          AND academic_year_id = ?
+    SELECT DISTINCT
+        t.id,
+        t.title
+    FROM tests t
+    JOIN classes c
+        ON c.academic_level_id=t.academic_level_id
+    WHERE c.id=?
+    AND t.year=?
+    ORDER BY t.created_at
     ");
-    $stmt->bind_param("ii", $student_id, $academic_year_id);
-    $stmt->execute();
 
-    $scores_raw = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->bind_param(
+        "is",
+        $student['class_id'],
+        $active_term['year']
+    );
+
+    $stmt->execute();
+    $tests=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $scores = [];
-    foreach ($subjects as $subject) {
-        $subject_id = $subject['id'];
+    $stmt=$conn->prepare("
+    SELECT
+        s.id AS subject_id,
+        s.subject_name,
+        t.id AS test_id,
+        t.title,
+        r.score,
+        r.total_questions
+    FROM results r
+    JOIN tests t
+    ON r.test_id=t.id
+    JOIN subjects s
+    ON LOWER(TRIM(s.subject_name))
+    =
+    LOWER(TRIM(
+    REPLACE(
+    SUBSTRING_INDEX(t.subject,'(',1),
+    ')',
+    ''
+    )
+    ))
+    JOIN classes c
+    ON c.academic_level_id=t.academic_level_id
+    WHERE
+    r.user_id=?
+    AND c.id=?
+    AND t.year=?
+    ORDER BY
+    s.subject_name,
+    t.created_at
+    ");
 
-        // Initialize scores array
-        $scores[$subject_id] = [
-            'subject_id' => $subject_id,
-            'ca1' => 0,
-            'ca2' => 0,
-            'ca3' => 0,
-            'ca4' => 0,
-            'exam' => 0
+    $stmt->bind_param(
+        "iis",
+        $student_id,
+        $student['class_id'],
+        $active_term['year']
+    );
+
+    $stmt->execute();
+
+    $reportRows=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    $stmt->close();
+
+    $subjects=[];
+    $report=[];
+
+    foreach($reportRows as $row){
+        $subjects[$row['subject_id']]=$row['subject_name'];
+        $report[$row['subject_id']][$row['test_id']]=[
+            'score'=>$row['score'],
+            'total'=>$row['total_questions']
         ];
-
-        // Populate from student_subject_scores if available
-        foreach ($scores_raw as $row) {
-            if ($row['subject_id'] == $subject_id) {
-                $scores[$subject_id] = [
-                    'subject_id' => $subject_id,
-                    'ca1' => (int)$row['ca1'],
-                    'ca2' => (int)$row['ca2'],
-                    'ca3' => (int)$row['ca3'],
-                    'ca4' => (int)$row['ca4'],
-                    'exam' => (int)$row['exam']
-                ];
-            }
-        }
-
-        // Auto-populate exam score from `results` table if empty
-        if ($scores[$subject_id]['exam'] === 0) {
-            $stmt_exam = $conn->prepare("
-                SELECT score
-                FROM results r
-                JOIN tests t ON t.id = r.test_id
-                WHERE r.user_id = ? 
-                AND t.subject = ? 
-                AND t.year = ?
-                LIMIT 1
-            ");
-            $stmt_exam->bind_param('iss', $student_id, $subject['subject_name'], $active_term['year']);
-            $stmt_exam->execute();
-            $exam_result = $stmt_exam->get_result()->fetch_assoc();
-            $stmt_exam->close();
-
-            if ($exam_result) {
-                $scores[$subject_id]['exam'] = (int)$exam_result['score'];
-            }
-        }
     }
-
 } catch (Exception $e) {
     error_log("Student profile error: " . $e->getMessage());
     echo "<pre>System error: " . $e->getMessage() . "</pre>"; 
@@ -256,11 +279,89 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
         .grade-cell {
             font-weight: bold;
         }
-        .profile-card img {
-            width: 120px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 50%;
+        .profile-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.08);
+        }
+        .profile-photo{
+            width:150px;
+            height:150px;
+            object-fit:cover;
+            border-radius:50%;
+            border:5px solid #fff;
+            box-shadow:0 4px 15px rgba(0,0,0,.2);
+        }
+        .profile-label{
+            font-size:.85rem;
+            color:#6c757d;
+            margin-bottom:2px;
+        }
+        .profile-value{
+            font-weight:600;
+            margin-bottom:15px;
+        }
+        .page-title{
+            font-weight:700;
+        }
+        .page-subtitle{
+            color:#6c757d;
+            font-size:.9rem;
+        }
+        .info-icon{
+            width:20px;
+            color:#0d6efd;
+        }
+        .summary-card{
+            border:none;
+            border-radius:15px;
+            box-shadow:0 .5rem 1rem rgba(0,0,0,.08);
+            transition:.25s;
+        }
+
+        .summary-card:hover{
+            transform:translateY(-3px);
+        }
+        .summary-icon{
+            width:60px;
+            height:60px;
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:24px;
+            color:#fff;
+        }
+        .summary-number{
+            font-size:28px;
+            font-weight:700;
+            margin-bottom:0;
+        }
+        .summary-title{
+            color:#6c757d;
+            margin-bottom:4px;
+        }
+        .bg-average{
+            background:#0d6efd;
+        }
+        .bg-subject{
+            background:#198754;
+        }
+        .bg-highest{
+            background:#ffc107;
+            color:#000;
+        }
+        .bg-lowest{
+            background:#dc3545;
+        }
+        .percentage-good{
+            color:#198754;
+        }
+        .percentage-average{
+            color:#ffc107;
+        }
+        .percentage-poor{
+            color:#dc3545;
         }
     </style>
 </head>
@@ -291,10 +392,29 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
     <!-- Main Content -->
     <div class="main-content">
         <!-- Header -->
-        <div class="header d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">View Results</h2>
-            <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+        <div class="header d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+
+        <div class="d-flex align-items-center gap-3">
+            <a href="manage_students.php" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+
+            <div>
+                <h2 class="page-title mb-0">
+                    <i class="fas fa-user-graduate text-primary me-2"></i>
+                    Student Profile
+                </h2>
+
+                <div class="page-subtitle">
+                    View academic information, assessment records and student profile.
+                </div>
+            </div>
         </div>
+
+        <button class="btn btn-primary d-lg-none" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
 
         <!-- Alerts -->
         <?php if ($error): ?>
@@ -310,91 +430,306 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
         <?php endif; ?>
 
         <!-- ================= STUDENT PROFILE ================= -->
-        <div class="card mb-4 profile-card">
-            <div class="card-body d-flex align-items-center gap-4">
-                <img src="/EXAMCENTER/uploads/students/default.png" alt="Student Photo">
-                <div>
-                    <h4><?= htmlspecialchars($student['full_name']) ?></h4>
-                    <p class="mb-1"><strong>Class:</strong> <?= htmlspecialchars($student['full_class_name']) ?></p>
-                    <p class="mb-1"><strong>Parent Email:</strong> <?= htmlspecialchars($student['email'] ?? '') ?></p>
-                    <p class="mb-1"><strong>Parent Phone:</strong> <?= htmlspecialchars($student['phone'] ?? '') ?></p>
-                    <p class="mb-1"><strong>Address:</strong> <?= htmlspecialchars($student['address'] ?? '') ?></p>
-                    <p class="mb-0">
-                        <strong>Academic Session:</strong>
-                        <?= htmlspecialchars($active_term['year'] ?? '') ?> —
-                        <?= htmlspecialchars($active_term['session'] ?? '') ?>
-                    </p>
+        <div class="card profile-card mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0">
+                    <i class="fas fa-id-card text-primary me-2"></i>
+                    Student Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-lg-3 text-center">
+                        <img
+                            src="/EXAMCENTER/uploads/students/default.png"
+                            class="profile-photo mb-3"
+                            alt="Student">
+
+                        <h4 class="fw-bold mb-1">
+                            <?= htmlspecialchars($student['full_name']) ?>
+                        </h4>
+
+                        <span class="badge bg-primary px-3 py-2">
+                            <?= htmlspecialchars($student['full_class_name']) ?>
+                        </span>
+                    </div>
+
+                    <div class="col-lg-9">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="profile-label">
+                                    <i class="fas fa-school info-icon"></i>
+                                    Class
+                                </div>
+
+                                <div class="profile-value">
+                                    <?= htmlspecialchars($student['full_class_name']) ?>
+                                </div>
+
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="profile-label">
+                                    <i class="fas fa-calendar-alt info-icon"></i>
+                                    Academic Session
+                                </div>
+
+                                <div class="profile-value">
+                                    <?= htmlspecialchars($active_term['year']) ?>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="profile-label">
+                                    <i class="fas fa-layer-group info-icon"></i>
+                                    Current Term
+                                </div>
+
+                                <div class="profile-value">
+                                    <?= htmlspecialchars($active_term['session']) ?>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="profile-label">
+                                    <i class="fas fa-envelope info-icon"></i>
+                                    Parent Email
+                                </div>
+
+                                <div class="profile-value">
+                                    <?= htmlspecialchars($student['email'] ?: 'Not Available') ?>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="profile-label">
+                                    <i class="fas fa-phone info-icon"></i>
+                                    Parent Phone
+                                </div>
+
+                                <div class="profile-value">
+                                    <?= htmlspecialchars($student['phone'] ?: 'Not Available') ?>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="profile-label">
+                                    <i class="fas fa-map-marker-alt info-icon"></i>
+                                    Address
+                                </div>
+
+                                <div class="profile-value">
+                                    <?= htmlspecialchars($student['address'] ?: 'Not Available') ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ================= SUMMARY ================= -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="card summary-card">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="summary-icon bg-average me-3">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <div class="summary-title">
+                                Overall Average
+                            </div>
+                            <h3
+                                class="summary-number"
+                                id="summaryAverage">
+                                0%
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card summary-card">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="summary-icon bg-subject me-3">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div>
+                            <div class="summary-title">
+                                Subjects
+                            </div>
+                            <h3
+                                class="summary-number"
+                                id="summarySubjects">
+                                <?= count($subjects) ?>
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card summary-card">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="summary-icon bg-highest me-3">
+                            <i class="fas fa-arrow-up"></i>
+                        </div>
+                        <div>
+                            <div class="summary-title">
+                                Highest Score
+                            </div>
+                            <h3
+                                class="summary-number"
+                                id="summaryHighest">
+                                0
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card summary-card">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="summary-icon bg-lowest me-3">
+                            <i class="fas fa-arrow-down"></i>
+                        </div>
+                        <div>
+                            <div class="summary-title">
+                                Lowest Score
+                            </div>
+                            <h3
+                                class="summary-number"
+                                id="summaryLowest">
+                                0
+                            </h3>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- ================= TERM SWITCH ================= -->
-        <div class="mb-3">
-            <label class="form-label"><strong>Select Term</strong></label>
-            <!-- Replace existing select -->
-            <select id="termSwitcher" class="form-select w-auto" data-student-id="<?= $student_id ?>">
-                <option value="<?= $active_term['id'] ?>"><?= htmlspecialchars($active_term['session'] ?? '') ?></option>
-                <!-- other terms will be dynamically loaded -->
-            </select>
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-calendar-check me-2 text-primary"></i>
+                            Select Academic Term
+                        </label>
+
+                        <select
+                            id="termSwitcher"
+                            class="form-select"
+                            data-student-id="<?= $student_id ?>">
+
+                            <option value="<?= $active_term['id'] ?>">
+                                <?= htmlspecialchars($active_term['session']) ?>
+                            </option>
+
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- ================= RESULT TABLE ================= -->
-        <div class="card">
-            <div class="card-body">
-                <h5 class="mb-3">Student Performance</h5>
+       <!-- ================= STUDENT PERFORMANCE ================= -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line text-primary me-2"></i>
+                        Student Performance
+                    </h5>
+                    <small class="text-muted">
+                        <?= htmlspecialchars($active_term['year']) ?>
+                        •
+                        <?= htmlspecialchars($active_term['session']) ?>
+                    </small>
+                </div>
+                <span class="badge bg-primary fs-6">
+                    <?= count($subjects) ?> Subjects
+                </span>
+            </div>
 
+            <div class="card-body p-0">
+                <?php if(empty($subjects)): ?>
+                    <div class="text-center p-5">
+                        <i class="fas fa-book-open fa-3x text-muted mb-3"></i>
+                        <h5>No Subjects Found</h5>
+                        <p class="text-muted">
+                            No subjects have been assigned to this class.
+                        </p>
+                    </div>
+
+                <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table table-bordered align-middle text-center">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Subject</th>
-                                <th>1st CA (10)</th>
-                                <th>2nd CA (10)</th>
-                                <th>3rd CA (10)</th>
-                                <th>4th CA (10)</th>
-                                <th>Exam (60)</th>
-                                <th>Total (100)</th>
-                                <th>Grade</th>
-                            </tr>
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th style="width:220px;">Subject</th>
+                            <?php foreach($tests as $test): ?>
+                                <th class="text-center">
+                                    <?= htmlspecialchars($test['title']) ?>
+                                    <br>
+                                    <small class="text-muted">
+                                        / <?= $test['max_score'] ?>
+                                    </small>
+                                </th>
+                            <?php endforeach; ?>
+                            <th class="text-center">Total</th>
+                            <th class="text-center">Grade</th>
+                        </tr>
                         </thead>
                         <tbody>
+                            <?php foreach($subjects as $subjectId=>$subjectName): ?>
 
-                        <?php foreach ($subjects as $subject): 
-                            $subjectScore = $scores[$subject['id']] ?? [];
-                        ?>
-                            <tr data-subject-id="<?= $subject['id'] ?>">
-                                <td class="text-start"><?= htmlspecialchars($subject['subject_name']) ?></td>
-
-                                <?php for ($i = 1; $i <= 4; $i++): ?>
-                                    <td>
-                                        <input
-                                            type="number"
-                                            class="form-control score-input ca-score"
-                                            min="0"
-                                            max="10"
-                                            value="<?= $subjectScore["ca$i"] ?? '' ?>"
-                                        >
-                                    </td>
-                                <?php endfor; ?>
-
-                                <td>
-                                    <input
-                                        type="number"
-                                        class="form-control score-input exam-score"
-                                        min="0"
-                                        max="60"
-                                        value="<?= $subjectScore['exam'] ?? '' ?>"
-                                    >
-                                </td>
-
-                                <td class="total-cell">0</td>
-                                <td class="grade-cell">-</td>
+                            <tr>
+                            <td>
+                                <strong>
+                                <?= htmlspecialchars($subjectName) ?>
+                                </strong>
+                            </td>
+                            <?php $totalScore=0; $totalPossible=0;?>
+                            <?php foreach($tests as $test): ?>
+                            <?php
+                            $item=$report[$subjectId][$test['id']]??null;
+                            ?>
+                            <td class="text-center">
+                                <?php
+                                if($item){
+                                    echo $item['score'].'/'.$item['total'];
+                                    $totalScore+=$item['score'];
+                                    $totalPossible+=$item['total'];
+                                }else{
+                                    echo '-';
+                                }
+                                ?>
+                            </td>
+                            <?php endforeach; ?>
+                            <td class="text-center fw-bold">
+                                <?= $totalScore ?>
+                            </td>
+                            <td class="text-center">
+                                <?php
+                                $percent=$totalPossible
+                                ?($totalScore/$totalPossible)*100
+                                :0;
+                                if($percent>=85) echo "A";
+                                elseif($percent>=75) echo "B";
+                                elseif($percent>=65) echo "C";
+                                elseif($percent>=50) echo "D";
+                                else echo "F";
+                                ?>
+                            </td>
                             </tr>
-                        <?php endforeach; ?>
-
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -440,116 +775,8 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
             });
         });
     </script>
-   <script>
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
-
-            const gradeScale = [
-                { min: 85, grade: 'A' },
-                { min: 75, grade: 'B' },
-                { min: 65, grade: 'C' },
-                { min: 50, grade: 'D' },
-                { min: 0, grade: 'F' }
-            ];
-
-            const finalPercentageEl = document.getElementById('finalPercentage');
-            const saveBtn = document.getElementById('saveResultsBtn');
-            const termSwitcher = document.getElementById('termSwitcher');
-            const studentId = termSwitcher.dataset.studentId;
-
-            // ======== CALCULATION FUNCTIONS ========
-            function calculateRow(row) {
-                let total = 0;
-                row.querySelectorAll('.ca-score').forEach(input => total += parseFloat(input.value) || 0);
-                total += parseFloat(row.querySelector('.exam-score').value) || 0;
-                row.querySelector('.total-cell').textContent = total;
-
-                const gradeCell = row.querySelector('.grade-cell');
-                for (let g of gradeScale) {
-                    if (total >= g.min) {
-                        gradeCell.textContent = g.grade;
-                        break;
-                    }
-                }
-            }
-
-            function calculateFinalPercentage() {
-                const rows = document.querySelectorAll('tbody tr');
-                let totalScore = 0, maxScore = 0;
-                rows.forEach(row => {
-                    totalScore += parseFloat(row.querySelector('.total-cell').textContent) || 0;
-                    maxScore += 100;
-                });
-                finalPercentageEl.textContent = maxScore ? ((totalScore / maxScore) * 100).toFixed(2) + '%' : '0%';
-            }
-
-            // ======== INITIAL CALCULATION ========
-            document.querySelectorAll('tbody tr').forEach(row => calculateRow(row));
-            calculateFinalPercentage();
-
-            // ======== INPUT CHANGE EVENTS ========
-            document.querySelectorAll('.ca-score, .exam-score').forEach(input => {
-                input.addEventListener('input', () => {
-                    const row = input.closest('tr');
-                    calculateRow(row);
-                    calculateFinalPercentage();
-                });
-            });
-
-            // ======== SAVE RESULTS AJAX ========
-            saveBtn.addEventListener('click', () => {
-                const scores = [];
-                document.querySelectorAll('tbody tr').forEach(row => {
-                    const subjectId = row.dataset.subjectId;
-                    const caInputs = row.querySelectorAll('.ca-score');
-                    const ca1 = caInputs[0].value || 0;
-                    const ca2 = caInputs[1].value || 0;
-                    const ca3 = caInputs[2].value || 0;
-                    const ca4 = caInputs[3].value || 0;
-
-                    // const ca1 = row.querySelector('.ca-score:nth-of-type(1)').value || 0;
-                    // const ca2 = row.querySelector('.ca-score:nth-of-type(2)').value || 0;
-                    // const ca3 = row.querySelector('.ca-score:nth-of-type(3)').value || 0;
-                    // const ca4 = row.querySelector('.ca-score:nth-of-type(4)').value || 0;
-                    const exam = row.querySelector('.exam-score').value || 0;
-                    scores.push({ subject_id: subjectId, ca1, ca2, ca3, ca4, exam });
-                });
-
-                const remark = document.querySelector('textarea').value;
-                const termId = termSwitcher.value;
-
-                fetch('/EXAMCENTER/teacher/save_student_scores.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student_id: studentId, academic_year_id: termId, scores, remark })
-                })
-                .then(res => res.json())
-                .then(data => alert(data.message))
-                .catch(err => console.error(err));
-            });
-
-            // ======== TERM SWITCHING ========
-            termSwitcher.addEventListener('change', () => {
-                const termId = termSwitcher.value;
-                fetch(`/EXAMCENTER/ajax/load_student_scores.php?student_id=${studentId}&academic_year_id=${termId}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        // Populate scores table
-                        data.scores.forEach(score => {
-                            const row = document.querySelector(`tr[data-subject-id="${score.subject_id}"]`);
-                            if (row) {
-                                row.querySelectorAll('.ca-score')[0].value = score.ca1 || '';
-                                row.querySelectorAll('.ca-score')[1].value = score.ca2 || '';
-                                row.querySelectorAll('.ca-score')[2].value = score.ca3 || '';
-                                row.querySelectorAll('.ca-score')[3].value = score.ca4 || '';
-                                row.querySelector('.exam-score').value = score.exam || '';
-                                calculateRow(row);
-                            }
-                        });
-                        calculateFinalPercentage();
-                        document.querySelector('textarea').value = data.remark || '';
-                    });
-            });
-
             // ======== DOWNLOAD / EMAIL BUTTONS ========
             document.getElementById('downloadReportBtn').addEventListener('click', () => {
                 window.location.href = `/EXAMCENTER/teacher/download_student_report.php?student_id=${studentId}&academic_year_id=${termSwitcher.value}`;
@@ -567,8 +794,6 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
             });
 
         });
-</script>
-
-
+    </script>
 </body>
 </html>

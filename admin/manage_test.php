@@ -2,6 +2,7 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 require_once '../vendor/autoload.php'; // Adjust path if PHPWord is elsewhere
 
 use PhpOffice\PhpWord\PhpWord;
@@ -71,6 +72,27 @@ $conn->close();
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link rel="stylesheet" href="../css/add_question.css"> 
     <!-- <link rel="stylesheet" href="../css/sidebar.css"> -->
+     <style>
+        .card{
+            border-radius:12px;
+        }
+        .card-header{
+            border-radius:12px 12px 0 0 !important;
+        }
+        .table td{
+            vertical-align:middle;
+        }
+        .badge{
+            font-size:14px;
+            padding:8px 12px;
+        }
+        .btn{
+            border-radius:8px;
+        }
+        .table-hover tbody tr:hover{
+            background:#f8f9fa;
+        }
+    </style>
 </head>
 <body class="container py-5">
 <div class="sidebar">
@@ -103,70 +125,98 @@ $conn->close();
             <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
         </div>
 
-    <h2 class="mb-4">Available Tests</h2>
-    <table class="table table-bordered table-striped">
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Class</th>
-                <th>Subject</th>
-                <th>Duration (mins)</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php while($row = $result->fetch_assoc()): ?>
-            <tr>
-                <td><?= htmlspecialchars($row['title']) ?></td>
-                <td><?= htmlspecialchars($row['class']) ?></td>
-                <td><?= htmlspecialchars($row['subject']) ?></td>
-                <td><?= htmlspecialchars($row['duration']) ?></td>
-                <td>
-                    <a class="btn btn-sm btn-primary" 
-                    href="download.php?class=<?= urlencode($row['class']) ?>&subject=<?= urlencode($row['subject']) ?>&title=<?= urlencode($row['title']) ?>">
-                    Download
-                    </a>
-                    <button class="btn btn-sm btn-warning edit-duration" 
-                            data-id="<?= $row['id'] ?>" 
-                            data-duration="<?= htmlspecialchars($row['duration']) ?>"
-                            data-title="<?= htmlspecialchars($row['title']) ?>">
-                        Edit Duration
-                    </button>
-                    <button class="btn btn-sm btn-danger delete-test" 
-                            data-id="<?= $row['id'] ?>" 
-                            data-title="<?= htmlspecialchars($row['title']) ?>">
-                        Delete
-                    </button>
-                </td>
-            </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-file-signature me-2"></i>
+                Available Tests
+            </h5>
+
+            <span class="badge bg-light text-dark">
+                <?= $result ? $result->num_rows : 0 ?> Tests
+            </span>
+        </div>
+
+        <div class="card-body p-0">
+            <table class="table table-hover table-striped mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-file-alt me-1"></i> Test</th>
+                        <th><i class="fas fa-school me-1"></i> Class</th>
+                        <th><i class="fas fa-book me-1"></i> Subject</th>
+                        <th><i class="fas fa-clock me-1"></i> Duration</th>
+                        <th class="text-center"><i class="fas fa-cogs me-1"></i> Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($result && $result->num_rows > 0): ?>
+                    <?php while($row = $result->fetch_assoc()): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($row['title']) ?></td>
+                        <td><span class="badge bg-primary"><?= htmlspecialchars($row['class']) ?></span></td>
+                        <td><span class="badge bg-secondary"><?= htmlspecialchars($row['subject']) ?></span></td>
+                        <td><i class="fas fa-clock text-warning"></i><?= htmlspecialchars($row['duration']) ?>mins</td>
+                        <td class="text-center">
+                            <a class="btn btn-sm btn-outline-primary" 
+                            href="download.php?class=<?= urlencode($row['class']) ?>&subject=<?= urlencode($row['subject']) ?>&title=<?= urlencode($row['title']) ?>"><i class="fas fa-download"></i>
+                            Download
+                            </a>
+                            <button class="btn btn-sm btn-warning edit-duration" 
+                                    data-id="<?= $row['id'] ?>" 
+                                    data-duration="<?= htmlspecialchars($row['duration']) ?>"
+                                    data-title="<?= htmlspecialchars($row['title']) ?>">
+                                Edit Duration
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-test" 
+                                    data-id="<?= $row['id'] ?>" 
+                                    data-title="<?= htmlspecialchars($row['title']) ?>"><i class="fas fa-trash-alt"></i>
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="5" class="text-center py-5">
+                                <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">
+                                    No Tests Found
+                                </h5>
+                                <p class="text-muted">
+                                    You have not created any tests yet.
+                                </p>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <!-- Edit Duration Modal -->
-<div class="modal fade" id="editDurationModal" tabindex="-1" aria-labelledby="editDurationModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <form id="editDurationForm">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="editDurationModalLabel">Edit Duration</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal fade" id="editDurationModal" tabindex="-1" aria-labelledby="editDurationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="editDurationForm">
+        <div class="modal-content">
+            <div class="modal-header">
+            <h5 class="modal-title" id="editDurationModalLabel">Edit Duration</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+            <input type="hidden" id="editTestId" name="id">
+            <div class="mb-3">
+                <label for="editDurationInput" class="form-label">Duration (minutes)</label>
+                <input type="number" class="form-control" id="editDurationInput" name="duration" min="1" required>
+            </div>
+            </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Update Duration</button>
+            </div>
         </div>
-        <div class="modal-body">
-          <input type="hidden" id="editTestId" name="id">
-          <div class="mb-3">
-            <label for="editDurationInput" class="form-label">Duration (minutes)</label>
-            <input type="number" class="form-control" id="editDurationInput" name="duration" min="1" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Update Duration</button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
+        </form>
+    </div>
+    </div>
 
     <script src="../js/bootstrap.bundle.min.js"></script>
     <script src="../js/jquery-3.7.0.min.js"></script>

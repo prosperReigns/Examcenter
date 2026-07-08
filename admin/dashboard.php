@@ -2,6 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once "../backup/backup_scheduler.php";
+
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'admin') {
@@ -47,6 +49,11 @@ try {
     $stmt->bind_param("siss", $activity, $admin_id, $ip_address, $user_agent);
     $stmt->execute();
     $stmt->close();
+
+    runBackupScheduler(
+        $conn,
+        $_SESSION['user_id']
+    );
 
     // Initialize stats array
     $stats = [
@@ -401,7 +408,7 @@ try {
         COUNT(q.id) AS total
     FROM subjects s
     LEFT JOIN new_questions q
-        ON s.id = q.id
+        ON s.subject_name = q.subject
     GROUP BY s.id
     ORDER BY s.subject_name
     ";
@@ -542,8 +549,6 @@ try {
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
-            <a href="add_teacher.php"><i class="fas fa-user-plus"></i>license</a>
-            <a href="../backup/backup_list.php"><i class="fas fa-user-plus"></i>backup</a>
             <a href="manage_classes.php"><i class="fas fa-users"></i>Manage Classes</a>
             <a href="manage_session.php"><i class="fas fa-user-plus"></i>manage session</a>
             <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
@@ -551,6 +556,9 @@ try {
             <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
             <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
+            <a href="add_teacher.php"><i class="fas fa-user-plus"></i>license</a>
+            <a href="audit_logs.php"><i class="fas fa-database"></i>audit log</a>
+            <a href="../backup/backup_list.php"><i class="fas fa-database"></i>backup</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>
     </div>
@@ -564,7 +572,49 @@ try {
                 <a href="../admin/view_results.php" class="btn btn-secondary"><i class="fas fa-chart-bar me-2"></i>View Results</a>
                 <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
             </div>
+            
         </div>
+        <div class="row g-3 mb-4">
+                <div class="col-lg-3 col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <small class="text-muted">Question Bank</small>
+                            <h2><?= number_format($totalQuestions) ?></h2>
+                            <i class="fas fa-database text-primary fa-2x float-end"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <small class="text-muted">Tests</small>
+                            <h2><?= number_format($totalTests) ?></h2>
+                            <i class="fas fa-file-alt text-success fa-2x float-end"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <small class="text-muted">Students</small>
+                            <h2><?= number_format($totalStudents) ?></h2>
+                            <i class="fas fa-user-graduate text-warning fa-2x float-end"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <small class="text-muted">Teachers</small>
+                            <h2><?= number_format($totalTeachers) ?></h2>
+                            <i class="fas fa-chalkboard-teacher text-danger fa-2x float-end"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
         <div class="row mt-4">
 
         <!-- System Alerts -->
@@ -946,12 +996,16 @@ try {
     new Chart(document.getElementById('resultChart'),{
     type:'pie',
     data:{
-    labels:resultData.map(x=>x.grade),
+    labels:resultData.map(x=>x.score),
     datasets:[{
     data:resultData.map(x=>x.total)
     }]
     }
     });
+
+    setInterval(function(){
+        $("#dashboardStats").load(location.href+" #dashboardStats>*","");
+    },60000);
     </script>
 </body>
 </html>

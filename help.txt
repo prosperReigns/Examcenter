@@ -253,8 +253,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
-
 -- 25. teacher_classes
 CREATE TABLE IF NOT EXISTS teacher_classes (
     teacher_id INT NOT NULL,
@@ -329,7 +327,7 @@ CREATE TABLE IF NOT EXISTS reattempt_schedule (
 );
 
 
-CREATE TABLE question_bank (
+CREATE TABLE IF NOT EXISTS question_bank (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_id INT NOT NULL,
     test_id INT NOT NULL,
@@ -342,11 +340,12 @@ CREATE TABLE question_bank (
     UNIQUE(question_id,test_id)
 );
 
-CREATE TABLE licenses (
+CREATE TABLE IF NOT EXISTS licenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
     license_key VARCHAR(255) NOT NULL UNIQUE,
     school_name VARCHAR(255),
     machine_fingerprint VARCHAR(255),
+    license_type VARCHAR(100),
     activation_date DATETIME,
     expiry_date DATETIME,
     status ENUM(
@@ -360,7 +359,7 @@ CREATE TABLE licenses (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE backups
+CREATE TABLE IF NOT EXISTS backups
 (
     id INT AUTO_INCREMENT PRIMARY KEY,
     filename VARCHAR(255) NOT NULL,
@@ -379,7 +378,7 @@ CREATE TABLE backups
     REFERENCES admins(id)
 );
 
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     admin_id INT NULL,
     username VARCHAR(100),
@@ -397,4 +396,23 @@ CREATE TABLE audit_logs (
     FOREIGN KEY(admin_id)
     REFERENCES admins(id)
     ON DELETE SET NULL
+);
+
+CREATE TABLE backup_settings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    auto_backup_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    backup_frequency ENUM(
+        'hourly',
+        'daily',
+        'weekly',
+        'monthly'
+    ) DEFAULT 'daily',
+    backup_time TIME DEFAULT '00:00:00',
+    retention_days INT DEFAULT 30,
+    max_backups INT DEFAULT 50,
+    last_backup DATETIME NULL,
+    next_backup DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ON UPDATE CURRENT_TIMESTAMP
 );

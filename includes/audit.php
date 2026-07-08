@@ -56,9 +56,10 @@ if (!function_exists('getUserAgent')) {
  */
 
 if (!function_exists('getAuditUsername')) {
-    function getAuditUsername()
+   function getAuditUsername()
     {
-        return $_SESSION['username']
+        return $_SESSION['user_username']
+            ?? $_SESSION['username']
             ?? $_SESSION['email']
             ?? "Unknown";
     }
@@ -76,8 +77,8 @@ if (!function_exists('logAudit')) {
         mysqli $conn,
         ?int $adminId,
         string $module,
-        string $action,
-        string $description
+        string $description,
+        string $action = "SYSTEM"
     ) {
         $username = getAuditUsername();
         $ip = getClientIP();
@@ -86,19 +87,18 @@ if (!function_exists('logAudit')) {
         $stmt = $conn->prepare("
             INSERT INTO audit_logs
             (
-                admin_id,
-                username,
-                module,
-                action,
-                description,
-                ip_address,
-                computer_name,
-                user_agent
+            admin_id,
+            username,
+            module,
+            action,
+            description,
+            ip_address,
+            computer_name,
+            user_agent
             )
             VALUES
             (?,?,?,?,?,?,?,?)
-
-        ");
+            ");
 
         $stmt->bind_param(
             "isssssss",

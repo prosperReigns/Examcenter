@@ -6,6 +6,9 @@ require_once "backup_functions.php";
 
 require_once "../includes/audit.php";
 
+$conn = Database::connection();
+$conn->begin_transaction();
+
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../login.php");
     exit;
@@ -27,7 +30,7 @@ if (!$backup) {
     exit;
 }
 
-$file = $backupDirectory . DIRECTORY_SEPARATOR . $backup['filename'];
+$file = BACKUP_DIRECTORY . DIRECTORY_SEPARATOR . $backup['filename'];
 
 if (!file_exists($file)) {
     $_SESSION['error'] = "Backup file not found.";
@@ -88,8 +91,9 @@ try {
         logAudit(
             $conn,
             $_SESSION['user_id'],
-            "Restore Backup",
-            "Restored backup {$backup['filename']}"
+            "Backups",
+            "Restored backup '{$backup['filename']}'",
+            "RESTORE"
         );
     }
 
@@ -98,8 +102,11 @@ try {
         Emergency backup created:<br><strong>" .
         basename($emergencyBackup) .
         "</strong>";
+
+    $conn->commit();
 }
-catch(Exception $e){
+catch(Throwable $e){
+    $conn->rollback();
     $_SESSION['error'] = $e->getMessage();
 }
 

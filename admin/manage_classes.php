@@ -175,6 +175,25 @@ while ($row = $result->fetch_assoc()) {
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link rel="stylesheet" href="../css/sidebar.css">
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
+    <style>
+        .card{
+            border:none;
+            border-radius:12px;
+            box-shadow:0 .125rem .5rem rgba(0,0,0,.08);
+        }
+        .card-header{
+            font-weight:600;
+        }
+        .table td{
+            vertical-align:middle;
+        }
+        .btn{
+            border-radius:8px;
+        }
+        .badge{
+            padding:.55em .9em;
+        }
+    </style>
 </head>
 <body>
 
@@ -214,18 +233,51 @@ while ($row = $result->fetch_assoc()) {
     <?php if ($error): ?>
         <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
     <?php endif; ?>
+        <div class="row mb-4">
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <small class="text-muted">Total Classes</small>
+                    <h2><?= count($classes) ?></h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <small class="text-muted">Active Classes</small>
+                    <h2><?= count(array_filter($classes, fn($c)=>$c['is_active'])) ?></h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <small class="text-muted">Inactive Classes</small>
+                    <h2><?= count(array_filter($classes, fn($c)=>!$c['is_active'])) ?></h2>
+                </div>
+            </div>
+        </div>
+
+    </div>
     <?php if ($success): ?>
         <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
     <?php endif; ?>
 
     <div class="card mb-4">
-        <div class="card-header"><strong>Add / Edit Class</strong></div>
+        <div class="card-header bg-primary text-white"><i class="fas fa-school me-2"></i>Add / Edit Class</div>
         <div class="card-body">
             <form method="post">
             <div class="mb-3">
                     <label>Class Group</label>
                     <div class="input-group">
-                        <select id="class_group" name="class_group" class="form-control" required>
+                        <span class="input-group-text">
+                            <i class="fas fa-layer-group"></i>
+                        </span>
+                        <select id="class_group" name="class_group" class="form-select" required>
                             <option value="">-- Select Group --</option>
                             <?php foreach($class_groups as $cg): ?>
                                 <option value="<?= htmlspecialchars($cg) ?>"><?= htmlspecialchars($cg) ?></option>
@@ -234,27 +286,43 @@ while ($row = $result->fetch_assoc()) {
                     </div>
                 </div>
 
-                <div class="mb-3">
+                <div class="input-group">
+                     <span class="input-group-text">
+                        <i class="fas fa-code"></i>
+                    </span>
+
                     <label>Level Code</label>
                     <input type="text" id="level_code" name="level_code" class="form-control" placeholder="-- JSS1 --" required>
                 </div>
 
-                <div class="mb-3">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-users"></i>
+                    </span>
                     <label>Stream Name</label>
                     <input type="text" id="stream_name" name="stream_name" class="form-control" placeholder="-- Gold --" required>
                 </div>
 
 
-                <button class="btn btn-success">Save Class</button>
-                <button type="reset" class="btn btn-secondary" onclick="resetForm()">Cancel</button>
+                <button class="btn btn-success px-4"><i class="fas fa-save me-2"></i>Save Class</button>
+                <button type="reset" class="btn btn-outline-secondary px-4" onclick="resetForm()"><i class="fas fa-times me-2"></i>Cancel</button>
             </form>
         </div>
     </div>
 
     <div class="card">
-        <div class="card-header"><strong>Classes</strong></div>
+        <div class="card-header bg-dark text-white d-flex justify-content-between">
+            <span>
+                <i class="fas fa-list me-2"></i>
+                Classes
+            </span>
+
+            <span class="badge bg-light text-dark">
+                <?= count($classes) ?> Total
+            </span>
+        </div>
         <div class="card-body">
-            <table class="table table-bordered">
+            <table class="table table-hover align-middle">
                 <thead>
                     <tr>
                         <th>Class</th>
@@ -263,27 +331,40 @@ while ($row = $result->fetch_assoc()) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($classes as $c): ?>
+                    <?php if(empty($classes)): ?>
                     <tr>
-                    <td><?= htmlspecialchars($c['level_code'] . ' ' . $c['stream_name']) ?></td>
-                        <td>
-                            <?= $c['is_active'] ? 
-                                '<span class="badge bg-success">Active</span>' : 
-                                '<span class="badge bg-secondary">Inactive</span>' ?>
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-warning" disabled>
-                                Edit
-                            </button>
-
-                            <a href="?toggle=<?= $c['id'] ?>"
-                            class="btn btn-sm btn-danger"
-                            onclick="return confirm('Change class status?')">
-                            <?= $c['is_active'] ? 'Disable' : 'Enable' ?>
-                            </a>
+                        <td colspan="3" class="text-center text-muted py-5">
+                            <i class="fas fa-school fa-3x mb-3"></i>
+                            <h5>No Classes Found</h5>
+                            <p>Create your first class to get started.</p>
                         </td>
                     </tr>
-                    <?php endforeach; ?>
+                    <?php else: ?>
+                        <?php foreach ($classes as $c): ?>
+                        <tr>
+                        <td><?= htmlspecialchars($c['level_code'] . ' ' . $c['stream_name']) ?></td>
+                            <td>
+                                <?= $c['is_active'] ? 
+                                    '<span class="badge bg-success">Active</span>' : 
+                                    '<span class="badge bg-secondary">Inactive</span>' ?>
+                            </td>
+                            <td class="text-center">
+                                <button
+                                    class="btn btn-warning btn-sm"
+                                    disabled
+                                    title="Coming Soon">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+
+                                <a href="?toggle=<?= $c['id'] ?>"
+                                class="btn btn-sm <?= $c['is_active'] ? 'btn-outline-danger' : 'btn-outline-success' ?>"
+                                onclick="return confirm('Change class status?')">
+                                <i class="fas <?= $c['is_active'] ? 'fa-ban' : 'fa-check' ?>"></i><?= $c['is_active'] ? ' Disable' : ' Enable' ?>
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -296,12 +377,18 @@ while ($row = $result->fetch_assoc()) {
     <script src="../js/dataTables.bootstrap5.min.js"></script>
     <script src="../js/jquery.validate.min.js"></script>
 <script>
-    $(document).ready(function() {
-            // Sidebar toggle
-            $('#sidebarToggle').click(function() {
-                $('.sidebar').toggleClass('active');
-            })
+    $(function(){
+        $('#sidebarToggle').click(function(){
+            $('.sidebar').toggleClass('active');
         });
+
+        $('table').DataTable({
+            pageLength:10,
+            responsive:true,
+            ordering:true,
+            lengthChange:false
+        });
+    });
 </script>
     
 <script>
