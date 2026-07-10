@@ -32,25 +32,34 @@ def _load_public_key() -> Any:
     return serialization.load_pem_public_key(public_key_bytes)
 
 
-def generate_license(*, school: str, machine: str, license_type: str, issued_at: datetime | None = None, expiry: datetime | None = None, version: int = 1) -> SignedLicenseResponse:
+def generate_license(
+    *,
+    school: str,
+    machine: str,
+    license_type: str,
+    issued_at: datetime | None = None,
+    expiry: datetime | None = None,
+    version: int = 1,
+):
+    """
+    Generates the exact license format expected
+    by the PHP application.
+    {
+        payload: "...json...",
+        signature:"..."
+    }
+    """
+
     issued_at = issued_at or datetime.now(timezone.utc)
-    payload = LicensePayload(
-        school=school,
-        machine=machine,
-        license_type=license_type,
-        issued_at=issued_at,
-        expiry=expiry,
-        version=version,
-    )
-    payload_data = payload.model_dump(mode="json")
+    payload = LicensePayload(school=school, machine=machine, license_type=license_type, issued_at=issued_at, expiry=expiry, version=version,)
+    payload_json = json.dumps(payload.model_dump(mode="json"), separators=(",", ":"), sort_keys=True,)
     private_key = _load_private_key()
-    signature_bytes = private_key.sign(
-        _canonical_json(payload_data),
-        padding.PKCS1v15(),
-        hashes.SHA256(),
-    )
-    signature = base64.b64encode(signature_bytes).decode("ascii")
-    return SignedLicenseResponse(**payload_data, signature=signature)
+    signature = private_key.sign(payload_json.encode(), padding.PKCS1v15(), hashes.SHA256(),)
+    document = {"payload": payload_json, "signature": base64.b64encode(signature).decode(),}
+
+    return base64.b64encode(
+        json.dumps(document).encode()
+    ).decode()
 
 
 def verify_license(license_document: str | dict[str, Any]) -> LicenseVerificationResult:

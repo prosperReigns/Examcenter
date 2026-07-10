@@ -1,15 +1,15 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.activation import ActivationRead, ActivationRequest, LicenseValidationResponse
-from app.services.activation_service import activate_license, deactivate_license_activation, get_activation, validate_license_for_machine
+from app.services.activation_service import activate_license, deactivate_license_activation, get_activation, validate_license_for_machine, get_activation_statistics
+
 
 router = APIRouter(prefix="/api/activations", tags=["activations"])
-
 
 @router.post("/{license_id}/validate", response_model=LicenseValidationResponse)
 def validate_activation_endpoint(
@@ -37,8 +37,10 @@ def get_activation_endpoint(
     db: Session = Depends(get_db),
     admin=Depends(require_roles("Super Admin", "Staff")),
 ):
+    """
+    Fetch details for a specific activation record.
+    """
     return get_activation(db, activation_id)
-
 
 @router.post("/{activation_id}/deactivate", response_model=ActivationRead)
 def deactivate_activation_endpoint(
@@ -47,3 +49,18 @@ def deactivate_activation_endpoint(
     admin=Depends(require_roles("Super Admin", "Staff")),
 ):
     return deactivate_license_activation(db, activation_id)
+
+@router.get(
+    "/statistics",
+)
+def activation_statistics_endpoint(
+    db: Session = Depends(get_db),
+    admin=Depends(
+        require_roles(
+            "Super Admin",
+            "Staff",
+        )
+    ),
+):
+
+    return get_activation_statistics(db)

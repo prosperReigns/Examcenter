@@ -33,7 +33,7 @@ def create_customer_endpoint(payload: CustomerCreate, request: Request, db: Sess
     return create_customer_record(db, payload, admin=admin, request=request)
 
 
-@router.put("/{customer_id}", response_model=CustomerRead)
+@router.patch("/{customer_id}", response_model=CustomerRead)
 def update_customer_endpoint(customer_id: UUID, payload: CustomerUpdate, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
     return update_customer_record(db, customer_id, payload, admin=admin, request=request)
 

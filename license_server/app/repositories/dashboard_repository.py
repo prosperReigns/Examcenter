@@ -27,7 +27,7 @@ def get_dashboard_stats(db: Session) -> dict[str, int]:
         "total_schools": int(total_schools),
         "active_licenses": int(active_licenses),
         "expired_licenses": int(expired_licenses),
-        "revenue": int(revenue),
+        "revenue": revenue,
         "pending_renewals": int(pending_renewals),
         "recent_payments": int(recent_payments),
         "recent_activations": int(recent_activations),

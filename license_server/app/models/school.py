@@ -22,3 +22,19 @@ class School(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     customer = relationship("Customer", back_populates="schools")
     licenses = relationship("License", back_populates="school", cascade="all, delete-orphan")
     activations = relationship("Activation", back_populates="school")
+    payments = relationship(
+        "Payment",
+        back_populates="school",
+    )
+    receipts = relationship(
+        "Receipt",
+        back_populates="school",
+    )
+    notifications = relationship(
+        "Notification",
+        back_populates="school",
+    )
+    invoices = relationship(
+        "Invoice",
+        back_populates="school",
+    )

@@ -11,7 +11,7 @@ def get_customer_by_id(db: Session, customer_id: UUID) -> Customer | None:
 
 
 def get_customer_by_email(db: Session, email: str) -> Customer | None:
-    statement = select(Customer).where(Customer.email == email, Customer.deleted_at.is_(None))
+    statement = select(Customer).where(Customer.email == email.lower().strip(), Customer.deleted_at.is_(None))
     return db.scalar(statement)
 
 

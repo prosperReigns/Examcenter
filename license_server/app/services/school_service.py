@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.repositories.customer_repository import get_customer_by_id
-from app.repositories.school_repository import create_school, get_school_by_id, list_schools, soft_delete_school
+from app.repositories.school_repository import create_school, get_school_by_id, list_schools, soft_delete_school, persist_school
 from app.schemas.school import SchoolCreate, SchoolUpdate
 from app.services.audit_service import record_audit_event
 
@@ -99,7 +99,8 @@ def update_school_record(db: Session, school_id: UUID, payload: SchoolUpdate, *,
 
 def delete_school_record(db: Session, school_id: UUID, *, admin=None, request=None) -> None:
     school = get_school(db, school_id)
-    soft_delete_school(db, school)
+    if school.deleted_at is None:
+        soft_delete_school(db, school)
     db.commit()
     record_audit_event(
         db,
@@ -112,3 +113,84 @@ def delete_school_record(db: Session, school_id: UUID, *, admin=None, request=No
         user_agent=request.headers.get("user-agent") if request else None,
     )
     db.commit()
+
+def activate_school(
+    db: Session,
+    school_id: UUID,
+    *,
+    admin=None,
+    request=None,
+):
+
+    school = get_school(
+        db,
+        school_id,
+    )
+
+    if school.is_active:
+
+        return school
+
+    school.is_active = True
+
+    persist_school(
+        db,
+        school,
+    )
+
+    record_audit_event(
+        db,
+        admin=admin,
+        action="school_activated",
+        entity_type="school",
+        entity_id=str(school.id),
+        description=f"Activated school {school.name}",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+
+    db.commit()
+
+    db.refresh(school)
+
+    return school
+
+def deactivate_school(
+    db: Session,
+    school_id: UUID,
+    *,
+    admin=None,
+    request=None,
+):
+
+    school = get_school(
+        db,
+        school_id,
+    )
+
+    if not school.is_active:
+        return school
+
+    school.is_active = False
+
+    persist_school(
+        db,
+        school,
+    )
+
+    record_audit_event(
+        db,
+        admin=admin,
+        action="school_deactivated",
+        entity_type="school",
+        entity_id=str(school.id),
+        description=f"Deactivated school {school.name}",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+
+    db.commit()
+
+    db.refresh(school)
+
+    return school

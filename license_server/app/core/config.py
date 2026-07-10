@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     flutterwave_hash: str = ""
     flutterwave_base_url: str = "https://api.flutterwave.com/v3"
     flutterwave_webhook_secret_header: str = "verif-hash"
+    paystack_public_key: str = ""
+    paystack_secret_key: str = ""
+    paystack_base_url: str = "https://api.paystack.co"
+    paystack_webhook_secret: str = ""
+    payment_gateway: str = "flutterwave"
+    payment_callback_url: str = ""
     company_name: str = "Your Company"
     support_email: str = "support@example.com"
     license_currency: str = "USD"
@@ -50,3 +56,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()

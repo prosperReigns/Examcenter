@@ -16,3 +16,15 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     schools = relationship("School", back_populates="customer", cascade="all, delete-orphan")
+    payments = relationship(
+        "Payment",
+        back_populates="customer",
+    )
+    receipts = relationship(
+        "Receipt",
+        back_populates="customer",
+    )
+    notifications = relationship(
+        "Notification",
+        back_populates="customer",
+    )

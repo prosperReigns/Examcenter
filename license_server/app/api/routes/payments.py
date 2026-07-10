@@ -6,15 +6,27 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.payment import FlutterwaveWebhookPayload, PaymentInitializeRequest, PaymentInitializationResponse, PaymentRead, PaymentVerifyRequest
-from app.services.payment_service import handle_flutterwave_webhook, initialize_payment, verify_payment
+from app.services.payment_service import handle_flutterwave_webhook, initialize_payment, verify_payment, refund_payment
 from app.repositories.payment_repository import get_payment_by_id, list_payments
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
 
 @router.get("", response_model=list[PaymentRead])
-def list_payments_endpoint(db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
-    items, _ = list_payments(db)
+def list_payments_endpoint(page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    admin=Depends(
+        require_roles(
+            "Super Admin",
+            "Staff",
+        )
+    ),):
+    items, _ = list_payments(
+        db,
+        page=page,
+        page_size=page_size,
+    )
     return items
 
 
@@ -49,5 +61,38 @@ def verify_payment_endpoint(
 
 
 @router.post("/webhooks/flutterwave")
-def flutterwave_webhook_endpoint(payload: FlutterwaveWebhookPayload, request: Request, db: Session = Depends(get_db)):
-    return handle_flutterwave_webhook(db, request, payload)
+def flutterwave_webhook_endpoint(payload: Request, request: Request, db: Session = Depends(get_db)):
+    return handle_flutterwave_webhook(db, request)
+
+@router.post("/{invoice_id}/initialize")
+def initialize_payment_endpoint(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    admin=Depends(require_roles("Super Admin", "Staff")),
+):
+    return initialize_payment(
+        db,
+        invoice_id,
+    )
+
+@router.post("/verify/{transaction_id}")
+def verify_payment_endpoint(
+    transaction_id: str,
+    db: Session = Depends(get_db),
+    admin=Depends(require_roles("Super Admin", "Staff")),
+):
+    return verify_payment(
+        db,
+        transaction_id,
+    )
+
+@router.post("/{transaction_id}/refund")
+def refund_payment_endpoint(
+    transaction_id: str,
+    db: Session = Depends(get_db),
+    admin=Depends(require_roles("Super Admin")),
+):
+    return refund_payment(
+        db,
+        transaction_id,
+    )

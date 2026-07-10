@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow">
+
+<div class="card-body">
+
+<h2>
+
+Receipt
+
+{{ receipt.receipt_number }}
+
+</h2>
+
+<hr>
+
+<table class="table">
+
+<tr>
+
+<th>Invoice</th>
+
+<td>
+
+{{ receipt.invoice.id }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Payment</th>
+
+<td>
+
+{{ receipt.payment.payment_reference }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Customer</th>
+
+<td>
+
+{{ receipt.customer.full_name }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>School</th>
+
+<td>
+
+{{ receipt.school.name }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Amount</th>
+
+<td>
+
+{{ receipt.currency }}
+
+{{ "{:,.2f}".format(receipt.amount) }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Status</th>
+
+<td>
+
+{{ receipt.status.title() }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Issued</th>
+
+<td>
+
+{{ receipt.issued_at }}
+
+</td>
+
+</tr>
+
+</table>
+
+<hr>
+
+<div class="d-flex gap-2">
+
+<a
+class="btn btn-primary"
+href="/receipts/{{receipt.id}}/download">
+
+Download PDF
+
+</a>
+
+<form
+method="post"
+action="/receipts/{{receipt.id}}/reissue">
+
+<button
+class="btn btn-warning">
+
+Reissue
+
+</button>
+
+</form>
+
+<form
+method="post"
+action="/receipts/{{receipt.id}}/void">
+
+<button
+class="btn btn-danger">
+
+Void
+
+</button>
+
+</form>
+
+<form
+    method="post"
+    action="/receipts/{{ receipt.id }}/email">
+
+    <button
+        class="btn btn-success">
+
+        Email Receipt
+
+    </button>
+
+</form>
+
+<form
+    method="post"
+    action="/receipts/{{ receipt.id }}/email">
+
+    <button
+        class="btn btn-success">
+
+        Email Receipt
+
+    </button>
+
+</form>
+
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

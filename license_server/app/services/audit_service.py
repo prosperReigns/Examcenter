@@ -7,7 +7,7 @@ from app.repositories.audit_log_repository import create_audit_log
 def record_audit_event(
     db: Session,
     *,
-    admin: Admin | None,
+    admin: Admin | None = None,
     action: str,
     entity_type: str | None = None,
     entity_id: str | None = None,

@@ -35,8 +35,6 @@ def create_customer_record(db: Session, payload: CustomerCreate, *, admin=None, 
             country=payload.country,
             is_active=payload.is_active,
         )
-        db.commit()
-        db.refresh(customer)
         record_audit_event(
             db,
             admin=admin,
@@ -48,6 +46,8 @@ def create_customer_record(db: Session, payload: CustomerCreate, *, admin=None, 
             user_agent=request.headers.get("user-agent") if request else None,
         )
         db.commit()
+        db.refresh(customer)
+        
         return customer
     except IntegrityError as exc:
         db.rollback()
@@ -70,12 +70,12 @@ def update_customer_record(db: Session, customer_id: UUID, payload: CustomerUpda
         data["country"] = data["country"].strip()
 
     for field, value in data.items():
-        setattr(customer, field, value)
+        if hasattr(customer, field):
+            setattr(customer, field, value)
 
     try:
         db.add(customer)
-        db.commit()
-        db.refresh(customer)
+
         record_audit_event(
             db,
             admin=admin,
@@ -86,7 +86,10 @@ def update_customer_record(db: Session, customer_id: UUID, payload: CustomerUpda
             ip_address=request.client.host if request and request.client else None,
             user_agent=request.headers.get("user-agent") if request else None,
         )
+
         db.commit()
+        db.refresh(customer)
+        
         return customer
     except IntegrityError as exc:
         db.rollback()
@@ -96,7 +99,7 @@ def update_customer_record(db: Session, customer_id: UUID, payload: CustomerUpda
 def delete_customer_record(db: Session, customer_id: UUID, *, admin=None, request=None) -> None:
     customer = get_customer(db, customer_id)
     soft_delete_customer(db, customer)
-    db.commit()
+
     record_audit_event(
         db,
         admin=admin,

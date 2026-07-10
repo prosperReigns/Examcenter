@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
-
+from datetime import datetime
 
 class SchoolBase(BaseModel):
     customer_id: UUID
@@ -31,3 +31,6 @@ class SchoolRead(SchoolBase):
     id: UUID
 
     model_config = {"from_attributes": True}
+    created_at: datetime
+
+    updated_at: datetime

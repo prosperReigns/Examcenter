@@ -8,6 +8,14 @@ from app.models.license_product import LicenseProduct
 from app.models.payment import Payment
 from app.models.school import School
 from app.models.setting import Setting
+from app.models.invoice import Invoice
+from app.models.receipt import Receipt
+from app.models.notification import Notification
+from app.models.license_history import LicenseHistory
+from app.models.license_renewal import LicenseRenewal
+from app.models.payment_webhook import PaymentWebhook
+from app.models.outbox_event import OutboxEvent
+from app.models.idempotency_key import IdempotencyKey
 
 __all__ = [
 	"Activation",
@@ -20,4 +28,12 @@ __all__ = [
 	"Payment",
 	"School",
 	"Setting",
+    "Notification",
+    "Invoice",
+    "Receipt",
+    "LicenseHistory",
+    "IdempotencyKey",
+    "PaymentWebhook",
+    "LicenseRenewal",
+    "outboxEvent"
 ]

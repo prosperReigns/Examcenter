@@ -1,0 +1,714 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <div>
+        <h2>{{ device.renamed_to or device.computer_name or "Unnamed Device" }}</h2>
+
+        <p class="text-muted mb-0">
+            Machine ID:
+            <code>{{ device.machine_id }}</code>
+        </p>
+    </div>
+
+    <div>
+
+        {% if device.blacklisted %}
+
+            <span class="badge bg-danger fs-6">
+                Blacklisted
+            </span>
+
+        {% elif device.status=="active" %}
+
+            <span class="badge bg-success fs-6">
+                Active
+            </span>
+
+        {% else %}
+
+            <span class="badge bg-secondary fs-6">
+                Inactive
+            </span>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+<div class="card shadow-sm mt-4">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+
+        <strong>License Renewal</strong>
+
+        <span class="badge bg-success">
+            Version {{ license.version }}
+        </span>
+
+    </div>
+
+    <div class="card-body">
+
+        <form
+            action="/licenses/{{ license.id }}/renew"
+            method="post"
+        >
+
+            <div class="row">
+
+                <div class="col-md-4 mb-3">
+
+                    <label class="form-label">
+
+                        Renewal Plan
+
+                    </label>
+
+                    <select
+                        class="form-select"
+                        name="plan"
+                        required
+                    >
+
+                        {% for plan in plans %}
+
+                        <option value="{{ plan.plan }}">
+
+                            {{ plan.plan|replace("_"," ")|title }}
+
+                            —
+
+                            ₦{{ "{:,.0f}".format(plan.price) }}
+
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-8 mb-3">
+
+                    <label class="form-label">
+
+                        Notes
+
+                    </label>
+
+                    <input
+                        class="form-control"
+                        name="notes"
+                        placeholder="Optional renewal notes"
+                    >
+
+                </div>
+
+            </div>
+
+            <button
+                class="btn btn-primary"
+            >
+
+                Renew License
+
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+<div class="card shadow-sm mt-4">
+
+<div class="card-header">
+
+Renewal History
+
+</div>
+
+<div class="card-body p-0">
+
+<table class="table table-hover mb-0">
+
+<thead>
+
+<tr>
+
+<th>Date</th>
+
+<th>Plan</th>
+
+<th>Amount</th>
+
+<th>Expiry</th>
+
+<th></th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for renewal in renewals %}
+
+<tr>
+
+<td>
+
+{{ renewal.renewed_at }}
+
+</td>
+
+<td>
+
+{{ renewal.plan }}
+
+</td>
+
+<td>
+
+₦{{ "{:,.2f}".format(renewal.amount) }}
+
+</td>
+
+<td>
+
+{{ renewal.new_expiry }}
+
+</td>
+
+<td>
+
+<a
+href="/renewals/{{ renewal.id }}"
+class="btn btn-sm btn-outline-primary"
+>
+
+View
+
+</a>
+
+</td>
+
+</tr>
+
+{% else %}
+
+<tr>
+
+<td
+colspan="5"
+class="text-center text-muted"
+>
+
+No renewals yet.
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<div class="row">
+
+<!-- LEFT COLUMN -->
+
+<div class="col-lg-8">
+
+<div class="card shadow-sm mb-4">
+
+<div class="card-header">
+
+<h5 class="mb-0">
+
+General Information
+
+</h5>
+
+</div>
+
+<div class="card-body">
+
+<table class="table">
+
+<tr>
+<th width="35%">Computer Name</th>
+<td>{{ device.computer_name or "-" }}</td>
+</tr>
+
+<tr>
+<th>Friendly Name</th>
+<td>{{ device.renamed_to or "-" }}</td>
+</tr>
+
+<tr>
+<th>Machine ID</th>
+<td><code>{{ device.machine_id }}</code></td>
+</tr>
+
+<tr>
+<th>License</th>
+<td>
+
+{% if device.license %}
+
+<a href="/licenses/{{ device.license.id }}">
+
+{{ device.license.school.name }}
+
+</a>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+</tr>
+
+<tr>
+<th>Status</th>
+<td>{{ device.status }}</td>
+</tr>
+
+<tr>
+<th>Activation Count</th>
+<td>{{ device.activation_count }}</td>
+</tr>
+
+<tr>
+<th>First Seen</th>
+<td>{{ device.created_at }}</td>
+</tr>
+
+<tr>
+<th>Last Seen</th>
+<td>{{ device.last_seen }}</td>
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card shadow-sm mb-4">
+
+<div class="card-header">
+
+<h5>
+
+Hardware Information
+
+</h5>
+
+</div>
+
+<div class="card-body">
+
+<table class="table">
+
+<tr>
+
+<th width="35%">
+
+Windows Version
+
+</th>
+
+<td>
+
+{{ device.windows_version or "-" }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+CPU ID
+
+</th>
+
+<td>
+
+<code>
+
+{{ device.cpu_id or "-" }}
+
+</code>
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Motherboard
+
+</th>
+
+<td>
+
+<code>
+
+{{ device.motherboard_serial or "-" }}
+
+</code>
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Disk Serial
+
+</th>
+
+<td>
+
+<code>
+
+{{ device.disk_serial or "-" }}
+
+</code>
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+MAC Address
+
+</th>
+
+<td>
+
+{{ device.mac_address or "-" }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+IP Address
+
+</th>
+
+<td>
+
+{{ device.ip_address or "-" }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Last Logged-in User
+
+</th>
+
+<td>
+
+{{ device.last_user or "-" }}
+
+</td>
+
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card shadow-sm">
+
+<div class="card-header">
+
+Internal Notes
+
+</div>
+
+<div class="card-body">
+
+<form
+method="post"
+action="/devices/{{ device.id }}/notes"
+>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+
+
+<!-- RIGHT COLUMN -->
+
+<div class="col-lg-4">
+
+<div class="card shadow-sm mb-4">
+
+<div class="card-header">
+
+Actions
+
+</div>
+
+<div class="card-body d-grid gap-2">
+
+<div class="card shadow-sm mb-4">
+
+<div class="card-header">
+
+Rename Device
+
+</div>
+
+<div class="card-body">
+
+<form
+action="/devices/{{ device.id }}/rename"
+method="post"
+>
+
+<div class="mb-3">
+
+<input
+type="text"
+class="form-control"
+name="renamed_to"
+value="{{ device.renamed_to or device.computer_name }}"
+required
+>
+
+</div>
+
+<button class="btn btn-primary">
+
+Save Name
+
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+{% if device.blacklisted %}
+
+<form
+method="post"
+action="/devices/{{ device.id }}/unblacklist"
+>
+
+<button class="btn btn-success w-100">
+
+Remove Blacklist
+
+</button>
+
+</form>
+
+{% else %}
+
+<form
+method="post"
+action="/devices/{{ device.id }}/blacklist"
+>
+
+<div class="mb-2">
+
+<input
+class="form-control"
+name="reason"
+placeholder="Reason (optional)"
+>
+
+</div>
+
+<button class="btn btn-danger w-100">
+
+Blacklist Device
+
+</button>
+
+</form>
+
+{% endif %}
+
+<form
+method="post"
+action="/devices/{{ device.id }}/reset"
+class="mb-2"
+>
+    <button class="btn btn-warning w-100">
+        Reset Activation
+    </button>
+</form>
+
+<form
+method="post"
+action="/devices/{{ device.id }}/deactivate"
+>
+    <button class="btn btn-secondary w-100">
+        Deactivate Device
+    </button>
+</form>
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card shadow-sm mb-4">
+
+<div class="card-header">
+
+Heartbeat
+
+</div>
+
+<div class="card-body">
+
+<p>
+
+<strong>Last Seen</strong>
+
+</p>
+
+<p>
+
+{{ device.last_seen }}
+
+</p>
+
+<hr>
+
+<p>
+
+{% if device.last_seen %}
+
+<span class="badge bg-success">
+
+Online Recently
+
+</span>
+
+{% else %}
+
+<span class="badge bg-secondary">
+
+Never Contacted
+
+</span>
+
+{% endif %}
+
+</p>
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card shadow-sm">
+
+<div class="card-header">
+
+Activation Summary
+
+</div>
+
+<div class="card-body">
+
+<p>
+
+Total Activations
+
+</p>
+
+<h3>
+
+{{ device.activation_count }}
+
+</h3>
+
+<hr>
+
+<p>
+
+License Status
+
+</p>
+
+<h5>
+
+{{ device.license.status if device.license else "-" }}
+
+</h5>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

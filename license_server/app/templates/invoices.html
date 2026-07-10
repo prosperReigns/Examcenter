@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            <h2 class="mb-1">Invoices</h2>
+
+            <p class="text-muted mb-0">
+                Manage renewal invoices.
+            </p>
+
+        </div>
+
+        <a
+            href="/invoices/new"
+            class="btn btn-primary"
+        >
+            New Invoice
+        </a>
+
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="card-body">
+
+            <table class="table table-hover align-middle">
+
+                <thead>
+
+                <tr>
+
+                    <th>Invoice</th>
+
+                    <th>School</th>
+
+                    <th>Amount</th>
+
+                    <th>Status</th>
+
+                    <th>Due</th>
+
+                    <th></th>
+
+                </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for invoice in invoices %}
+
+                <tr>
+
+                    <td>
+
+                        <strong>
+
+                            {{ invoice.invoice_number }}
+
+                        </strong>
+
+                    </td>
+
+                    <td>
+
+                        {{ invoice.school.name if invoice.school else "-" }}
+
+                    </td>
+
+                    <td>
+
+                        ₦{{ "{:,.2f}".format(invoice.amount) }}
+
+                    </td>
+
+                    <td>
+
+                        {% if invoice.status=="paid" %}
+
+                        <span class="badge bg-success">
+
+                            Paid
+
+                        </span>
+
+                        {% elif invoice.status=="pending" %}
+
+                        <span class="badge bg-warning text-dark">
+
+                            Pending
+
+                        </span>
+
+                        {% elif invoice.status=="cancelled" %}
+
+                        <span class="badge bg-danger">
+
+                            Cancelled
+
+                        </span>
+
+                        {% else %}
+
+                        <span class="badge bg-secondary">
+
+                            {{ invoice.status }}
+
+                        </span>
+
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        {{ invoice.due_date.strftime("%d %b %Y") if invoice.due_date else "-" }}
+
+                    </td>
+
+                    <td class="text-end">
+
+                        <a
+
+                            href="/invoices/{{ invoice.id }}"
+
+                            class="btn btn-sm btn-outline-primary"
+
+                        >
+
+                            View
+
+                        </a>
+
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+
+                    <td colspan="6" class="text-center text-muted">
+
+                        No invoices found.
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

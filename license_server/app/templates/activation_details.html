@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+<div class="row">
+
+<div class="col-lg-8">
+
+<div class="card shadow-sm mb-4">
+
+<div class="card-header">
+
+<h4>
+
+Activation Information
+
+</h4>
+
+</div>
+
+<div class="card-body">
+
+<table class="table">
+
+<tr>
+
+<th>School</th>
+
+<td>{{ activation.school.name }}</td>
+
+</tr>
+
+<tr>
+
+<th>Computer</th>
+
+<td>{{ activation.computer_name }}</td>
+
+</tr>
+
+<tr>
+
+<th>Machine Fingerprint</th>
+
+<td>
+
+<small>
+
+{{ activation.machine_id }}
+
+</small>
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Status</th>
+
+<td>
+
+<span class="badge bg-success">
+
+{{ activation.status }}
+
+</span>
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Activated</th>
+
+<td>
+
+{{ activation.activated_at }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>IP Address</th>
+
+<td>
+
+{{ activation.ip_address or "-" }}
+
+</td>
+
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+<div class="card shadow-sm">
+
+<div class="card-header">
+
+<h4>
+
+License Information
+
+</h4>
+
+</div>
+
+<div class="card-body">
+
+<table class="table">
+
+<tr>
+
+<th>License Type</th>
+
+<td>
+
+{{ activation.license.license_type|title }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Expiry</th>
+
+<td>
+
+{{ activation.license.expiry_at }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Status</th>
+
+<td>
+
+{{ activation.license.status }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>Version</th>
+
+<td>
+
+{{ activation.license.version }}
+
+</td>
+
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="col-lg-4">
+
+<div class="card shadow-sm">
+
+<div class="card-header">
+
+Quick Actions
+
+</div>
+
+<div class="card-body d-grid gap-2">
+
+<a
+class="btn btn-primary"
+href="/licenses/{{ activation.license.id }}">
+
+View All Licenses
+
+</a>
+
+<a
+class="btn btn-secondary"
+href="/activations">
+
+Back to Activations
+
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.school import SchoolCreate, SchoolRead, SchoolUpdate
-from app.services.school_service import create_school_record, delete_school_record, get_school, get_schools, update_school_record
+from app.services.school_service import create_school_record, delete_school_record, get_school, get_schools, update_school_record, activate_school, deactivate_school
 
 router = APIRouter(prefix="/api/schools", tags=["schools"])
 
@@ -41,3 +41,31 @@ def update_school_endpoint(school_id: UUID, payload: SchoolUpdate, request: Requ
 @router.delete("/{school_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_school_endpoint(school_id: UUID, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
     delete_school_record(db, school_id, admin=admin, request=request)
+
+@router.post("/{school_id}/activate")
+def activate_school_endpoint(
+    school_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin=Depends(require_roles("Super Admin")),
+):
+    return activate_school(
+        db,
+        school_id,
+        admin=admin,
+        request=request,
+    )
+
+@router.post("/{school_id}/deactivate")
+def deactivate_school_endpoint(
+    school_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin=Depends(require_roles("Super Admin")),
+):
+    return deactivate_school(
+        db,
+        school_id,
+        admin=admin,
+        request=request,
+    )

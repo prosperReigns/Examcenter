@@ -27,3 +27,6 @@ class CustomerRead(CustomerBase):
     id: UUID
 
     model_config = {"from_attributes": True}
+    created_at: datetime
+
+    updated_at: datetime

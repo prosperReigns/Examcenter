@@ -55,3 +55,14 @@ def soft_delete_school(db: Session, school: School) -> School:
     db.add(school)
     db.flush()
     return school
+
+def persist_school(
+    db: Session,
+    school: School,
+) -> School:
+
+    db.add(school)
+
+    db.flush()
+
+    return school

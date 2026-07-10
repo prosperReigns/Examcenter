@@ -1,5 +1,5 @@
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.audit_log import AuditLog
 
@@ -30,7 +30,7 @@ def create_audit_log(
 
 
 def list_audit_logs(db: Session, *, offset: int = 0, limit: int = 20) -> tuple[list[AuditLog], int]:
-    statement = select(AuditLog)
+    statement = joinedload(AuditLog.admin)
     count_statement = select(func.count()).select_from(AuditLog)
     total = db.scalar(count_statement) or 0
     items = db.scalars(statement.order_by(AuditLog.occurred_at.desc()).offset(offset).limit(limit)).all()

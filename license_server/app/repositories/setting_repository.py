@@ -2,7 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.setting import Setting
-
+from sqlalchemy import delete
 
 def list_settings(db: Session, *, category: str | None = None) -> list[Setting]:
     statement = select(Setting)
@@ -41,3 +41,20 @@ def upsert_setting(
 
 def get_setting_count(db: Session) -> int:
     return db.scalar(select(func.count()).select_from(Setting)) or 0
+
+def delete_setting(
+    db: Session,
+    setting: Setting,
+):
+
+    db.delete(setting)
+    db.flush()
+
+def persist_setting(
+    db: Session,
+    setting: Setting,
+) -> Setting:
+
+    db.add(setting)
+    db.flush()
+    return setting

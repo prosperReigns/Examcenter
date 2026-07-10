@@ -15,3 +15,63 @@ body.app-shell {
 .card {
     border-radius: 1rem;
 }
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:Arial,Helvetica,sans-serif;
+    background:#f5f6fa;
+    color:#333;
+}
+
+.container{
+    display:flex;
+    min-height:100vh;
+}
+
+.content{
+    flex:1;
+    padding:25px;
+}
+
+nav{
+    background:#1f2937;
+    color:#fff;
+    padding:15px 25px;
+}
+
+aside{
+    width:250px;
+    background:#111827;
+    color:white;
+    min-height:100vh;
+}
+
+aside ul{
+    list-style:none;
+}
+
+aside li{
+    border-bottom:1px solid #2d3748;
+}
+
+aside a{
+    display:block;
+    color:white;
+    text-decoration:none;
+    padding:15px;
+}
+
+aside a:hover{
+    background:#374151;
+}
+
+footer{
+    padding:15px;
+    background:#1f2937;
+    color:white;
+    text-align:center;
+}

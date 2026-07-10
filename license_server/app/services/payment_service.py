@@ -1,4 +1,5 @@
 from __future__ import annotations
+from uuid import UUID
 
 import hmac
 import secrets
@@ -7,24 +8,41 @@ from typing import Any
 
 import httpx
 from fastapi import HTTPException, Request, status
+from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.payment import Payment
+from app.models.invoice import Invoice
 from app.repositories.customer_repository import get_customer_by_id
+from app.repositories.invoice_repository import (
+    get_invoice_by_id,
+    persist_invoice,
+    list_invoices
+)
 from app.repositories.payment_repository import (
+    create_payment,
+    get_payment,
+    list_payments,
     create_payment_record,
     get_payment_by_id,
     get_payment_by_transaction_id,
     get_payment_by_tx_ref,
     persist_payment,
+    get_payment_by_reference
 )
 from app.repositories.school_repository import get_school_by_id
 from app.schemas.license import LicenseCreateRequest
-from app.schemas.payment import FlutterwaveWebhookPayload, PaymentInitializeRequest, PaymentInitializationResponse, PaymentRead, PaymentVerifyRequest
+from app.schemas.payment import FlutterwaveWebhookPayload, PaymentInitializeRequest, PaymentInitializationResponse, PaymentRead, PaymentVerifyRequest, PaymentCreateRequest
 from app.services.audit_service import record_audit_event
-from app.services.license_management_service import issue_license
+from app.services.license_management_service import issue_license, renew_license
 from app.services.license_service import normalize_license_type
+from app.services.invoice_service import (
+    mark_invoice_paid,
+)
+from app.services.receipt_service import (
+    generate_receipt,
+)
 from app.utils.invoice import build_invoice_payload, save_invoice_document
 
 settings = get_settings()
@@ -212,6 +230,177 @@ def verify_payment(db: Session, payload: PaymentVerifyRequest, *, admin=None, re
     db.commit()
     return payment
 
+def mark_payment_successful(
+    db: Session,
+    *,
+    payment_reference: str,
+    gateway_reference: str | None = None,
+    gateway_response: str | None = None,
+    admin=None,
+    request=None,
+) -> Payment:
+
+    payment = verify_payment(
+        db,
+        payment_reference,
+    )
+
+    if payment.status == "successful":
+        return payment
+
+    if payment.status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cancelled payment cannot be completed.",
+        )
+
+    payment.status = "successful"
+
+    payment.gateway_reference = gateway_reference
+
+    payment.gateway_response = gateway_response
+
+    payment.verified_at = datetime.now(timezone.utc)
+
+    payment.paid_at = datetime.now(timezone.utc)
+
+    persist_payment(
+        db,
+        payment,
+    )
+
+    mark_invoice_paid(
+        db,
+        invoice_id=payment.invoice_id,
+        admin=admin,
+        request=request,
+    )
+
+    renew_license(
+        db,
+        invoice_id=payment.invoice_id,
+        admin=admin,
+        request=request,
+    )
+
+    generate_receipt(
+        db,
+        payment,
+    )
+
+    record_audit_event(
+        db,
+        admin=admin,
+        action="payment_successful",
+        entity_type="payment",
+        entity_id=str(payment.id),
+        description=f"Payment {payment.payment_reference} marked successful.",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+
+    db.commit()
+
+    db.refresh(payment)
+
+    return payment
+
+def mark_payment_failed(
+    db: Session,
+    *,
+    payment_reference: str,
+    gateway_response: str | None = None,
+    admin=None,
+    request=None,
+) -> Payment:
+
+    payment = verify_payment(
+        db,
+        payment_reference,
+    )
+
+    if payment.status == "successful":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Successful payment cannot be marked as failed.",
+        )
+
+    payment.status = "failed"
+
+    payment.gateway_response = gateway_response
+
+    payment.verified_at = datetime.now(timezone.utc)
+
+    persist_payment(
+        db,
+        payment,
+    )
+
+    record_audit_event(
+        db,
+        admin=admin,
+        action="payment_failed",
+        entity_type="payment",
+        entity_id=str(payment.id),
+        description=f"Payment {payment.payment_reference} failed.",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+
+    db.commit()
+
+    db.refresh(payment)
+
+    return payment
+
+def cancel_payment(
+    db: Session,
+    *,
+    payment_reference: str,
+    admin=None,
+    request=None,
+) -> Payment:
+
+    payment = verify_payment(
+        db,
+        payment_reference,
+    )
+
+    if payment.status == "successful":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Successful payment cannot be cancelled.",
+        )
+
+    payment.status = "cancelled"
+
+    persist_payment(
+        db,
+        payment,
+    )
+
+    record_audit_event(
+        db,
+        admin=admin,
+        action="payment_cancelled",
+        entity_type="payment",
+        entity_id=str(payment.id),
+        description=f"Payment {payment.payment_reference} cancelled.",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+
+    db.commit()
+
+    db.refresh(payment)
+
+    return payment
+
+def payment_is_processable(
+    payment: Payment,
+) -> bool:
+
+    return payment.status == "pending"
 
 def handle_flutterwave_webhook(db: Session, request: Request, payload: FlutterwaveWebhookPayload) -> dict[str, Any]:
     header_hash = request.headers.get(settings.flutterwave_webhook_secret_header, "")
@@ -234,3 +423,476 @@ def handle_flutterwave_webhook(db: Session, request: Request, payload: Flutterwa
     verify_payload = PaymentVerifyRequest(tx_ref=payment.flutterwave_tx_ref, transaction_id=transaction_id or payment.flutterwave_transaction_id)
     verified_payment = verify_payment(db, verify_payload, admin=None, request=request)
     return {"status": "processed", "payment_id": str(verified_payment.id)}
+
+def generate_payment_reference(
+    db: Session,
+) -> str:
+
+    year = datetime.now().year
+
+    count = db.scalar(
+        select(func.count())
+        .select_from(Payment)
+        .where(
+            extract("year", Payment.created_at) == year
+        )
+    ) or 0
+
+    return f"PAY-{year}-{count+1:06d}"
+
+def get_payment_record(
+    db: Session,
+    payment_id: UUID,
+) -> Payment:
+
+    payment = get_payment(
+        db,
+        payment_id,
+    )
+
+    if payment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    return payment
+
+def get_payment_list(
+    db: Session,
+    *,
+    search: str | None = None,
+    status_filter: str | None = None,
+    school_id: UUID | None = None,
+    invoice_id: UUID | None = None,
+    page: int = 1,
+    page_size: int = 20,
+):
+
+    offset = (page - 1) * page_size
+
+    return list_payments(
+        db,
+        search=search,
+        status=status_filter,
+        school_id=school_id,
+        invoice_id=invoice_id,
+        offset=offset,
+        limit=page_size,
+    )
+
+def create_payment_record(
+    db: Session,
+    payload: PaymentCreateRequest,
+    *,
+    gateway: str | None = None,
+    admin=None,
+    request=None,
+) -> Payment:
+
+    invoice = get_invoice_by_id(
+        db,
+        payload.invoice_id,
+    )
+
+    if invoice is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found",
+        )
+
+    if invoice.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invoice is not awaiting payment",
+        )
+
+    payment = Payment(
+
+        customer_id=invoice.customer_id,
+
+        school_id=invoice.school_id,
+
+        invoice_id=invoice.id,
+
+        payment_reference=generate_payment_reference(db),
+
+        gateway=gateway,
+
+        gateway_reference=None,
+
+        amount=invoice.amount,
+
+        currency=invoice.currency,
+
+        payment_method=payload.payment_method,
+
+        status="pending",
+
+    )
+
+    create_payment(
+        db,
+        payment,
+    )
+
+    db.commit()
+
+    db.refresh(payment)
+
+    record_audit_event(
+        db,
+        admin=admin,
+        action="payment_created",
+        entity_type="payment",
+        entity_id=str(payment.id),
+        description=f"Created payment {payment.payment_reference}",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+
+    db.commit()
+
+    return payment
+
+def total_revenue(
+    db: Session,
+):
+
+    statement = (
+        select(
+            func.sum(
+                Payment.amount
+            )
+        )
+        .where(
+            Payment.status == "successful"
+        )
+    )
+
+    return db.scalar(statement) or 0
+
+def successful_payment_count(
+    db: Session,
+):
+
+    statement = (
+        select(func.count())
+        .select_from(Payment)
+        .where(
+            Payment.status == "successful"
+        )
+    )
+
+    return db.scalar(statement) or 0
+
+def pending_payment_count(
+    db: Session,
+):
+
+    statement = (
+        select(func.count())
+        .select_from(Payment)
+        .where(
+            Payment.status == "pending"
+        )
+    )
+
+    return db.scalar(statement) or 0
+
+def failed_payment_count(
+    db: Session,
+):
+
+    statement = (
+        select(func.count())
+        .select_from(Payment)
+        .where(
+            Payment.status == "failed"
+        )
+    )
+
+    return db.scalar(statement) or 0
+
+def refund_payment(
+    db: Session,
+    *,
+    payment_reference: str,
+    reason: str | None = None,
+    admin=None,
+    request=None,
+) -> Payment:
+
+    payment = verify_payment(
+        db,
+        payment_reference,
+    )
+
+    if payment.status != "successful":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only successful payments can be refunded.",
+        )
+
+    payment.status = "refunded"
+
+    response = {
+        "refund_reason": reason,
+        "refunded_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    payment.gateway_response = json.dumps(response)
+
+    persist_payment(
+        db,
+        payment,
+    )
+
+    record_audit_event(
+        db,
+        admin=admin,
+        action="payment_refunded",
+        entity_type="payment",
+        entity_id=str(payment.id),
+        description=f"Refunded payment {payment.payment_reference}",
+        ip_address=request.client.host if request and request.client else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+    )
+
+    db.commit()
+
+    db.refresh(payment)
+
+    return payment
+
+def revenue_today(
+    db: Session,
+):
+
+    today = datetime.now(timezone.utc).date()
+
+    statement = (
+        select(
+            func.sum(
+                Payment.amount
+            )
+        )
+        .where(
+            Payment.status == "successful",
+            func.date(
+                Payment.paid_at
+            ) == today,
+        )
+    )
+
+    return db.scalar(statement) or 0
+
+def revenue_this_month(
+    db: Session,
+):
+
+    now = datetime.now(timezone.utc)
+
+    statement = (
+        select(
+            func.sum(Payment.amount)
+        )
+        .where(
+            Payment.status == "successful",
+            extract(
+                "year",
+                Payment.paid_at,
+            ) == now.year,
+            extract(
+                "month",
+                Payment.paid_at,
+            ) == now.month,
+        )
+    )
+
+    return db.scalar(statement) or 0
+
+def revenue_this_year(
+    db: Session,
+):
+
+    year = datetime.now(timezone.utc).year
+
+    statement = (
+        select(
+            func.sum(Payment.amount)
+        )
+        .where(
+            Payment.status == "successful",
+            extract(
+                "year",
+                Payment.paid_at,
+            ) == year,
+        )
+    )
+
+    return db.scalar(statement) or 0
+
+def outstanding_invoice_total(
+    db: Session,
+):
+
+    invoices, _ = list_invoices(
+        db,
+        status="pending",
+        offset=0,
+        limit=100000,
+    )
+
+    return sum(
+        invoice.amount
+        for invoice in invoices
+    )
+
+def get_payment_dashboard_stats(
+    db: Session,
+):
+
+    return {
+
+        "successful_payments":
+            successful_payment_count(db),
+
+        "pending_payments":
+            pending_payment_count(db),
+
+        "failed_payments":
+            failed_payment_count(db),
+
+        "revenue_today":
+            revenue_today(db),
+
+        "revenue_month":
+            revenue_this_month(db),
+
+        "revenue_year":
+            revenue_this_year(db),
+
+        "total_revenue":
+            total_revenue(db),
+
+        "outstanding_invoices":
+            outstanding_invoice_total(db),
+
+    }
+
+def revenue_by_payment_method(
+    db: Session,
+):
+
+    statement = (
+        select(
+            Payment.payment_method,
+            func.sum(Payment.amount),
+        )
+        .where(
+            Payment.status == "successful"
+        )
+        .group_by(
+            Payment.payment_method
+        )
+    )
+
+    return db.execute(statement).all()
+
+def monthly_revenue(
+    db: Session,
+    year: int,
+):
+
+    statement = (
+        select(
+            extract(
+                "month",
+                Payment.paid_at,
+            ),
+            func.sum(
+                Payment.amount,
+            ),
+        )
+        .where(
+            Payment.status == "successful",
+            extract(
+                "year",
+                Payment.paid_at,
+            ) == year,
+        )
+        .group_by(
+            extract(
+                "month",
+                Payment.paid_at,
+            )
+        )
+        .order_by(
+            extract(
+                "month",
+                Payment.paid_at,
+            )
+        )
+    )
+
+    return db.execute(statement).all()
+
+def top_paying_schools(
+    db: Session,
+    limit: int = 10,
+):
+
+    statement = (
+        select(
+            Payment.school_id,
+            func.sum(
+                Payment.amount,
+            ).label("total"),
+        )
+        .where(
+            Payment.status == "successful"
+        )
+        .group_by(
+            Payment.school_id,
+        )
+        .order_by(
+            func.sum(
+                Payment.amount,
+            ).desc()
+        )
+        .limit(limit)
+    )
+
+    return db.execute(statement).all()
+
+def initialize_invoice_payment(
+    db,
+    invoice,
+    customer,
+):
+    payment = Payment(
+
+        invoice_id=invoice.id,
+
+        customer_id=customer.id,
+
+        school_id=invoice.school_id,
+
+        amount=invoice.amount,
+
+        currency=invoice.currency,
+
+        status="pending",
+
+        payment_type="flutterwave",
+
+    )
+
+    gateway.initialize_payment(
+
+        invoice,
+
+        customer,
+
+    )

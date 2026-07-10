@@ -14,3 +14,12 @@ class Admin(TimestampMixin, Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="Staff")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    renewals = relationship(
+        "LicenseRenewal",
+        back_populates="admin",
+    )
+
+    audit_logs = relationship(
+        "AuditLog",
+    )

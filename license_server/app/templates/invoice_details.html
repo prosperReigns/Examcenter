@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+<div>
+
+<h2>
+
+{{ invoice.invoice_number }}
+
+</h2>
+
+<p class="text-muted">
+
+Invoice Details
+
+</p>
+
+</div>
+
+<div>
+
+<a
+href="/invoices"
+class="btn btn-outline-secondary"
+>
+
+Back
+
+</a>
+
+</div>
+
+</div>
+
+<div class="row">
+
+<div class="col-lg-8">
+
+<div class="card shadow-sm mb-4">
+
+<div class="card-header">
+
+Invoice Information
+
+</div>
+
+<div class="card-body">
+
+<table class="table">
+
+<tr>
+
+<th width="30%">
+
+Invoice Number
+
+</th>
+
+<td>
+
+{{ invoice.invoice_number }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Status
+
+</th>
+
+<td>
+
+{% if invoice.status=="paid" %}
+
+<span class="badge bg-success">
+
+Paid
+
+</span>
+
+{% elif invoice.status=="pending" %}
+
+<span class="badge bg-warning text-dark">
+
+Pending
+
+</span>
+
+{% elif invoice.status=="cancelled" %}
+
+<span class="badge bg-danger">
+
+Cancelled
+
+</span>
+
+{% else %}
+
+<span class="badge bg-secondary">
+
+{{ invoice.status }}
+
+</span>
+
+{% endif %}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Amount
+
+</th>
+
+<td>
+
+₦{{ "{:,.2f}".format(invoice.amount) }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Currency
+
+</th>
+
+<td>
+
+{{ invoice.currency }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Description
+
+</th>
+
+<td>
+
+{{ invoice.description }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Created
+
+</th>
+
+<td>
+
+{{ invoice.created_at.strftime("%d %b %Y %H:%M") }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Due Date
+
+</th>
+
+<td>
+
+{{ invoice.due_date.strftime("%d %b %Y") if invoice.due_date else "-" }}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+Paid At
+
+</th>
+
+<td>
+
+{{ invoice.paid_at.strftime("%d %b %Y %H:%M") if invoice.paid_at else "-" }}
+
+</td>
+
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+<div class="card shadow-sm">
+
+<div class="card-header">
+
+Related Objects
+
+</div>
+
+<div class="card-body">
+
+<table class="table">
+
+<tr>
+
+<th width="30%">
+
+School
+
+</th>
+
+<td>
+
+{% if invoice.school %}
+
+<a href="/schools/{{ invoice.school.id }}">
+
+{{ invoice.school.name }}
+
+</a>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+</tr>
+
+<tr>
+
+<th>
+
+License
+
+</th>
+
+<td>
+
+{% if invoice.license %}
+
+<a href="/licenses/{{ invoice.license.id }}">
+
+{{ invoice.license.id }}
+
+</a>
+
+{% else %}
+
+-
+
+{% endif %}
+
+</td>
+
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="col-lg-4">
+
+<div class="card shadow-sm">
+
+<div class="card-header">
+
+Actions
+
+</div>
+
+<div class="card-body d-grid gap-2">
+
+{% if invoice.status=="pending" %}
+
+<form
+action="/invoices/{{ invoice.id }}/pay"
+method="post"
+>
+
+<button
+class="btn btn-success w-100"
+>
+
+Mark Paid
+
+</button>
+
+</form>
+
+<form
+action="/invoices/{{ invoice.id }}/cancel"
+method="post"
+>
+
+<button
+class="btn btn-danger w-100"
+>
+
+Cancel Invoice
+
+</button>
+
+</form>
+
+{% endif %}
+
+<a
+href="/invoices/{{ invoice.id }}/print"
+class="btn btn-outline-primary"
+>
+
+Print Invoice
+
+</a>
+
+<a
+href="/invoices/{{ invoice.id }}/pdf"
+class="btn btn-outline-dark"
+>
+
+Download PDF
+
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

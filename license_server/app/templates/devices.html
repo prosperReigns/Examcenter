@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm border-0">
+
+<div class="card-body">
+
+<h2 class="mb-4">
+
+Registered Devices
+
+</h2>
+
+<div class="row mb-3">
+
+<div class="col-md-6">
+
+<input
+type="text"
+class="form-control"
+placeholder="Search computer or machine..."
+>
+
+</div>
+
+<div class="col-md-3">
+
+<select class="form-select">
+
+<option>All Status</option>
+
+<option>Active</option>
+
+<option>Inactive</option>
+
+<option>Blacklisted</option>
+
+</select>
+
+</div>
+
+</div>
+
+<div class="table-responsive">
+
+<table class="table table-hover align-middle">
+
+<thead>
+
+<tr>
+
+<th>Computer</th>
+
+<th>Machine ID</th>
+
+<th>Status</th>
+
+<th>Activations</th>
+
+<th>Last Seen</th>
+
+<th></th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for device in devices %}
+
+<tr>
+
+<td>
+
+{{ device.renamed_to or device.computer_name or "Unknown" }}
+
+</td>
+
+<td>
+
+<small>
+
+{{ device.machine_id[:24] }}...
+
+</small>
+
+</td>
+
+<td>
+
+{% if device.blacklisted %}
+
+<span class="badge bg-danger">
+
+Blacklisted
+
+</span>
+
+{% elif device.status=="active" %}
+
+<span class="badge bg-success">
+
+Active
+
+</span>
+
+{% else %}
+
+<span class="badge bg-secondary">
+
+Inactive
+
+</span>
+
+{% endif %}
+
+</td>
+
+<td>
+
+{{ device.activation_count }}
+
+</td>
+
+<td>
+
+{{ device.last_seen }}
+
+</td>
+
+<td>
+
+<a
+href="/devices/{{ device.id }}"
+class="btn btn-primary btn-sm"
+>
+
+View
+
+</a>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

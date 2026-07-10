@@ -1,0 +1,743 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h2 class="mb-0">License Details</h2>
+            <small class="text-muted">
+                {{ license.id }}
+            </small>
+        </div>
+
+        <div>
+
+            <a href="/licenses"
+               class="btn btn-outline-secondary">
+                ← Back
+            </a>
+
+            <a href="/licenses/{{ license.id }}/download"
+               class="btn btn-success">
+                 <i class="bi bi-download"></i> Download License
+            </a>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- STATUS CARD -->
+
+    <div class="row mb-4">
+
+        <div class="col-md-4">
+
+            <div class="card shadow-sm">
+
+                <div class="card-body">
+
+                    <h5>Status</h5>
+
+                    {% if license.status == "active" %}
+                        <span class="badge bg-success">
+                            Active
+                        </span>
+
+                    {% elif license.status == "suspended" %}
+                        <span class="badge bg-warning">
+                            Suspended
+                        </span>
+
+                    {% elif license.status == "revoked" %}
+                        <span class="badge bg-danger">
+                            Revoked
+                        </span>
+
+                    {% else %}
+                        <span class="badge bg-secondary">
+                            {{ license.status }}
+                        </span>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="col-md-4">
+
+            <div class="card shadow-sm">
+
+                <div class="card-body">
+
+                    <h5>License Type</h5>
+
+                    <h4>
+                        {{ license.license_type|title }}
+                    </h4>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <div class="col-md-4">
+
+            <div class="card shadow-sm">
+
+                <div class="card-body">
+
+                    <h5>Expiry</h5>
+
+                    <strong>
+
+                        {% if license.expiry_at %}
+                            {{ license.expiry_at }}
+                        {% else %}
+                            Never
+                        {% endif %}
+
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- LICENSE INFORMATION -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+
+            <strong>License Information</strong>
+
+        </div>
+
+        <div class="card-body">
+
+            <table class="table">
+
+                <tr>
+                    <th width="220">School</th>
+                    <td>{{ license.school.name }}</td>
+                </tr>
+
+                <tr>
+                    <th>Machine Fingerprint</th>
+                    <td class="text-break">
+                        {{ license.machine_fingerprint }}
+                    </td>
+                </tr>
+
+                <tr>
+                    <th>Issued</th>
+                    <td>{{ license.issued_at }}</td>
+                </tr>
+
+                <tr>
+                    <th>Version</th>
+                    <td>{{ license.version }}</td>
+                </tr>
+
+                <tr>
+                    <th>Created</th>
+                    <td>{{ license.created_at }}</td>
+                </tr>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <div class="card mt-4">
+
+        <div class="card-header">
+
+            Renewal History
+
+        </div>
+
+        <div class="card-body">
+
+            <table class="table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Date</th>
+
+                        <th>Old Plan</th>
+
+                        <th>New Plan</th>
+
+                        <th>Old Expiry</th>
+
+                        <th>New Expiry</th>
+
+                        <th>Amount</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for renewal in renewals %}
+
+                    <tr>
+
+                        <td>{{ renewal.renewed_at }}</td>
+
+                        <td>{{ renewal.old_license_type }}</td>
+
+                        <td>{{ renewal.new_license_type }}</td>
+
+                        <td>{{ renewal.old_expiry }}</td>
+
+                        <td>{{ renewal.new_expiry }}</td>
+
+                        <td>{{ renewal.amount_paid }}</td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="6">
+
+                            No renewals yet.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <div class="card mt-4 shadow-sm">
+        <div class="card-header">
+            Renewal Information
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-bordered">
+
+                <tr>
+                    <th>Renewal Count</th>
+                    <td>{{ license.renewal_count }}</td>
+                </tr>
+
+                <tr>
+                    <th>Last Renewed</th>
+                    <td>
+                        {{ license.last_renewed_at or "Never" }}
+                    </td>
+                </tr>
+
+                <tr>
+                    <th>Next Expiry</th>
+                    <td>
+                        {{ license.expiry_at }}
+                    </td>
+                </tr>
+
+                <tr>
+                    <th>Version</th>
+                    <td>{{ license.version }}</td>
+                </tr>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- ACTIONS -->
+
+    <div class="card mt-4 shadow-sm">
+        <div class="card-header">
+            License Actions
+        </div>
+
+        <div class="card-body">
+
+            {% if license.status == "active" %}
+
+                <form method="post"
+                    action="/licenses/{{ license.id }}/renew"
+                    class="d-inline">
+                    <button class="btn btn-success">
+                        Renew
+                    </button>
+                </form>
+
+                <form method="post"
+                    action="/licenses/{{ license.id }}/suspend"
+                    class="d-inline"
+                    onsubmit="return confirm('Suspend this license?');">
+
+                    <button class="btn btn-warning">
+                        Suspend
+                    </button>
+
+                </form>
+
+                {% if admin.role == "Super Admin" %}
+                <form method="post"
+                    action="/licenses/{{ license.id }}/revoke"
+                    class="d-inline"
+                    onsubmit="return confirm('Permanently revoke this license?');">
+
+                    <button class="btn btn-danger">
+                        Revoke
+                    </button>
+
+                </form>
+                {% endif %}
+
+            {% elif license.status == "suspended" %}
+
+                <form method="post"
+                    action="/licenses/{{ license.id }}/reactivate"
+                    class="d-inline">
+
+                    <button class="btn btn-success">
+                        Reactivate
+                    </button>
+
+                </form>
+
+                {% if admin.role == "Super Admin" %}
+                <form method="post"
+                    action="/licenses/{{ license.id }}/revoke"
+                    class="d-inline"
+                    onsubmit="return confirm('Permanently revoke this license?');">
+
+                    <button class="btn btn-danger">
+                        Revoke
+                    </button>
+
+                </form>
+                {% endif %}
+
+            {% elif license.status == "revoked" %}
+
+                <div class="alert alert-danger mb-0">
+                    This license has been revoked and cannot be modified.
+                </div>
+
+            {% endif %}
+            
+            <form
+                method="post"
+                action="/licenses/{{ license.id }}/delete"
+                onsubmit="return confirm(
+                    'Delete this license?\n\nThis action can be reversed only from the database.'
+                );"
+                class="d-inline"
+            >
+
+                <button
+                    class="btn btn-outline-danger"
+                >
+
+                    <i class="bi bi-trash"></i>
+
+                    Delete License
+
+                </button>
+
+            </form>
+        </div>
+
+    </div>
+
+    <!-- ACTIVATIONS -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+
+            <strong>
+
+                Activations ({{ activations|length }})
+
+            </strong>
+
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-striped">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Machine</th>
+
+                        <th>Computer</th>
+
+                        <th>Activated</th>
+
+                        <th>Status</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for activation in activations %}
+
+                    <tr>
+
+                        <td>
+
+                            {{ activation.machine_id }}
+
+                        </td>
+
+                        <td>
+
+                            {{ activation.computer_name }}
+
+                        </td>
+
+                        <td>
+
+                            {{ activation.activated_at }}
+
+                        </td>
+
+                        <td>
+
+                            {{ activation.status }}
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="4">
+
+                            No activations found.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- REGISTERED DEVICES -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+
+            <strong>
+
+                Registered Devices
+
+            </strong>
+
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-hover">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Machine</th>
+
+                        <th>Computer</th>
+
+                        <th>Activation Count</th>
+
+                        <th>Status</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for device in devices %}
+
+                    <tr>
+
+                        <td>{{ device.machine_id }}</td>
+
+                        <td>{{ device.computer_name }}</td>
+
+                        <td>{{ device.activation_count }}</td>
+
+                        <td>{{ device.status }}</td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="4">
+
+                            No registered devices.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- PAYMENTS -->
+
+    <div class="card shadow-sm">
+
+        <div class="card-header">
+
+            <strong>
+
+                Payment History
+
+            </strong>
+
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Date</th>
+
+                        <th>Amount</th>
+
+                        <th>Method</th>
+
+                        <th>Status</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for payment in payments %}
+
+                    <tr>
+
+                        <td>{{ payment.created_at }}</td>
+
+                        <td>₦{{ payment.amount }}</td>
+
+                        <td>{{ payment.payment_method }}</td>
+
+                        <td>{{ payment.status }}</td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="4">
+
+                            No payments found.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div
+    class="modal fade"
+    id="renewModal"
+    tabindex="-1"
+>
+    <div class="modal-dialog">
+
+        <form
+            method="post"
+            action="/licenses/{{ license.id }}/renew"
+            class="modal-content"
+        >
+
+            <div class="modal-header">
+
+                <h5>
+
+                    Renew License
+
+                </h5>
+
+                <button
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                ></button>
+
+            </div>
+
+            <div class="modal-body">
+
+                <label class="form-label">
+
+                    Plan
+
+                </label>
+
+                <select
+                    name="license_type"
+                    class="form-select"
+                >
+
+                    <option value="demo">Demo</option>
+
+                    <option value="monthly">Monthly</option>
+
+                    <option value="quarterly">Quarterly</option>
+
+                    <option value="annual" selected>
+
+                        Annual
+
+                    </option>
+
+                    <option value="lifetime">
+
+                        Lifetime
+
+                    </option>
+
+                </select>
+
+                <br>
+
+                <label>
+
+                    Amount Paid
+
+                </label>
+
+                <input
+                    name="amount_paid"
+                    type="number"
+                    step="0.01"
+                    class="form-control"
+                >
+
+                <br>
+
+                <label>
+
+                    Payment Reference
+
+                </label>
+
+                <input
+                    name="payment_reference"
+                    class="form-control"
+                >
+
+                <br>
+
+                <label>
+
+                    Remarks
+
+                </label>
+
+                <textarea
+                    name="remarks"
+                    class="form-control"
+                ></textarea>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    class="btn btn-success"
+                >
+
+                    Renew
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}
