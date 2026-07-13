@@ -1,3 +1,8 @@
+from app.core.config import get_settings
+
+
+settings = get_settings()
+
 LICENSE_PRICES = {
 
     "demo": 0,

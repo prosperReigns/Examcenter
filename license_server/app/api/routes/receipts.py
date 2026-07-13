@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.receipt import ReceiptRead
@@ -28,7 +29,7 @@ router = APIRouter(
 @router.get("", response_model=list[ReceiptRead])
 def list_receipts_api(
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")), page: int = Query(1, ge=1),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)), page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
     receipts, _ = get_receipt_list(
@@ -40,10 +41,10 @@ def list_receipts_api(
 
 
 @router.get("/{receipt_id}", response_model=ReceiptRead)
-def get_receipt_api(
+def receipt_details(
     receipt_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     return get_receipt_record(
         db,
@@ -56,8 +57,8 @@ def download_receipt_api(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -73,8 +74,8 @@ def regenerate_receipt_api(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 
@@ -91,8 +92,8 @@ def email_receipt_api(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -113,8 +114,8 @@ def sms_receipt_api(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -134,7 +135,7 @@ def sms_receipt_api(
 def reissue_receipt_api(
     receipt_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     receipt = reissue_receipt(
         db,
@@ -154,7 +155,7 @@ def reissue_receipt_api(
 def void_receipt_api(
     receipt_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     receipt = void_receipt(
         db,
@@ -169,22 +170,12 @@ def void_receipt_api(
 
     }
 
-@router.get("/{receipt_id}")
-def receipt_details(
-    receipt_id: UUID,
-    db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
-):
-    return get_receipt(
-        db,
-        receipt_id,
-    )
 
 @router.get("/{receipt_id}/download")
 def download_receipt_endpoint(
     receipt_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     path = download_receipt(
@@ -198,7 +189,7 @@ def download_receipt_endpoint(
 def regenerate_receipt_endpoint(
     receipt_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     return regenerate_pdf(
         db,
@@ -209,7 +200,7 @@ def regenerate_receipt_endpoint(
 def email_receipt_endpoint(
     receipt_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     email_receipt(
         db,
@@ -224,7 +215,7 @@ def email_receipt_endpoint(
 def sms_receipt_endpoint(
     receipt_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     sms_receipt(
         db,

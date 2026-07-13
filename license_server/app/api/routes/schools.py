@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.school import SchoolCreate, SchoolRead, SchoolUpdate
@@ -17,29 +18,29 @@ def list_schools_endpoint(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     items, _ = get_schools(db, search=search, page=page, page_size=page_size)
     return items
 
 
 @router.get("/{school_id}", response_model=SchoolRead)
-def get_school_endpoint(school_id: UUID, db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
+def get_school_endpoint(school_id: UUID, db: Session = Depends(get_db), admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))):
     return get_school(db, school_id)
 
 
 @router.post("", response_model=SchoolRead, status_code=status.HTTP_201_CREATED)
-def create_school_endpoint(payload: SchoolCreate, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
+def create_school_endpoint(payload: SchoolCreate, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))):
     return create_school_record(db, payload, admin=admin, request=request)
 
 
 @router.put("/{school_id}", response_model=SchoolRead)
-def update_school_endpoint(school_id: UUID, payload: SchoolUpdate, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
+def update_school_endpoint(school_id: UUID, payload: SchoolUpdate, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))):
     return update_school_record(db, school_id, payload, admin=admin, request=request)
 
 
 @router.delete("/{school_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_school_endpoint(school_id: UUID, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
+def delete_school_endpoint(school_id: UUID, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))):
     delete_school_record(db, school_id, admin=admin, request=request)
 
 @router.post("/{school_id}/activate")
@@ -47,7 +48,7 @@ def activate_school_endpoint(
     school_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return activate_school(
         db,
@@ -61,7 +62,7 @@ def deactivate_school_endpoint(
     school_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return deactivate_school(
         db,

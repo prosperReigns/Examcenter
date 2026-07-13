@@ -1,0 +1,129 @@
+{% extends "base/base_admin.html" %}
+
+{% block content %}
+
+<h2>
+
+{{ title }}
+
+</h2>
+
+<form method="post">
+
+<div class="card shadow-sm">
+
+<div class="card-body">
+
+<div class="row">
+
+<div class="col-md-6 mb-3">
+
+<label>
+
+School Name
+
+</label>
+
+<input
+class="form-control"
+name="name"
+value="{{ school.name if school else '' }}"
+required
+>
+
+</div>
+
+<div class="col-md-6 mb-3">
+
+<label>
+
+Centre Number
+
+</label>
+
+<input
+class="form-control"
+name="center_number"
+value="{{ school.center_number if school else '' }}"
+required
+>
+
+</div>
+
+<div class="col-md-6 mb-3">
+
+<label>
+
+Email
+
+</label>
+
+<input
+type="email"
+class="form-control"
+name="email"
+value="{{ school.email if school else '' }}"
+>
+
+</div>
+
+<div class="col-md-6 mb-3">
+
+<label>
+
+Phone
+
+</label>
+
+<input
+class="form-control"
+name="phone"
+value="{{ school.phone if school else '' }}"
+>
+
+</div>
+
+<div class="col-md-12 mb-3">
+
+<label>
+
+Address
+
+</label>
+
+<textarea
+class="form-control"
+rows="4"
+name="address"
+>{{ school.address if school else '' }}</textarea>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="card-footer">
+
+<button class="btn btn-success">
+
+Save School
+
+</button>
+
+<a
+href="/schools"
+class="btn btn-secondary"
+>
+
+Cancel
+
+</a>
+
+</div>
+
+</div>
+
+</form>
+
+{% endblock %}

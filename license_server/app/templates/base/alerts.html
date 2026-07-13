@@ -1,0 +1,13 @@
+{% if messages %}
+
+    {% for message in messages %}
+
+        <div class="alert alert-{{ message.category }} mt-3">
+
+            {{ message.message }}
+
+        </div>
+
+    {% endfor %}
+
+{% endif %}

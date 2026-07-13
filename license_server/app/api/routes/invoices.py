@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 
@@ -46,8 +47,8 @@ def list_invoices_endpoint(
 
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 
@@ -81,8 +82,8 @@ def invoice_details_endpoint(
 
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 
@@ -108,8 +109,8 @@ def create_invoice_endpoint(
 
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 
@@ -147,8 +148,8 @@ def pay_invoice_endpoint(
 
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 
@@ -180,8 +181,8 @@ def cancel_invoice_endpoint(
 
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 
@@ -210,8 +211,8 @@ def download_invoice_endpoint(
 
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 

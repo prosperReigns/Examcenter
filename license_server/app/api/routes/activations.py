@@ -1,12 +1,14 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.activation import ActivationRead, ActivationRequest, LicenseValidationResponse
 from app.services.activation_service import activate_license, deactivate_license_activation, get_activation, validate_license_for_machine, get_activation_statistics
+from app.core.roles import Roles
 
 
 router = APIRouter(prefix="/api/activations", tags=["activations"])
@@ -16,7 +18,7 @@ def validate_activation_endpoint(
     license_id: UUID,
     payload: ActivationRequest,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     return validate_license_for_machine(db, license_id, payload.machine_id)
 
@@ -26,7 +28,7 @@ def create_activation_endpoint(
     license_id: UUID,
     payload: ActivationRequest,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     return activate_license(db, license_id, payload)
 
@@ -35,7 +37,7 @@ def create_activation_endpoint(
 def get_activation_endpoint(
     activation_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     """
     Fetch details for a specific activation record.
@@ -46,7 +48,7 @@ def get_activation_endpoint(
 def deactivate_activation_endpoint(
     activation_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     return deactivate_license_activation(db, activation_id)
 
@@ -57,8 +59,8 @@ def activation_statistics_endpoint(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):

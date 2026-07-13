@@ -11,6 +11,7 @@ from app.schemas.notification import (
     NotificationRead,
 )
 
+from app.core.roles import Roles
 from app.services.notification_service import (
     list_notifications,
     get_notification,
@@ -34,7 +35,7 @@ def list_notifications_endpoint(
     page: int = 1,
     page_size: int = 20,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     notifications, _ = list_notifications(
@@ -53,7 +54,7 @@ def list_notifications_endpoint(
 def get_notification_endpoint(
     notification_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return get_notification(
@@ -69,7 +70,7 @@ def mark_notification_read_endpoint(
     notification_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return mark_as_read(
@@ -83,7 +84,7 @@ def mark_notification_read_endpoint(
 def mark_all_notifications_read_endpoint(
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     count = mark_all_read(
@@ -105,7 +106,7 @@ def delete_notification_endpoint(
     notification_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
 
     delete_notification(
@@ -124,7 +125,7 @@ def create_system_notification_endpoint(
     payload: NotificationCreate,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
 
     return send_system_notification(

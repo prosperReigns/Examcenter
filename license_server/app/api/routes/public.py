@@ -14,10 +14,24 @@ from app.schemas.license_device import (
 
 from app.services.activation_service import (
     validate_public_license,
+    activate_from_token,
 )
 
 from app.services.device_service import (
     heartbeat_device,
+)
+
+from app.schemas.purchase_session import (
+    PurchaseSessionCreate,
+)
+
+from app.schemas.activation import (
+    ActivationRequest,
+)
+
+from app.services.purchase_session_service import (
+    start_purchase,
+    get_purchase_status,
 )
 
 router = APIRouter(
@@ -54,4 +68,45 @@ def heartbeat_endpoint(
     return heartbeat_device(
         db,
         payload,
+    )
+
+@router.post("/start-purchase")
+def start_purchase_endpoint(
+    payload: PurchaseSessionCreate,
+    db: Session = Depends(get_db),
+):
+    return start_purchase(
+        db,
+        payload,
+    )
+
+@router.get("/purchase-status/{session_id}")
+def purchase_status_endpoint(
+    session_id: str,
+    db: Session = Depends(get_db),
+):
+    return get_purchase_status(
+        db,
+        session_id,
+    )
+
+@router.post("/activate")
+def activate_endpoint(
+    payload: ActivationRequest,
+    db: Session = Depends(get_db),
+):
+    return activate_from_token(
+        db,
+        payload,
+    )
+
+@router.post("/verify")
+def verify_license_endpoint(
+    payload: ActivationRequest,
+    db: Session = Depends(get_db),
+):
+    return activate_from_token(
+        db,
+        payload,
+        verify_only=True,
     )

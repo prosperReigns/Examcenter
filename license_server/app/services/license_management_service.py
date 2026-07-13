@@ -6,12 +6,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.license import License
-from app.repositories.license_repository import create_license_record, get_license_by_id, list_licenses, persist_license, renew_license_record,  soft_delete_license
+from app.repositories.license_repository import create_license_record, list_licenses, persist_license,  soft_delete_license
 from app.repositories.school_repository import get_school_by_id
-from app.schemas.license import ( LicenseCreateRequest, LicenseRenewRequest, 
+from app.schemas.license import ( LicenseCreateRequest,
 LicenseStatusUpdateRequest,)
 from app.services.audit_service import record_audit_event
-from app.services.license_service import( build_license_expiry, create_signed_license, normalize_license_type, verify_signed_license,)
+from app.services.license_service import( create_signed_license, normalize_license_type, verify_signed_license,)
 from sqlalchemy.orm import selectinload
 
 from app.repositories.license_history_repository import create_history_record
@@ -409,3 +409,6 @@ def revoke_license(
     db.commit()
 
     return license_obj
+
+def renew_license():
+    pass

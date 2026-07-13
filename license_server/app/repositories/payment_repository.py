@@ -204,3 +204,12 @@ def total_revenue(
     )
 
     return db.scalar(statement) or 0
+
+def create_payment_record():
+    pass
+def get_payment_by_transaction_id():
+    pass
+def get_payment_by_tx_ref():
+    pass
+def get_payment_by_id():
+    pass

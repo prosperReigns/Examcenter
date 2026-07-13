@@ -1,0 +1,35 @@
+<header class="topbar">
+
+    <button id="menu-toggle" class="btn btn-outline">
+
+        ☰
+
+    </button>
+
+    <h3>
+
+        {{ title }}
+
+    </h3>
+
+    <div class="user-menu">
+
+        <div class="user-avatar">
+
+            {{ admin.full_name[:1] if admin else "A" }}
+
+        </div>
+
+        <div>
+
+            <strong>
+
+                {{ admin.full_name if admin else "Administrator" }}
+
+            </strong>
+
+        </div>
+
+    </div>
+
+</header>

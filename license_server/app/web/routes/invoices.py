@@ -7,6 +7,7 @@ from app.database.session import SessionLocal
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 
+from app.core.roles import Roles
 from app.services.invoice_service import get_invoice_list
 from app.services.invoice_service import (
     get_invoice_record,pay_invoice, cancel_invoice
@@ -18,16 +19,17 @@ from app.utils.flash import flash
 from app.web.templates import templates
 from app.core.config import get_settings
 
-settings = get_settings()
-router = APIRouter(
-    prefix="/invoices",
-    tags=["Invoice Pages"],
-)
 
-@router.get("/invoices", response_class=HTMLResponse)
+router = APIRouter(
+    prefix="/invoices", 
+    tags=["Web - Invoices"],
+)
+settings = get_settings()
+
+@router.get("/", response_class=HTMLResponse)
 def invoices_page(
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
@@ -49,11 +51,11 @@ def invoices_page(
         },
     )
 
-@router.get("/invoices/{invoice_id}", response_class=HTMLResponse)
+@router.get("/{invoice_id}", response_class=HTMLResponse)
 def invoice_details_page(
     invoice_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
@@ -75,11 +77,11 @@ def invoice_details_page(
     )
 
 
-@router.post("/invoices/{invoice_id}/pay")
+@router.post("/{invoice_id}/pay")
 def pay_invoice_submit(
     invoice_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
@@ -102,11 +104,11 @@ def pay_invoice_submit(
         status_code=303,
     )
 
-@router.post("/invoices/{invoice_id}/cancel")
+@router.post("/{invoice_id}/cancel")
 def cancel_invoice_submit(
     invoice_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
@@ -128,10 +130,10 @@ def cancel_invoice_submit(
         status_code=303,
     )
 
-@router.get("/invoices/{invoice_id}/pdf")
+@router.get("/{invoice_id}/pdf")
 def download_invoice_pdf(
     invoice_id: UUID,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:

@@ -8,7 +8,7 @@ from app.models.setting import Setting
 from app.repositories.setting_repository import get_setting_by_key, list_settings, upsert_setting, delete_setting, persist_setting
 from app.schemas.setting import SettingUpsert
 from app.services.audit_service import record_audit_event
-from core.default_settings import DEFAULT_SETTINGS
+from app.core.default_settings import DEFAULT_SETTINGS
 
 def get_settings_list(db: Session, *, category: str | None = None) -> list[Setting]:
     return list_settings(db, category=category)

@@ -21,6 +21,7 @@ from .devices import router as devices_router
 from .license_renewals import router as license_renewals_router
 from .invoices import router as invoices_router
 from .notifications import router as notification_router
+from .public_activation import router as public_activation_router
 
 
 def register_routes(app: FastAPI) -> None:
@@ -45,7 +46,10 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(idempotency_router)
     app.include_router(admin_router)
     app.include_router(webhook_router)
-    
+    api_router.include_router(
+    public_activation_router,
+)
+
 __all__ = [
     "activation_router",
     "admin_router",

@@ -154,3 +154,14 @@ def get_total_invoice_amount(
     )
 
     return db.scalar(statement) or 0
+
+def mark_invoice_cancelled():
+    pass
+def mark_invoice_paid():
+    pass
+def persist_invoice():
+    pass
+def get_invoice_by_id():
+    pass
+def get_invoice_by_payment():
+    pass

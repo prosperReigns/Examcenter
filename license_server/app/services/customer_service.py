@@ -111,3 +111,6 @@ def delete_customer_record(db: Session, customer_id: UUID, *, admin=None, reques
         user_agent=request.headers.get("user-agent") if request else None,
     )
     db.commit()
+
+def customer_statistics():
+    pass

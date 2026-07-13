@@ -461,3 +461,6 @@ def send_system_notification(
         subject=subject,
         message=message,
     )
+
+def queue_notification():
+    pass

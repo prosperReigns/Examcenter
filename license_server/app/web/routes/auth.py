@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from fastapi import Depends, APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse, PlainTextResponse
 from app.database.session import SessionLocal
 
 from app.services.audit_service import record_audit_event
@@ -10,17 +10,21 @@ from app.utils.flash import flash
 from app.web.templates import templates
 from app.core.config import get_settings
 
-settings = get_settings()
 router = APIRouter(
-    prefix="/auth",
-    tags=["Auth Pages"],
+    prefix="", 
+    tags=["Web Auths"],
 )
-
+settings = get_settings()
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("login.html", {"request": request, "settings": settings, "title": "Admin Login"})
+    print("========== LOGIN PAGE HIT ==========")
+    return templates.TemplateResponse("auth/login.html", {"request": request, "settings": settings, "title": "Admin Login"})
 
+# @router.get("/login")
+# def login_page():
+#     print("******** LOGIN ROUTE EXECUTED ********")
+#     return HTMLResponse("<h1>LOGIN PAGE WORKS</h1>")
 
 @router.post("/login")
 def login_submit(request: Request, email: str = Form(...), password: str = Form(...), remember_me: bool = Form(False)) -> RedirectResponse:
@@ -64,6 +68,6 @@ def login_submit(request: Request, email: str = Form(...), password: str = Form(
 @router.post("/logout")
 def logout(request: Request) -> RedirectResponse:
     flash(request, "You have been signed out.", "info")
-    response = RedirectResponse(url="/login", status_code=303)
+    response = RedirectResponse(url="auth/login", status_code=303)
     response.delete_cookie(key=settings.access_token_cookie_name, path="/")
     return response

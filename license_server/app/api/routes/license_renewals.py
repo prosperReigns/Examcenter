@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, status, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.license import LicenseRead
@@ -35,8 +36,8 @@ def renew_license_endpoint(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -60,8 +61,8 @@ def renewal_history_endpoint(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -80,8 +81,8 @@ def renewal_details_endpoint(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -101,7 +102,7 @@ def renewal_details_endpoint(
 
 @router.get("/renewal-plans")
 def renewal_plans_endpoint(
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return get_available_renewal_plans()
@@ -115,8 +116,8 @@ def renewal_statistics_endpoint(
 
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 

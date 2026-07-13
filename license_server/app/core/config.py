@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from app.core.roles import Roles
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     access_token_cookie_samesite: str = "lax"
     access_token_cookie_max_age_seconds: int = 3600
     remember_me_max_age_seconds: int = 2592000
-    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/license_server"
+    database_url: str = "postgresql+psycopg://examcenteradmin:examcenterpassword@localhost:5432/examcenterlicense"
     flutterwave_public_key: str = ""
     flutterwave_secret_key: str = ""
     flutterwave_hash: str = ""
@@ -50,7 +51,7 @@ class Settings(BaseSettings):
     bootstrap_admin_full_name: str = ""
     bootstrap_admin_email: str = ""
     bootstrap_admin_password: str = ""
-    bootstrap_admin_role: str = "Super Admin"
+    bootstrap_admin_role: str = Roles.SUPER_ADMIN
 
 
 @lru_cache

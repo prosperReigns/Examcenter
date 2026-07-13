@@ -66,3 +66,6 @@ def persist_school(
     db.flush()
 
     return school
+
+def get_school_by_name():
+    pass

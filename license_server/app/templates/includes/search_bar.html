@@ -1,0 +1,21 @@
+<form method="get">
+
+    <input
+
+        type="text"
+
+        name="search"
+
+        value="{{ request.query_params.get('search','') }}"
+
+        placeholder="Search..."
+
+    >
+
+    <button type="submit">
+
+        Search
+
+    </button>
+
+</form>

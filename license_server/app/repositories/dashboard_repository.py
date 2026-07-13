@@ -9,8 +9,8 @@ from app.models.school import School
 
 
 def get_dashboard_stats(db: Session) -> dict[str, int]:
-    total_customers = db.scalar(select(func.count()).select_from(Customer).where(Customer.deleted_at.is_(None))) or 0
-    total_schools = db.scalar(select(func.count()).select_from(School).where(School.deleted_at.is_(None))) or 0
+    customer_count = db.scalar(select(func.count()).select_from(Customer).where(Customer.deleted_at.is_(None))) or 0
+    school_count = db.scalar(select(func.count()).select_from(School).where(School.deleted_at.is_(None))) or 0
     active_licenses = db.scalar(select(func.count()).select_from(License).where(License.deleted_at.is_(None), License.status == "active")) or 0
     expired_licenses = db.scalar(select(func.count()).select_from(License).where(License.deleted_at.is_(None), License.status == "expired")) or 0
     revenue = db.scalar(
@@ -23,8 +23,8 @@ def get_dashboard_stats(db: Session) -> dict[str, int]:
     recent_activations = db.scalar(select(func.count()).select_from(Activation).where(Activation.status == "active")) or 0
 
     return {
-        "total_customers": int(total_customers),
-        "total_schools": int(total_schools),
+        "customers": int(customer_count),
+        "schools": int(school_count),
         "active_licenses": int(active_licenses),
         "expired_licenses": int(expired_licenses),
         "revenue": revenue,

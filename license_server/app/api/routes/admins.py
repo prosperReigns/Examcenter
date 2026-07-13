@@ -15,6 +15,7 @@ from app.schemas.admin import (
     AdminRead,
     AdminUpdate,
 )
+from app.core.roles import Roles
 from app.schemas.admin import ChangePasswordRequest, ResetPasswordRequest
 from app.services.admin_service import (
     create_admin_record,
@@ -44,7 +45,7 @@ def list_admins_endpoint(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     items, _ = get_admins(
         db,
@@ -62,7 +63,7 @@ def list_admins_endpoint(
 def get_admin_endpoint(
     admin_id: int,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return get_admin(
         db,
@@ -79,7 +80,7 @@ def create_admin_endpoint(
     payload: AdminCreate,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return create_admin_record(
         db,
@@ -98,7 +99,7 @@ def update_admin_endpoint(
     payload: AdminUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return update_admin_record(
         db,
@@ -117,7 +118,7 @@ def delete_admin_endpoint(
     admin_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     delete_admin_record(
         db,
@@ -135,7 +136,7 @@ def activate_admin_endpoint(
     admin_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return activate_admin(
         db,
@@ -153,7 +154,7 @@ def deactivate_admin_endpoint(
     admin_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return deactivate_admin(
         db,
@@ -171,7 +172,7 @@ def change_password_endpoint(
     payload: ChangePasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return change_admin_password(
         db,
@@ -191,7 +192,7 @@ def reset_password_endpoint(
     payload: ResetPasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return reset_admin_password(
         db,
@@ -207,6 +208,6 @@ def reset_password_endpoint(
 )
 def statistics_endpoint(
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     return admin_statistics(db)

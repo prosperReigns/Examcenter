@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
-from enums.payment_status import PaymentStatus
+from app.enums.payment_status import PaymentStatus
 
 
 class Payment(UUIDPrimaryKeyMixin, TimestampMixin, Base):

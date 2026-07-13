@@ -194,3 +194,9 @@ def deactivate_school(
     db.refresh(school)
 
     return school
+
+def school_statistics():
+    pass
+
+def create_school_if_not_exists():
+    pass

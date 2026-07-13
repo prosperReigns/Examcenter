@@ -14,7 +14,9 @@ from app.repositories.invoice_repository import (
     mark_invoice_cancelled,
     mark_invoice_paid,
     persist_invoice,
+
 )
+from app.services.license_management_service import renew_license
 from app.repositories.license_repository import get_license_by_id
 from app.services.audit_service import record_audit_event
 
@@ -246,3 +248,4 @@ def expire_invoice(
     db.commit()
 
     return invoice
+

@@ -1,0 +1,131 @@
+/* ==========================================================
+   CARDS
+   ========================================================== */
+
+.card{
+
+    background:white;
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow);
+
+    padding:24px;
+
+    margin-bottom:20px;
+
+}
+
+.card-header{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:20px;
+
+}
+
+.card-title{
+
+    font-size:18px;
+
+    font-weight:700;
+
+}
+
+.card-body{
+
+    width:100%;
+
+}
+
+.card-footer{
+
+    margin-top:20px;
+
+    padding-top:15px;
+
+    border-top:1px solid var(--gray-200);
+
+}
+
+/* ==========================================================
+   DASHBOARD STATS
+   ========================================================== */
+
+.stats-grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+
+    gap:20px;
+
+}
+
+.stat-card{
+
+    background:white;
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow);
+
+    padding:24px;
+
+    transition:.25s;
+
+}
+
+.stat-card:hover{
+
+    transform:translateY(-4px);
+
+}
+
+.stat-title{
+
+    color:var(--gray-500);
+
+    font-size:14px;
+
+}
+
+.stat-value{
+
+    font-size:34px;
+
+    font-weight:bold;
+
+    margin-top:12px;
+
+}
+
+.stat-footer{
+
+    margin-top:18px;
+
+    color:var(--gray-500);
+
+    font-size:13px;
+
+}
+
+.action-bar{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:25px;
+
+    gap:20px;
+
+    flex-wrap:wrap;
+
+}

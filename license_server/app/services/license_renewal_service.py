@@ -16,7 +16,7 @@ from app.core.config import get_settings
 from app.repositories.license_history_repository import (
     list_license_history,
 )
-from core.pricing import LICENSE_PRICES
+from app.core.pricing import LICENSE_PRICES
 settings = get_settings()
 PLAN_DURATION_MAP = {
     "trial": 7,

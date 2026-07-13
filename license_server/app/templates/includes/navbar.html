@@ -1,0 +1,23 @@
+<header class="topbar">
+
+    <div>
+
+        <h3>{{ title }}</h3>
+
+    </div>
+
+    <div>
+
+        <strong>{{ admin.full_name }}</strong>
+
+        ({{ admin.role }})
+
+        <form action="/logout" method="post">
+
+            <button>Logout</button>
+
+        </form>
+
+    </div>
+
+</header>

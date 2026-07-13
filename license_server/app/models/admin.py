@@ -1,14 +1,15 @@
+import uuid
 from sqlalchemy import Boolean, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
-from app.models.base import TimestampMixin
+from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
 
 
-class Admin(TimestampMixin, Base):
+class Admin(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "admins"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)

@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
+from app.core.roles import Roles
 
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
@@ -37,7 +38,7 @@ def list_devices_endpoint(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     devices, _ = get_devices(
@@ -58,7 +59,7 @@ def list_devices_endpoint(
 def get_device_endpoint(
     device_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return get_device_or_404(
@@ -75,7 +76,7 @@ def rename_device_endpoint(
     payload: DeviceRenameRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return rename_license_device(
@@ -95,7 +96,7 @@ def blacklist_device_endpoint(
     payload: DeviceBlacklistRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return blacklist_license_device(
@@ -114,7 +115,7 @@ def unblacklist_device_endpoint(
     device_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return unblacklist_license_device(
@@ -133,7 +134,7 @@ def update_notes_endpoint(
     payload: DeviceNotesRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return save_device_notes(
@@ -150,7 +151,7 @@ def update_notes_endpoint(
 )
 def device_statistics_endpoint(
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return get_device_statistics(db)

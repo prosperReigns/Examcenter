@@ -25,18 +25,15 @@ from app.repositories.payment_repository import (
     get_payment,
     list_payments,
     create_payment_record,
-    get_payment_by_id,
     get_payment_by_transaction_id,
     get_payment_by_tx_ref,
     persist_payment,
-    get_payment_by_reference
 )
 from app.repositories.school_repository import get_school_by_id
 from app.schemas.license import LicenseCreateRequest
 from app.schemas.payment import FlutterwaveWebhookPayload, PaymentInitializeRequest, PaymentInitializationResponse, PaymentRead, PaymentVerifyRequest, PaymentCreateRequest
 from app.services.audit_service import record_audit_event
 from app.services.license_management_service import issue_license, renew_license
-from app.services.license_service import normalize_license_type
 from app.services.invoice_service import (
     mark_invoice_paid,
 )

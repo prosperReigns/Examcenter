@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 
+from app.core.roles import Roles
 from app.services.idempotency_service import (
     get_idempotency_key,
     list_idempotency_keys,
@@ -22,7 +23,7 @@ def list_idempotency_endpoint(
     page: int = 1,
     page_size: int = 20,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     keys, total = list_idempotency_keys(
         db,
@@ -41,7 +42,7 @@ def list_idempotency_endpoint(
 def get_idempotency_key_endpoint(
     key: str,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
 
     record = get_idempotency_key(
@@ -60,7 +61,7 @@ def get_idempotency_key_endpoint(
 @router.delete("/expired")
 def cleanup_expired_keys_endpoint(
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
 
     deleted = delete_expired_idempotency_keys(

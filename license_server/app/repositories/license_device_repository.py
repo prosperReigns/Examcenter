@@ -287,3 +287,6 @@ def device_statistics(
         "inactive": inactive,
         "blacklisted": blacklisted,
     }
+
+def get_device_by_fingerprint():
+    pass

@@ -1,4 +1,3 @@
-from app.clients.flutterwave_client import FlutterwaveClient
 from app.core.config import settings
 from app.services.paystack_service import PaystackService
 from fastapi import HTTPException, status
@@ -72,6 +71,15 @@ class FlutterwaveService:
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Refund failed: {exc}",
             )
+        
+    def webhook_signature_is_valid(
+        self,
+        request,
+    ):
+
+        return self.gateway.webhook_signature_is_valid(
+            request,
+        )
 
 class PaymentGatewayService:
     def __init__(self):

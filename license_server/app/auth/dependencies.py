@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Generator
 
 from fastapi import Cookie, Depends, HTTPException, status
@@ -31,7 +32,7 @@ def get_current_admin(
     except (JWTError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
 
-    admin = get_admin_by_id(db, int(admin_id))
+    admin = get_admin_by_id(db, uuid.UUID(admin_id))
     if admin is None or not admin.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive or missing admin")
     return admin

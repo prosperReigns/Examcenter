@@ -356,3 +356,6 @@ def heartbeat_device(
         "last_seen": updated.last_seen,
 
     }
+
+def register_device():
+    pass

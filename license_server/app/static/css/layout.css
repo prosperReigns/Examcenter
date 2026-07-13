@@ -1,0 +1,274 @@
+/* ==========================================================
+   APPLICATION LAYOUT
+   ========================================================== */
+
+.wrapper{
+
+    display:flex;
+
+    min-height:100vh;
+
+    background:var(--gray-100);
+
+}
+
+.main{
+
+    flex:1;
+
+    display:flex;
+
+    flex-direction:column;
+
+    margin-left:var(--sidebar-width);
+
+    transition:var(--transition);
+
+}
+
+/* ==========================================================
+   SIDEBAR
+   ========================================================== */
+
+.sidebar{
+
+    position:fixed;
+
+    left:0;
+
+    top:0;
+
+    width:var(--sidebar-width);
+
+    height:100vh;
+
+    background:var(--gray-900);
+
+    color:white;
+
+    overflow-y:auto;
+
+    box-shadow:var(--shadow);
+
+    z-index:1000;
+
+}
+
+.sidebar-header{
+
+    height:70px;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    font-size:22px;
+
+    font-weight:bold;
+
+    border-bottom:1px solid rgba(255,255,255,.08);
+
+}
+
+.sidebar-menu{
+
+    list-style:none;
+
+    padding:20px 0;
+
+}
+
+.sidebar-menu li{
+
+    margin:4px 0;
+
+}
+
+.sidebar-menu a{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+    padding:14px 24px;
+
+    color:#cbd5e1;
+
+    transition:var(--transition);
+
+}
+
+.sidebar-menu a:hover{
+
+    background:#1e293b;
+
+    color:white;
+
+}
+
+.sidebar-menu a.active{
+
+    background:var(--primary);
+
+    color:white;
+
+}
+
+
+/* ==========================================================
+   TOP BAR
+   ========================================================== */
+
+.topbar{
+
+    height:70px;
+
+    background:white;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:0 30px;
+
+    box-shadow:var(--shadow-sm);
+
+    position:sticky;
+
+    top:0;
+
+    z-index:500;
+
+}
+
+.content{
+
+    flex:1;
+
+    padding:30px;
+
+}
+
+.footer{
+
+    background:white;
+
+    padding:18px;
+
+    text-align:center;
+
+    color:var(--gray-500);
+
+    border-top:1px solid var(--gray-200);
+
+}
+
+.user-menu{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+}
+
+.user-avatar{
+
+    width:42px;
+
+    height:42px;
+
+    border-radius:50%;
+
+    background:var(--primary);
+
+    color:white;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-weight:bold;
+
+}
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media (max-width:992px){
+
+    .sidebar{
+
+        transform:translateX(-100%);
+
+    }
+
+    .sidebar.show{
+
+        transform:translateX(0);
+
+    }
+
+    .main{
+
+        margin-left:0;
+
+    }
+
+}
+
+/* ==========================================================
+   SIDEBAR IMPROVEMENTS
+   ========================================================== */
+
+.sidebar{
+
+    display:flex;
+
+    flex-direction:column;
+
+}
+
+.sidebar-menu{
+
+    flex:1;
+
+}
+
+.sidebar-menu a{
+
+    border-left:4px solid transparent;
+
+    font-weight:500;
+
+}
+
+.sidebar-menu a:hover{
+
+    border-left-color:var(--primary);
+
+}
+
+.sidebar-menu a.active{
+
+    border-left-color:white;
+
+}
+
+.sidebar-menu span{
+
+    width:24px;
+
+    text-align:center;
+
+}

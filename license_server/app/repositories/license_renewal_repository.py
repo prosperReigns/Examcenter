@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import Session
 
 from app.models.license_renewal import LicenseRenewal
@@ -90,3 +90,6 @@ def renewal_statistics(
         "pending": pending,
 
     }
+
+def get_license_renewal():
+    pass

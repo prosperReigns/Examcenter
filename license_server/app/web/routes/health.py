@@ -4,12 +4,12 @@ from sqlalchemy import text
 
 
 router = APIRouter(
-    prefix="/health",
-    tags=["Health Pages"],
+    prefix="/health", 
+    tags=["Web - Health"],
 )
 
 
-@router.get("/health")
+@router.get("/")
 def health_check() -> dict[str, str]:
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))

@@ -1,25 +1,89 @@
-table{
+/* ==========================================================
+   TABLES
+   ========================================================== */
+
+.table-responsive{
+
+    overflow-x:auto;
+
+}
+
+.table{
+
     width:100%;
+
     border-collapse:collapse;
-    margin-top:20px;
+
     background:white;
+
 }
 
-th{
-    background:#2563eb;
-    color:white;
-    padding:12px;
+.table thead{
+
+    background:var(--gray-100);
+
 }
 
-td{
-    padding:12px;
-    border-bottom:1px solid #ddd;
+.table th{
+
+    padding:16px;
+
+    text-align:left;
+
+    font-size:14px;
+
+    font-weight:600;
+
+    color:var(--gray-700);
+
+    border-bottom:2px solid var(--gray-200);
+
 }
 
-tr:nth-child(even){
-    background:#fafafa;
+.table td{
+
+    padding:16px;
+
+    border-bottom:1px solid var(--gray-200);
+
 }
 
-tr:hover{
-    background:#eef2ff;
+.table tbody tr{
+
+    transition:.2s;
+
+}
+
+.table tbody tr:hover{
+
+    background:var(--gray-50);
+
+}
+
+.table tbody tr:nth-child(even){
+
+    background:#fcfcfc;
+
+}
+
+.table-sm td{
+
+    padding:10px;
+
+}
+
+.table-sm th{
+
+    padding:10px;
+
+}
+
+.table-actions{
+
+    display:flex;
+
+    gap:8px;
+
+    flex-wrap:wrap;
+
 }

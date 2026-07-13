@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response, status,  HTTPE
 from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.schemas.license import LicenseCreateRequest, LicenseRead, LicenseStatusUpdateRequest, LicenseVerifyRequest
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api/licenses", tags=["licenses"])
 @router.get("/statistics")
 def license_statistics_endpoint(
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     """
     Dashboard summary statistics.
@@ -32,7 +33,7 @@ def list_licenses_endpoint(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     items, _ = get_licenses(db, search=search, page=page, page_size=page_size)
     return items
@@ -45,10 +46,7 @@ def get_license_endpoint(
     license_id: UUID,
     db: Session = Depends(get_db),
     admin=Depends(
-        require_roles(
-            "Super Admin",
-            "Staff",
-        )
+        require_roles(Roles.SUPER_ADMIN, Roles.STAFF)
     ),
 ):
     return get_license(
@@ -57,7 +55,7 @@ def get_license_endpoint(
     )
 
 @router.post("", response_model=LicenseRead, status_code=status.HTTP_201_CREATED)
-def create_license_endpoint(payload: LicenseCreateRequest, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles("Super Admin", "Staff"))):
+def create_license_endpoint(payload: LicenseCreateRequest, request: Request, db: Session = Depends(get_db), admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))):
     return issue_license(db, payload, admin=admin, request=request)
 
 
@@ -72,7 +70,7 @@ def update_license_status_endpoint(
     payload: LicenseStatusUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     return update_license_status(db, license_id, payload, admin=admin, request=request)
 
@@ -85,7 +83,7 @@ def renew_license_endpoint(
     payload: LicenseRenewRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     return renew_license(
         db,
@@ -163,7 +161,7 @@ def suspend_license_endpoint(
     license_id: UUID,
     request: Request,
     db: Session =Depends(get_db),
-    admin=Depends(require_roles("Super Admin","Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     payload = LicenseStatusUpdateRequest(
@@ -183,7 +181,7 @@ def revoke_license_endpoint(
     license_id: UUID,
     request: Request,
     db: Session=Depends(get_db),
-    admin=Depends(require_roles("Super Admin","Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     payload = LicenseStatusUpdateRequest(
@@ -203,7 +201,7 @@ def activate_license_endpoint(
     license_id: UUID,
     request: Request,
     db: Session=Depends(get_db),
-    admin=Depends(require_roles("Super Admin","Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     payload = LicenseStatusUpdateRequest(
@@ -222,7 +220,7 @@ def activate_license_endpoint(
 def download_license_endpoint(
     license_id: UUID,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     filename, contents = download_license_document(
         db,
@@ -244,7 +242,7 @@ def delete_license_endpoint(
     license_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     delete_license(
         db,

@@ -1,16 +1,15 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.repositories.license_repository import (list_licenses, get_license_details,)
 from app.services.license_management_service import renew_license, suspend_license, revoke_license, reactivate_license, delete_license, get_license, get_licenses
-from app.services.license_history_service import get_renewal_history
 from app.services.license_download_service import download_license_document
 from app.utils.flash import flash
 
@@ -18,18 +17,18 @@ from app.web.templates import templates
 
 from app.core.config import get_settings
 
-settings = get_settings()
+
 router = APIRouter(
-    prefix="/licenses",
-    tags=["License Pages"],
+    prefix="/licenses", 
+    tags=["Web - License"]
 )
+settings = get_settings()
 
-
-@router.get("", response_class=HTMLResponse,)
+@router.get("/", response_class=HTMLResponse,)
 def license_list_page(
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     licenses, _ = get_licenses(
@@ -44,6 +43,8 @@ def license_list_page(
         {
             "request": request,
             "licenses": licenses,
+            "title": "License",
+            "admin": admin,
         },
     )
 
@@ -52,26 +53,41 @@ def license_list_page(
 def license_details_page(
     request: Request,
     license_id: UUID,
-    db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
-    license = get_license(
-        db,
-        license_id,
-    )
+    with SessionLocal() as db:
+        license = get_license(
+            db,
+            UUID(license_id),
+        )
+
+    if license is None:
+        flash(
+            request,
+            "License not found.",
+            "danger",
+        )
+
+        return RedirectResponse(
+            "/licenses",
+            status_code=303,
+        )
 
     return templates.TemplateResponse(
         "license_details.html",
         {
             "request": request,
+            "settings": settings,
+            "title": "License Details",
+            "admin": admin,
             "license": license,
         },
     )
 
 
-@router.get("/licenses", response_class=HTMLResponse)
-def licenses_page(request: Request, admin=Depends(require_roles("Super Admin", "Staff"))) -> HTMLResponse:
+@router.get("/license", response_class=HTMLResponse)
+def licenses_page(request: Request, admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))) -> HTMLResponse:
     with SessionLocal() as db:
         licenses, _ = list_licenses(db, offset=0, limit=100)
     return templates.TemplateResponse(
@@ -85,11 +101,11 @@ def licenses_page(request: Request, admin=Depends(require_roles("Super Admin", "
         },
     )
 
-@router.post("/licenses/{license_id}/renew")
+@router.post("/{license_id}/renew")
 def renew_license_page(
     license_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     with SessionLocal() as db:
         renew_license(
@@ -106,15 +122,15 @@ def renew_license_page(
     )
 
     return RedirectResponse(
-        url=f"/licenses/{license_id}",
+        url=f"/{license_id}",
         status_code=303,
     )
 
-@router.post("/licenses/{license_id}/suspend")
+@router.post("/{license_id}/suspend")
 def suspend_license_page(
     license_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     with SessionLocal() as db:
         suspend_license(
@@ -127,15 +143,15 @@ def suspend_license_page(
     flash(request, "License suspended successfully.", "warning")
 
     return RedirectResponse(
-        url=f"/licenses/{license_id}",
+        url=f"/{license_id}",
         status_code=303,
     )
 
-@router.post("/licenses/{license_id}/reactivate")
+@router.post("/{license_id}/reactivate")
 def reactivate_license_page(
     license_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     with SessionLocal() as db:
         reactivate_license(
@@ -148,15 +164,15 @@ def reactivate_license_page(
     flash(request, "License reactivated successfully.", "success")
 
     return RedirectResponse(
-        url=f"/licenses/{license_id}",
+        url=f"/{license_id}",
         status_code=303,
     )
 
-@router.post("/licenses/{license_id}/revoke")
+@router.post("/{license_id}/revoke")
 def revoke_license_page(
     license_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     with SessionLocal() as db:
         revoke_license(
@@ -169,14 +185,14 @@ def revoke_license_page(
     flash(request, "License revoked.", "danger")
 
     return RedirectResponse(
-        url=f"/licenses/{license_id}",
+        url=f"/{license_id}",
         status_code=303,
     )
 
-@router.get("/licenses/{license_id}/download")
+@router.get("/{license_id}/download")
 def download_license(
     license_id: UUID,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
     with SessionLocal() as db:
 
@@ -194,31 +210,11 @@ def download_license(
         },
     )
 
-@router.get("/licenses/{license_id}/download")
-def download_license_page(
-    license_id: UUID,
-    admin=Depends(require_roles("Super Admin", "Staff")),
-):
-    from app.services.license_management_service import download_license
-
-    with SessionLocal() as db:
-        license_json, filename = download_license(db, license_id)
-
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"'
-    }
-
-    return Response(
-        content=license_json,
-        media_type="application/json",
-        headers=headers,
-    )
-
-@router.post("/licenses/{license_id}/delete")
+@router.post("/{license_id}/delete")
 def delete_license_page(
     license_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
 
     with SessionLocal() as db:
@@ -239,61 +235,4 @@ def delete_license_page(
     return RedirectResponse(
         "/licenses",
         status_code=303,
-    )
-
-@router.get(
-    "/licenses/{license_id}",
-    response_class=HTMLResponse,
-)
-def license_details_page(
-    license_id: str,
-    request: Request,
-    admin=Depends(
-        require_roles(
-            "Super Admin",
-            "Staff",
-        )
-    ),
-):
-
-    from uuid import UUID
-
-    with SessionLocal() as db:
-
-        license = get_license_details(
-            db,
-            UUID(license_id),
-        )
-
-    if license is None:
-
-        flash(
-            request,
-            "License not found.",
-            "danger",
-        )
-
-        return RedirectResponse(
-            "/licenses",
-            status_code=303,
-        )
-
-    return templates.TemplateResponse(
-
-        "license_details.html",
-
-        {
-
-            "request": request,
-
-            "settings": settings,
-
-            "title": "License Details",
-
-            "admin": admin,
-
-            "license": license,
-
-        },
-
     )

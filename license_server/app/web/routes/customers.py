@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 
@@ -17,18 +18,17 @@ from app.repositories.customer_repository import list_customers
 from app.web.templates import templates
 from app.core.config import get_settings
 
-settings = get_settings()
 router = APIRouter(
-    prefix="/customers",
-    tags=["Customer Pages"],
+    prefix="/customers", 
+    tags=["Customer"],
 )
+settings = get_settings()
 
-
-@router.get("",response_class=HTMLResponse,)
+@router.get("/",response_class=HTMLResponse,)
 def customer_list_page(
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     customers, _ = get_customers(
@@ -51,7 +51,7 @@ def customer_details_page(
     customer_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     return templates.TemplateResponse(
@@ -65,10 +65,11 @@ def customer_details_page(
         },
     )
 
-@router.get("/customers", response_class=HTMLResponse)
-def customers_page(request: Request, admin=Depends(require_roles("Super Admin", "Staff"))) -> HTMLResponse:
+@router.get("/customer", response_class=HTMLResponse)
+def customers_page(request: Request, admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))) -> HTMLResponse:
     with SessionLocal() as db:
         customers, _ = list_customers(db, offset=0, limit=100)
+
     return templates.TemplateResponse(
         "customers.html",
         {

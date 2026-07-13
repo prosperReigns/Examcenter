@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 
+from app.core.roles import Roles
 from app.auth.dependencies import require_roles
 from app.database.session import get_db
 from app.services.device_service import (
@@ -19,13 +20,14 @@ from app.utils.flash import flash
 from app.web.templates import templates
 from app.core.config import get_settings
 
-settings = get_settings()
-router = APIRouter(
-    prefix="/devices",
-    tags=["Device Pages"],
-)
 
-@router.get("", response_class=HTMLResponse,)
+router = APIRouter(
+    prefix="/devices", 
+    tags=["Web - Devices"],
+)
+settings = get_settings()
+
+@router.get("/", response_class=HTMLResponse,)
 def device_list_page(
     request: Request,
     search: str | None = Query(default=None),
@@ -35,8 +37,8 @@ def device_list_page(
     db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -61,43 +63,42 @@ def device_list_page(
         },
     )
 
-@router.get(
-    "/{device_id}",
-    response_class=HTMLResponse,
-)
+@router.get("/{device_id}",response_class=HTMLResponse)
 def device_details_page(
     request: Request,
     device_id: UUID,
-    db: Session = Depends(get_db),
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
 
-    device = get_device_or_404(
-        db,
-        device_id,
-    )
+    with SessionLocal() as db:
+        device = get_device_or_404(
+            db,
+            device_id,
+        )
 
     return templates.TemplateResponse(
         "device_details.html",
         {
             "request": request,
+            "settings": settings,
+            "title": "Device Details",
+            "admin": admin,
             "device": device,
         },
     )
 
-@router.get("/devices", response_class=HTMLResponse)
+@router.get("/device", response_class=HTMLResponse)
 def devices_page(
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
-
         devices, _ = list_devices(
             db,
             offset=0,
@@ -115,45 +116,15 @@ def devices_page(
         },
     )
 
-
-@router.get(
-    "/devices/{device_id}",
-    response_class=HTMLResponse,
-)
-def device_details_page(
-    device_id: UUID,
-    request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
-):
-
-    with SessionLocal() as db:
-
-        device = get_device(
-            db,
-            device_id,
-        )
-
-    return templates.TemplateResponse(
-        "device_details.html",
-        {
-            "request": request,
-            "settings": settings,
-            "title": "Device Details",
-            "admin": admin,
-            "device": device,
-        },
-    )
-
-@router.post("/devices/{device_id}/rename")
+@router.post("/{device_id}/rename")
 def rename_device_submit(
     device_id: UUID,
     request: Request,
     renamed_to: str = Form(...),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
-
         rename_license_device(
             db,
             device_id,
@@ -169,16 +140,15 @@ def rename_device_submit(
         status_code=303,
     )
 
-@router.post("/devices/{device_id}/notes")
+@router.post("/{device_id}/notes")
 def save_notes_submit(
     device_id: UUID,
     request: Request,
     notes: str = Form(""),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
-
         save_device_notes(
             db,
             device_id,
@@ -194,16 +164,15 @@ def save_notes_submit(
         status_code=303,
     )
 
-@router.post("/devices/{device_id}/blacklist")
+@router.post("/{device_id}/blacklist")
 def blacklist_submit(
     device_id: UUID,
     request: Request,
     reason: str = Form(""),
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
-
         blacklist_license_device(
             db,
             device_id,
@@ -219,15 +188,14 @@ def blacklist_submit(
         status_code=303,
     )
 
-@router.post("/devices/{device_id}/unblacklist")
+@router.post("/{device_id}/unblacklist")
 def unblacklist_submit(
     device_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
-
         unblacklist_license_device(
             db,
             device_id,
@@ -242,15 +210,14 @@ def unblacklist_submit(
         status_code=303,
     )
 
-@router.post("/devices/{device_id}/deactivate")
+@router.post("/{device_id}/deactivate")
 def deactivate_device_submit(
     device_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
-
         deactivate_device(
             db,
             device_id,
@@ -269,15 +236,14 @@ def deactivate_device_submit(
         status_code=303,
     )
 
-@router.post("/devices/{device_id}/reset")
+@router.post("/{device_id}/reset")
 def reset_device_submit(
     device_id: UUID,
     request: Request,
-    admin=Depends(require_roles("Super Admin", "Staff")),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
     with SessionLocal() as db:
-
         reset_device(
             db,
             device_id,

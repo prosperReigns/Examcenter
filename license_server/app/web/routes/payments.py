@@ -4,6 +4,7 @@ from fastapi import Depends, APIRouter, Request
 from app.database.session import SessionLocal
 from app.auth.dependencies import require_roles
 
+from app.core.roles import Roles
 from app.repositories.payment_repository import list_payments
 from app.web.templates import templates
 
@@ -15,8 +16,8 @@ router = APIRouter(
     tags=["Payment Pages"],
 )
 
-@router.get("/payments", response_class=HTMLResponse)
-def payments_page(request: Request, admin=Depends(require_roles("Super Admin", "Staff"))) -> HTMLResponse:
+@router.get("/", response_class=HTMLResponse)
+def payments_page(request: Request, admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF))) -> HTMLResponse:
     with SessionLocal() as db:
         payments, _ = list_payments(db, offset=0, limit=100)
     return templates.TemplateResponse(

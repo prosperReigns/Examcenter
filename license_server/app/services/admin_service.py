@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from app.auth.security import hash_password
+from app.auth.security import get_password_hash
 from app.models.admin import Admin
 from app.repositories.admin_repository import (
     create_admin,
@@ -75,7 +75,7 @@ def create_admin_record(
             db,
             full_name=payload.full_name.strip(),
             email=payload.email,
-            password_hash=hash_password(
+            password_hash=get_password_hash(
                 payload.password,
             ),
             role=payload.role,
@@ -134,7 +134,7 @@ def update_admin_record(
 
     for field, value in data.items():
         if field == "password":
-            admin.password_hash = hash_password(value)
+            admin.password_hash = get_password_hash(value)
         else:
             setattr(
                 admin,
@@ -212,3 +212,12 @@ def delete_admin_record(
     )
 
     db.commit()
+
+def change_admin_password():
+    pass
+def  reset_admin_password():
+    pass
+def admin_statistics():
+    pass
+def get_admins():
+    pass

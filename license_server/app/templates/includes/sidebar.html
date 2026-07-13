@@ -1,0 +1,39 @@
+<aside class="sidebar">
+
+    <div class="brand">
+        <h2>License Server</h2>
+    </div>
+
+    <ul>
+
+        <li><a href="/dashboard">Dashboard</a></li>
+
+        <li><a href="/licenses">Licenses</a></li>
+
+        <li><a href="/customers">Customers</a></li>
+
+        <li><a href="/schools">Schools</a></li>
+
+        <li><a href="/activations">Activations</a></li>
+
+        <li><a href="/devices">Devices</a></li>
+
+        <li><a href="/payments">Payments</a></li>
+
+        <li><a href="/invoices">Invoices</a></li>
+
+        <li><a href="/receipts">Receipts</a></li>
+
+        {% if admin.role == "Super Admin" %}
+
+        <li><a href="/admins">Admins</a></li>
+
+        <li><a href="/settings">Settings</a></li>
+
+        <li><a href="/audit-logs">Audit Logs</a></li>
+
+        {% endif %}
+
+    </ul>
+
+</aside>

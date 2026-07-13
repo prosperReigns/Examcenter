@@ -1,70 +1,212 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-4">
-                <h1 class="h3 mb-2">Dashboard</h1>
-                <p class="text-muted mb-3">Signed in as {{ admin.full_name }}.</p>
-                <div class="row g-3">
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Admins</div>
-                            <div class="fs-3 fw-semibold">{{ admin_count or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Customers</div>
-                            <div class="fs-3 fw-semibold">{{ stats.total_customers or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Schools</div>
-                            <div class="fs-3 fw-semibold">{{ stats.total_schools or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Active Licenses</div>
-                            <div class="fs-3 fw-semibold">{{ stats.active_licenses or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Expired Licenses</div>
-                            <div class="fs-3 fw-semibold">{{ stats.expired_licenses or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Revenue</div>
-                            <div class="fs-3 fw-semibold">{{ stats.revenue or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Pending Renewals</div>
-                            <div class="fs-3 fw-semibold">{{ stats.pending_renewals or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Recent Payments</div>
-                            <div class="fs-3 fw-semibold">{{ stats.recent_payments or 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 bg-light border">
-                            <div class="text-muted small">Recent Activations</div>
-                            <div class="fs-3 fw-semibold">{{ stats.recent_activations or 0 }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
+<div class="card">
+
+    <h2>
+
+        Welcome,
+
+        {{ admin.full_name }}
+
+    </h2>
+
+    <p>
+
+        Manage licenses, schools, customers, payments and activations from one dashboard.
+
+    </p>
+
+</div>
+
+<div class="stats-grid">
+
+    {% set value = stats.total_licenses %}
+    {% set label = "Licenses" %}
+    {% include "includes/stats_card.html" %}
+
+    {% set value = stats.active_licenses %}
+    {% set label = "Active Licenses" %}
+    {% include "includes/stats_card.html" %}
+
+    {% set value = stats.total_customers %}
+    {% set label = "Customers" %}
+    {% include "includes/stats_card.html" %}
+
+    {% set value = stats.total_schools %}
+    {% set label = "Schools" %}
+    {% include "includes/stats_card.html" %}
+
+    {% set value = stats.total_devices %}
+    {% set label = "Devices" %}
+    {% include "includes/stats_card.html" %}
+
+    {% set value = stats.total_activations %}
+    {% set label = "Activations" %}
+    {% include "includes/stats_card.html" %}
+
+</div>
+
+<hr>
+
+<div class="dashboard-grid">
+
+    <section class="panel">
+
+        <h3>System Overview</h3>
+
+        <table class="table">
+
+            <tr>
+                <td>Total Admins</td>
+                <td>{{ admin_count }}</td>
+            </tr>
+
+            <tr>
+                <td>Payments</td>
+                <td>{{ stats.total_payments }}</td>
+            </tr>
+
+            <tr>
+                <td>Invoices</td>
+                <td>{{ stats.total_invoices }}</td>
+            </tr>
+
+            <tr>
+                <td>Receipts</td>
+                <td>{{ stats.total_receipts }}</td>
+            </tr>
+
+        </table>
+
+    </section>
+
+    <section class="panel">
+
+        <h3>Quick Actions</h3>
+
+        <div class="quick-actions">
+
+            <a href="/licenses" class="btn">
+                Manage Licenses
+            </a>
+
+            <a href="/customers" class="btn">
+                Customers
+            </a>
+
+            <a href="/schools" class="btn">
+                Schools
+            </a>
+
+            <a href="/devices" class="btn">
+                Devices
+            </a>
+
+            <a href="/activations" class="btn">
+                Activations
+            </a>
+
+            <a href="/payments" class="btn">
+                Payments
+            </a>
+
+            <a href="/settings" class="btn">
+                Settings
+            </a>
+
         </div>
+
+    </section>
+
+</div>
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+
+        <div class="stat-title">
+
+            Total Licenses
+
+        </div>
+
+        <div class="stat-value">
+
+            {{ stats.total_licenses }}
+
+        </div>
+
     </div>
+
+    <div class="stat-card">
+
+        <div class="stat-title">
+
+            Active Licenses
+
+        </div>
+
+        <div class="stat-value">
+
+            {{ stats.active_licenses }}
+
+        </div>
+
+    </div>
+
+    <div class="stat-card">
+
+        <div class="stat-title">
+
+            Customers
+
+        </div>
+
+        <div class="stat-value">
+
+            {{ stats.total_customers }}
+
+        </div>
+
+    </div>
+
+    <div class="stat-card">
+
+        <div class="stat-title">
+
+            Schools
+
+        </div>
+
+        <div class="stat-value">
+
+            {{ stats.total_schools }}
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="card">
+
+    <div class="card-header">
+
+        <div class="card-title">
+
+            Recent Activity
+
+        </div>
+
+    </div>
+
+    <div class="card-body">
+
+        Coming soon...
+
+    </div>
+
 </div>
 {% endblock %}

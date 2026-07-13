@@ -491,3 +491,6 @@ def sms_receipt(
     db.commit()
 
     return receipt
+
+def generate_receipt():
+    pass

@@ -6,7 +6,7 @@ class DashboardStats(BaseModel):
     total_schools: int = 0
     active_licenses: int = 0
     expired_licenses: int = 0
-    revenue: Decimal("0")
+    revenue: Decimal = Decimal("0")
     pending_renewals: int = 0
     recent_payments: int = 0
     recent_activations: int = 0

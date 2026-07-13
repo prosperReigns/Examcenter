@@ -1,0 +1,311 @@
+/* ==========================================================
+   EXAMCENTER LICENSE SERVER
+   Global Design System
+   ========================================================== */
+
+:root{
+
+    /* Primary Colors */
+
+    --primary:#2563eb;
+    --primary-dark:#1d4ed8;
+
+    --secondary:#475569;
+
+    --success:#16a34a;
+    --danger:#dc2626;
+    --warning:#d97706;
+    --info:#0284c7;
+
+    /* Neutral */
+
+    --white:#ffffff;
+
+    --gray-50:#f8fafc;
+    --gray-100:#f1f5f9;
+    --gray-200:#e2e8f0;
+    --gray-300:#cbd5e1;
+    --gray-400:#94a3b8;
+    --gray-500:#64748b;
+    --gray-600:#475569;
+    --gray-700:#334155;
+    --gray-800:#1e293b;
+    --gray-900:#0f172a;
+
+    /* Layout */
+
+    --sidebar-width:260px;
+    --topbar-height:70px;
+
+    /* Radius */
+
+    --radius-sm:6px;
+    --radius:10px;
+    --radius-lg:16px;
+
+    /* Shadow */
+
+    --shadow-sm:0 1px 3px rgba(0,0,0,.08);
+
+    --shadow:0 4px 12px rgba(0,0,0,.08);
+
+    --shadow-lg:0 12px 30px rgba(0,0,0,.15);
+
+    /* Animation */
+
+    --transition:.25s ease;
+
+}
+
+/* ==========================================================
+   RESET
+   ========================================================== */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+html{
+
+    scroll-behavior:smooth;
+
+}
+
+body{
+
+    font-family:
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+
+    background:var(--gray-100);
+
+    color:var(--gray-800);
+
+    font-size:15px;
+
+    line-height:1.6;
+
+}
+
+/* ==========================================================
+   TYPOGRAPHY
+   ========================================================== */
+
+h1{
+
+    font-size:32px;
+
+    margin-bottom:18px;
+
+}
+
+h2{
+
+    font-size:28px;
+
+    margin-bottom:16px;
+
+}
+
+h3{
+
+    font-size:24px;
+
+    margin-bottom:14px;
+
+}
+
+h4{
+
+    font-size:20px;
+
+    margin-bottom:12px;
+
+}
+
+h5{
+
+    font-size:18px;
+
+}
+
+h6{
+
+    font-size:16px;
+
+}
+
+p{
+
+    margin-bottom:15px;
+
+}
+
+a{
+
+    color:var(--primary);
+
+    text-decoration:none;
+
+    transition:var(--transition);
+
+}
+
+a:hover{
+
+    color:var(--primary-dark);
+
+}
+
+/* ==========================================================
+   UTILITIES
+   ========================================================== */
+
+.container{
+
+    width:100%;
+
+    max-width:1400px;
+
+    margin:auto;
+
+    padding:20px;
+
+}
+
+.text-center{
+
+    text-align:center;
+
+}
+
+.text-right{
+
+    text-align:right;
+
+}
+
+.text-muted{
+
+    color:var(--gray-500);
+
+}
+
+.mt-1{margin-top:8px;}
+.mt-2{margin-top:16px;}
+.mt-3{margin-top:24px;}
+.mt-4{margin-top:32px;}
+
+.mb-1{margin-bottom:8px;}
+.mb-2{margin-bottom:16px;}
+.mb-3{margin-bottom:24px;}
+.mb-4{margin-bottom:32px;}
+
+.d-flex{
+
+    display:flex;
+
+}
+
+.justify-between{
+
+    justify-content:space-between;
+
+}
+
+.align-center{
+
+    align-items:center;
+
+}
+
+.gap-1{
+
+    gap:8px;
+
+}
+
+.gap-2{
+
+    gap:16px;
+
+}
+
+.gap-3{
+
+    gap:24px;
+
+}
+
+/* ==========================================================
+   CARDS
+   ========================================================== */
+
+.card{
+
+    background:white;
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow);
+
+    padding:20px;
+
+    margin-bottom:20px;
+
+}
+
+/* ==========================================================
+   TABLE WRAPPER
+   ========================================================== */
+
+.table-responsive{
+
+    overflow:auto;
+
+}
+
+/* ==========================================================
+   PAGE TITLE
+   ========================================================== */
+
+.page-header{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:25px;
+
+}
+
+/* ==========================================================
+   SCROLLBAR
+   ========================================================== */
+
+::-webkit-scrollbar{
+
+    width:10px;
+
+}
+
+::-webkit-scrollbar-thumb{
+
+    background:var(--gray-400);
+
+    border-radius:20px;
+
+}
+
+::-webkit-scrollbar-thumb:hover{
+
+    background:var(--gray-500);
+
+}

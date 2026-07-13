@@ -248,3 +248,8 @@ def get_activation_statistics(
 ):
 
     return activation_statistics(db)
+
+def validate_public_license():
+    pass
+def create_activation():
+    pass

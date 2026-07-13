@@ -5,6 +5,7 @@ from app.database.session import SessionLocal
 from fastapi import Depends, APIRouter, Form, Request
 from app.auth.dependencies import require_roles
 
+from app.core.roles import Roles
 from app.services.receipt_service import (
     get_receipt_record,
     get_receipt_list,
@@ -16,19 +17,20 @@ from app.web.templates import templates
 
 from app.core.config import get_settings
 
-settings = get_settings()
-router = APIRouter(
-    prefix="/receipts",
-    tags=["Receipt Pages"],
-)
 
-@router.get("/receipts", response_class=HTMLResponse)
+router = APIRouter(
+    prefix="/receipts", 
+    tags=["Web -Receipts"],
+)
+settings = get_settings()
+
+@router.get("/", response_class=HTMLResponse)
 def receipts_page(
     request: Request,
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+           Roles.STAFF
         )
     ),
 ):
@@ -47,14 +49,14 @@ def receipts_page(
         },
     )
 
-@router.get("/receipts/{receipt_id}", response_class=HTMLResponse)
+@router.get("/{receipt_id}", response_class=HTMLResponse)
 def receipt_details_page(
     receipt_id: UUID,
     request: Request,
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -78,13 +80,13 @@ def receipt_details_page(
 
 
 
-@router.get("/receipts/{receipt_id}/download")
+@router.get("/{receipt_id}/download")
 def download_receipt(
     receipt_id: UUID,
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):
@@ -101,14 +103,14 @@ def download_receipt(
         media_type="application/pdf",
     )
 
-@router.post("/receipts/{receipt_id}/email")
+@router.post("/{receipt_id}/email")
 def email_receipt_page(
     receipt_id: UUID,
     request: Request,
     admin=Depends(
         require_roles(
-            "Super Admin",
-            "Staff",
+            Roles.SUPER_ADMIN,
+            Roles.STAFF
         )
     ),
 ):

@@ -57,3 +57,17 @@ class LicenseValidationResponse(BaseModel):
     license_id: UUID | None = None
     school_id: UUID | None = None
     remaining_activations: int | None = None
+
+
+class ActivationResponse(BaseModel):
+    success: bool
+    message: str
+    license: str
+
+class ActivationRequest(BaseModel):
+
+    activation_token: str
+
+    machine_fingerprint: str
+
+    ip_address: str | None = None

@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 celery_app = Celery(
     "license_server",
@@ -35,3 +36,49 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
 
 )
+
+celery_app.conf.beat_schedule = {
+
+    "purge-expired-activation-tokens": {
+
+        "task": "activation_tokens.purge_expired",
+
+        "schedule": crontab(
+            minute=0,
+        ),
+
+    },
+
+    "revoke-stale-activation-tokens": {
+
+        "task": "activation_tokens.revoke_stale",
+
+        "schedule": crontab(
+            hour=2,
+            minute=0,
+        ),
+
+    },
+
+    "delete-used-activation-tokens": {
+
+        "task": "activation_tokens.delete_used",
+
+        "schedule": crontab(
+            hour=3,
+            minute=0,
+        ),
+
+    },
+
+    "activation-token-statistics": {
+
+        "task": "activation_tokens.statistics",
+
+        "schedule": crontab(
+            minute="*/30",
+        ),
+
+    },
+
+}

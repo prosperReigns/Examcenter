@@ -1,0 +1,81 @@
+{% extends "base/base_admin.html" %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between mb-4">
+
+    <h2>
+
+        Customer Details
+
+    </h2>
+
+    <a
+        href="/customers"
+        class="btn btn-secondary"
+    >
+
+        Back
+
+    </a>
+
+</div>
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <table class="table">
+
+            <tr>
+
+                <th>Name</th>
+
+                <td>{{ customer.full_name }}</td>
+
+            </tr>
+
+            <tr>
+
+                <th>Email</th>
+
+                <td>{{ customer.email }}</td>
+
+            </tr>
+
+            <tr>
+
+                <th>Phone</th>
+
+                <td>{{ customer.phone }}</td>
+
+            </tr>
+
+            <tr>
+
+                <th>Address</th>
+
+                <td>{{ customer.address }}</td>
+
+            </tr>
+
+        </table>
+
+    </div>
+
+</div>
+
+<div class="mt-4">
+
+    <a
+        href="/customers/{{ customer.id }}/edit"
+        class="btn btn-primary"
+    >
+
+        Edit
+
+    </a>
+
+</div>
+
+{% endblock %}

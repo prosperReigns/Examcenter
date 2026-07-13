@@ -5,7 +5,7 @@ from app.auth.dependencies import get_current_admin
 from app.database.session import get_db
 from app.schemas.auth import AdminProfile, LoginRequest, TokenResponse
 from app.services.auth_service import authenticate_admin, issue_admin_token
-from services.audit_service import record_audit_event
+from app.services.audit_service import record_audit_event
 
 
 router = APIRouter(prefix="/api", tags=["auth"])
