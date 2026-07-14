@@ -42,6 +42,10 @@ from app.services.receipt_service import (
 )
 from app.utils.invoice import build_invoice_payload, save_invoice_document
 
+from app.services.purchase_service import (
+    PurchaseContext,
+    complete_purchase,
+)
 settings = get_settings()
 
 LICENSE_PRICE_MAP = {

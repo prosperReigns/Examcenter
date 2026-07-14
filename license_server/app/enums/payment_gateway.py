@@ -10,3 +10,4 @@ class PaymentGateway(str, Enum):
     MONNIFY = "monnify"
 
     MANUAL = "manual"
+    

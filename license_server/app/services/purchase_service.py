@@ -97,6 +97,11 @@ from app.services.audit_service import (
     record_audit_event,
 )
 
+from app.services.purchase_service import (
+    PurchaseContext,
+    complete_purchase,
+)
+
 from dataclasses import dataclass
 
 
@@ -152,7 +157,7 @@ class PurchaseContext:
         """
 
         try:
-           customer = _create_customer(db, context)
+            customer = _create_customer(db, context)
 
             school = _create_school(db, context, customer)
 

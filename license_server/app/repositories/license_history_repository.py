@@ -34,6 +34,7 @@ def create_history_record(
 
 def list_license_history(
     db: Session,
+    *,
     license_id: UUID,
 ):
     return (
