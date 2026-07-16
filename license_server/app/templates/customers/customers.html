@@ -58,6 +58,8 @@
 
                 <th>Phone</th>
 
+                <th>Status</th>
+
                 <th></th>
 
             </tr>
@@ -75,6 +77,20 @@
                 <td>{{ customer.email }}</td>
 
                 <td>{{ customer.phone }}</td>
+
+                <td>
+
+                    {% if customer.is_active %}
+
+                        <span class="badge bg-success">Active</span>
+
+                    {% else %}
+
+                        <span class="badge bg-secondary">Inactive</span>
+
+                    {% endif %}
+
+                </td>
 
                 <td class="text-end">
 

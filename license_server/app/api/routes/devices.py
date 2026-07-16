@@ -53,6 +53,17 @@ def list_devices_endpoint(
     return devices
 
 @router.get(
+    "/statistics",
+    tags=["devices"],
+)
+def device_statistics_endpoint(
+    db: Session = Depends(get_db),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
+):
+
+    return get_device_statistics(db)
+
+@router.get(
     "/{device_id}",
     response_model=LicenseDeviceRead,
 )
@@ -145,13 +156,3 @@ def update_notes_endpoint(
         request=request,
     )
 
-@router.get(
-    "/statistics",
-    tags=["devices"],
-)
-def device_statistics_endpoint(
-    db: Session = Depends(get_db),
-    admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
-):
-
-    return get_device_statistics(db)

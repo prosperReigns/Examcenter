@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class AuditLogRead(BaseModel):
     id: UUID
-    admin_id: int | None = None
+    admin_id: UUID | None = None
     action: str
     entity_type: str | None = None
     entity_id: str | None = None

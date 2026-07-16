@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 
@@ -8,10 +10,13 @@ from app.auth.dependencies import require_roles
 from app.database.session import get_db
 
 from app.services.admin_service import (
+    create_admin_record,
     list_admins,
     get_admin,
-    get_admin_by_id
+    update_admin_record,
 )
+from app.schemas.admin import AdminCreate, AdminUpdate
+from app.utils.flash import flash
 
 from app.web.templates import templates
 
@@ -28,29 +33,37 @@ def admin_list_page(
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
 
-    admins, _ = list_admins(db)
+    admins = list_admins(db)
+    total = len(admins)
 
     return templates.TemplateResponse(
-        "admins.html",
+        "admins/index.html",
         {
             "request": request,
+            "title": "Administrators",
+            "admin": admin,
             "admins": admins,
+            "total": total,
+            "page": 1,
+            "total_pages": (total + 19) // 20,
         },
     )
 
 
-@router.get("/{admin_id}", response_class=HTMLResponse,)
+@router.get("/{admin_id:uuid}", response_class=HTMLResponse,)
 def admin_details_page(
-    admin_id: int,
+    admin_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
 
     return templates.TemplateResponse(
-        "admin_details.html",
+        "admins/details.html",
         {
             "request": request,
+            "title": "Administrator Details",
+            "admin": admin,
             "admin_record": get_admin(
                 db,
                 admin_id,
@@ -67,12 +80,13 @@ def admins_page(
 ):
     with SessionLocal() as db:
 
-        admins, total = list_admins(
+        admins = list_admins(
             db,
             search=search,
-            page=page,
-            page_size=20,
+            offset=(page - 1) * 20,
+            limit=20,
         )
+        total = len(admins)
 
     return templates.TemplateResponse(
         "admins/index.html",
@@ -101,15 +115,48 @@ def new_admin_page(
         },
     )
 
-@router.get("/{admin_id}/edit", response_class=HTMLResponse)
+
+@router.post("/new")
+def create_admin_page(
+    request: Request,
+    full_name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form("Staff"),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
+):
+    payload = AdminCreate(
+        full_name=full_name,
+        email=email,
+        password=password,
+        role=role,
+    )
+
+    with SessionLocal() as db:
+        created = create_admin_record(
+            db,
+            payload,
+            current_admin=admin,
+            request=request,
+        )
+
+    flash(request, "Administrator created successfully.", "success")
+
+    return RedirectResponse(
+        f"/admins/{created.id}",
+        status_code=303,
+    )
+
+
+@router.get("/{admin_id:uuid}/edit", response_class=HTMLResponse)
 def edit_admin_page(
-    admin_id: int,
+    admin_id: UUID,
     request: Request,
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
     with SessionLocal() as db:
 
-        target = get_admin_by_id(
+        target = get_admin(
             db,
             admin_id,
         )
@@ -122,4 +169,38 @@ def edit_admin_page(
             "admin": admin,
             "target": target,
         },
+    )
+
+
+@router.post("/{admin_id:uuid}/edit")
+def update_admin_page(
+    admin_id: UUID,
+    request: Request,
+    full_name: str = Form(...),
+    email: str = Form(...),
+    role: str = Form("Staff"),
+    is_active: bool = Form(False),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
+):
+    payload = AdminUpdate(
+        full_name=full_name,
+        email=email,
+        role=role,
+        is_active=is_active,
+    )
+
+    with SessionLocal() as db:
+        target = update_admin_record(
+            db,
+            admin_id,
+            payload,
+            current_admin=admin,
+            request=request,
+        )
+
+    flash(request, "Administrator updated successfully.", "success")
+
+    return RedirectResponse(
+        f"/admins/{target.id}",
+        status_code=303,
     )

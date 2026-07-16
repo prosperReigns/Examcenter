@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+
+        <h2>Administrator Details</h2>
+
+        <p class="text-muted mb-0">{{ admin_record.email }}</p>
+
+    </div>
+
+    <a href="/admins" class="btn btn-secondary">Back</a>
+
+</div>
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <table class="table">
+
+            <tr>
+
+                <th>Name</th>
+
+                <td>{{ admin_record.full_name }}</td>
+
+            </tr>
+
+            <tr>
+
+                <th>Email</th>
+
+                <td>{{ admin_record.email }}</td>
+
+            </tr>
+
+            <tr>
+
+                <th>Role</th>
+
+                <td>{{ admin_record.role }}</td>
+
+            </tr>
+
+            <tr>
+
+                <th>Status</th>
+
+                <td>
+
+                    {% if admin_record.is_active %}
+
+                        <span class="badge bg-success">Active</span>
+
+                    {% else %}
+
+                        <span class="badge bg-secondary">Inactive</span>
+
+                    {% endif %}
+
+                </td>
+
+            </tr>
+
+            <tr>
+
+                <th>Created</th>
+
+                <td>{{ admin_record.created_at.strftime("%d %b %Y %H:%M") if admin_record.created_at else "-" }}</td>
+
+            </tr>
+
+        </table>
+
+        <a href="/admins/{{ admin_record.id }}/edit" class="btn btn-primary">Edit Administrator</a>
+
+    </div>
+
+</div>
+
+{% endblock %}

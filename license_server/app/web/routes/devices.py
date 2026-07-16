@@ -63,7 +63,7 @@ def device_list_page(
         },
     )
 
-@router.get("/{device_id}",response_class=HTMLResponse)
+@router.get("/{device_id:uuid}",response_class=HTMLResponse)
 def device_details_page(
     request: Request,
     device_id: UUID,
@@ -116,7 +116,7 @@ def devices_page(
         },
     )
 
-@router.post("/{device_id}/rename")
+@router.post("/{device_id:uuid}/rename")
 def rename_device_submit(
     device_id: UUID,
     request: Request,
@@ -140,7 +140,7 @@ def rename_device_submit(
         status_code=303,
     )
 
-@router.post("/{device_id}/notes")
+@router.post("/{device_id:uuid}/notes")
 def save_notes_submit(
     device_id: UUID,
     request: Request,
@@ -164,7 +164,7 @@ def save_notes_submit(
         status_code=303,
     )
 
-@router.post("/{device_id}/blacklist")
+@router.post("/{device_id:uuid}/blacklist")
 def blacklist_submit(
     device_id: UUID,
     request: Request,
@@ -188,7 +188,7 @@ def blacklist_submit(
         status_code=303,
     )
 
-@router.post("/{device_id}/unblacklist")
+@router.post("/{device_id:uuid}/unblacklist")
 def unblacklist_submit(
     device_id: UUID,
     request: Request,
@@ -210,7 +210,7 @@ def unblacklist_submit(
         status_code=303,
     )
 
-@router.post("/{device_id}/deactivate")
+@router.post("/{device_id:uuid}/deactivate")
 def deactivate_device_submit(
     device_id: UUID,
     request: Request,
@@ -236,7 +236,7 @@ def deactivate_device_submit(
         status_code=303,
     )
 
-@router.post("/{device_id}/reset")
+@router.post("/{device_id:uuid}/reset")
 def reset_device_submit(
     device_id: UUID,
     request: Request,

@@ -13,8 +13,8 @@ from app.schemas.notification import (
 
 from app.core.roles import Roles
 from app.services.notification_service import (
-    list_notifications,
-    get_notification,
+    get_notification_list,
+    get_notification_record,
     mark_as_read,
     mark_all_read,
     delete_notification,
@@ -38,7 +38,7 @@ def list_notifications_endpoint(
     admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
-    notifications, _ = list_notifications(
+    notifications, _ = get_notification_list(
         db,
         unread_only=unread_only,
         page=page,
@@ -57,7 +57,7 @@ def get_notification_endpoint(
     admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
 ):
 
-    return get_notification(
+    return get_notification_record(
         db,
         notification_id,
     )
@@ -130,7 +130,8 @@ def create_system_notification_endpoint(
 
     return send_system_notification(
         db,
-        payload,
+        subject=payload.title,
+        message=payload.message,
         admin=admin,
         request=request,
     )

@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.services.license_management_service import get_license
+from app.services.license_package_service import license_package_document
 
 
 def download_license_document(
@@ -34,10 +35,10 @@ def download_license_document(
         school_name
         .replace(" ", "_")
         .lower()
-        + "_license.dat"
+        + "_license.package.json"
     )
 
     return (
         filename,
-        license_obj.signed_license,
+        license_package_document(license_obj),
     )

@@ -2,15 +2,21 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import UUID
 
 from app.core.config import get_settings
-from app.schemas.license import LicenseVerificationResult, SignedLicenseResponse
-from app.utils.license_crypto import generate_license, verify_license
+from app.schemas.license import LicensePackage, LicenseVerificationResult, SignedLicenseResponse
+from app.utils.license_crypto import generate_license, generate_license_package, verify_license
 
 settings = get_settings()
 
 LICENSE_DURATION_MAP = {
+    "demo": 7,
     "trial": 7,
+    "monthly": 30,
+    "quarterly": 90,
+    "annual": 365,
+    "lifetime": 0,
     "6_month": 180,
     "12_month": 365,
     "24_month": 730
@@ -23,12 +29,7 @@ def normalize_license_type(license_type: str) -> str:
         .strip()
         .lower()
     )
-    allowed = {
-        "trial",
-        "6_month",
-        "12_month",
-        "24_month"
-    }
+    allowed = set(LICENSE_DURATION_MAP)
 
     if normalized not in allowed:
         raise ValueError(
@@ -94,25 +95,91 @@ def create_signed_license(
     school: str,
     machine: str,
     license_type: str,
-    plan_name: str,
-    duration_months: int,
-    is_trial: bool,
+    license_id: UUID | str | None = None,
+    school_id: UUID | str | None = None,
+    school_code: str | None = None,
+    product_code: str = "cbt",
+    product_name: str = "CBT Examination Software",
+    plan_code: str | None = None,
+    plan_name: str = "standard",
+    duration_months: int = 0,
+    is_trial: bool = False,
+    features: dict[str, Any] | None = None,
     issued_at: datetime | None = None,
+    expiry: datetime | None = None,
+    public_key_version: str = "v1",
+    package_version: int = 1,
     version: int = 1,
 ) -> SignedLicenseResponse:
     issued_at = (issued_at or datetime.now(timezone.utc))
     normalized = normalize_license_type(license_type)
-    expiry = build_license_expiry(normalized, issued_at)
+    expiry = expiry or build_license_expiry(normalized, issued_at)
 
     return generate_license(
+        license_id=license_id,
+        school_id=school_id,
+        school_code=school_code,
         school=school,
         machine=machine,
+        product_code=product_code,
+        product_name=product_name,
         license_type=normalized,
+        plan_code=plan_code or normalized,
         plan_name=plan_name,
         duration_months=duration_months,
         is_trial=is_trial,
+        features=features,
         issued_at=issued_at,
         expiry=expiry,
+        public_key_version=public_key_version,
+        package_version=package_version,
+        version=version,
+    )
+
+
+def create_license_package(
+    *,
+    school: str,
+    machine: str,
+    license_type: str,
+    license_id: UUID | str | None = None,
+    school_id: UUID | str | None = None,
+    school_code: str | None = None,
+    product_code: str = "cbt",
+    product_name: str = "CBT Examination Software",
+    plan_code: str | None = None,
+    plan_name: str = "standard",
+    duration_months: int = 0,
+    is_trial: bool = False,
+    features: dict[str, Any] | None = None,
+    issued_at: datetime | None = None,
+    expiry: datetime | None = None,
+    public_key_version: str = "v1",
+    package_version: int = 1,
+    version: int = 1,
+) -> LicensePackage:
+    issued_at = issued_at or datetime.now(timezone.utc)
+    normalized = normalize_license_type(license_type)
+    expiry = expiry or build_license_expiry(normalized, issued_at)
+
+    return generate_license_package(
+        license_id=license_id,
+        school_id=school_id,
+        school_code=school_code,
+        school=school,
+        machine=machine,
+        product_code=product_code,
+        product_name=product_name,
+        license_type=normalized,
+        plan_code=plan_code or normalized,
+        plan_name=plan_name,
+        duration_months=duration_months,
+        is_trial=is_trial,
+        features=features,
+        issued_at=issued_at,
+        expiry=expiry,
+        public_key_version=public_key_version,
+        package_version=package_version,
         version=version,
     )
 

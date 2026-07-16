@@ -16,6 +16,8 @@ from app.models.license_renewal import LicenseRenewal
 from app.models.payment_webhook import PaymentWebhook
 from app.models.outbox_event import OutboxEvent
 from app.models.idempotency_key import IdempotencyKey
+from app.models.purchase_session import PurchaseSession
+from app.models.activation_token import ActivationToken
 
 __all__ = [
 	"Activation",
@@ -35,5 +37,7 @@ __all__ = [
     "IdempotencyKey",
     "PaymentWebhook",
     "LicenseRenewal",
-    "outboxEvent"
+    "OutboxEvent",
+    "PurchaseSession",
+    "ActivationToken",
 ]

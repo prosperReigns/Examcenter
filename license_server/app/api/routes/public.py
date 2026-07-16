@@ -25,9 +25,7 @@ from app.schemas.purchase_session import (
     PurchaseSessionCreate,
 )
 
-from app.schemas.activation import (
-    ActivationRequest,
-)
+from app.schemas.activation import ActivationTokenRequest
 
 from app.services.purchase_session_service import (
     start_purchase,
@@ -92,7 +90,7 @@ def purchase_status_endpoint(
 
 @router.post("/activate")
 def activate_endpoint(
-    payload: ActivationRequest,
+    payload: ActivationTokenRequest,
     db: Session = Depends(get_db),
 ):
     return activate_from_token(
@@ -102,7 +100,7 @@ def activate_endpoint(
 
 @router.post("/verify")
 def verify_license_endpoint(
-    payload: ActivationRequest,
+    payload: ActivationTokenRequest,
     db: Session = Depends(get_db),
 ):
     return activate_from_token(

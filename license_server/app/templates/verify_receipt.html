@@ -1,0 +1,93 @@
+{% extends "base/base_guest.html" %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <div class="row justify-content-center">
+
+        <div class="col-lg-8">
+
+            <div class="card shadow-sm">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between align-items-start mb-4">
+
+                        <div>
+
+                            <h1 class="h3 mb-1">Receipt Verified</h1>
+
+                            <p class="text-muted mb-0">
+                                {{ receipt.receipt_number }}
+                            </p>
+
+                        </div>
+
+                        {% if receipt.status == "issued" %}
+
+                            <span class="badge bg-success">Issued</span>
+
+                        {% elif receipt.status == "reissued" %}
+
+                            <span class="badge bg-warning text-dark">Reissued</span>
+
+                        {% else %}
+
+                            <span class="badge bg-secondary">{{ receipt.status|title }}</span>
+
+                        {% endif %}
+
+                    </div>
+
+                    <table class="table align-middle">
+
+                        <tr>
+
+                            <th>Customer</th>
+
+                            <td>{{ receipt.customer.name if receipt.customer else "-" }}</td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>School</th>
+
+                            <td>{{ receipt.school.name if receipt.school else "-" }}</td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>Amount</th>
+
+                            <td>{{ receipt.currency }} {{ "{:,.2f}".format(receipt.amount) }}</td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>Issued</th>
+
+                            <td>{{ receipt.issued_at.strftime("%d %b %Y %H:%M") if receipt.issued_at else "-" }}</td>
+
+                        </tr>
+
+                    </table>
+
+                    <p class="text-muted mb-0">
+                        This receipt was found in the license server records.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

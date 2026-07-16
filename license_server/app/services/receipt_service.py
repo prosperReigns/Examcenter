@@ -341,7 +341,7 @@ def email_receipt(
         recipient=receipt.customer.email,
         subject=f"Receipt {receipt.receipt_number}",
         message=(
-            f"Dear {receipt.customer.full_name},\n\n"
+            f"Dear {receipt.customer.name},\n\n"
             f"Attached is your payment receipt "
             f"{receipt.receipt_number}.\n\n"
             "Thank you."
@@ -492,5 +492,16 @@ def sms_receipt(
 
     return receipt
 
-def generate_receipt():
-    pass
+def generate_receipt(
+    db: Session,
+    payment: Payment,
+    *,
+    admin=None,
+    request=None,
+) -> Receipt:
+    return create_receipt_record(
+        db,
+        payment,
+        admin=admin,
+        request=request,
+    )

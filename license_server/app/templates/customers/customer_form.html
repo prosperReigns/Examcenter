@@ -22,8 +22,8 @@
 
 <input
 class="form-control"
-name="full_name"
-value="{{ customer.full_name if customer else '' }}"
+name="name"
+value="{{ customer.name if customer else '' }}"
 required
 >
 
@@ -57,13 +57,39 @@ value="{{ customer.phone if customer else '' }}"
 
 <div class="col-md-12 mb-3">
 
-<label>Address</label>
+<label>Country</label>
 
 <textarea
 class="form-control"
-name="address"
+name="country"
 rows="4"
->{{ customer.address if customer else '' }}</textarea>
+>{{ customer.country if customer else '' }}</textarea>
+
+</div>
+
+<div class="col-md-6 mb-3">
+
+<label>Status</label>
+
+<div class="form-check mt-2">
+
+<input
+class="form-check-input"
+type="checkbox"
+name="is_active"
+value="true"
+{% if not customer or customer.is_active %}
+checked
+{% endif %}
+>
+
+<label class="form-check-label">
+
+Customer is active
+
+</label>
+
+</div>
 
 </div>
 

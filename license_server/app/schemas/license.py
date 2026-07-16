@@ -7,19 +7,47 @@ from pydantic import BaseModel, Field
 
 
 class LicensePayload(BaseModel):
+    license_id: UUID | None = None
+    school_id: UUID | None = None
     school: str
+    school_code: str | None = None
+    product_code: str = "cbt"
+    product_name: str = "CBT Examination Software"
     machine: str
     license_type: str
+    plan_code: str | None = None
     plan_name: str
     duration_months: int
     is_trial: bool = False
+    features: dict[str, Any] = Field(default_factory=dict)
     issued_at: datetime
     expiry: datetime | None
+    public_key_version: str = "v1"
+    package_version: int = Field(default=1, ge=1)
     version: int = Field(default=1, ge=1)
 
 
 class SignedLicenseResponse(LicensePayload):
     signature: str
+    checksum: str
+    checksum_algorithm: str = "sha256"
+    signature_algorithm: str = "rsa-pkcs1v15-sha256"
+
+
+class LicensePackage(BaseModel):
+    package_type: str = "cbt_offline_license"
+    package_version: int = Field(default=1, ge=1)
+    generated_at: datetime
+    public_key_version: str = "v1"
+    checksum_algorithm: str = "sha256"
+    signature_algorithm: str = "rsa-pkcs1v15-sha256"
+    license: LicensePayload
+    checksum: str
+    signature: str
+
+    model_config = {
+        "populate_by_name": True
+    }
 
 
 class LicenseVerificationResult(BaseModel):

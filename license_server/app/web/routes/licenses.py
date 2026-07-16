@@ -49,7 +49,7 @@ def license_list_page(
     )
 
 
-@router.get("/{license_id}", response_class=HTMLResponse,)
+@router.get("/{license_id:uuid}", response_class=HTMLResponse,)
 def license_details_page(
     request: Request,
     license_id: UUID,
@@ -59,7 +59,7 @@ def license_details_page(
     with SessionLocal() as db:
         license = get_license(
             db,
-            UUID(license_id),
+            license_id,
         )
 
     if license is None:
@@ -101,7 +101,7 @@ def licenses_page(request: Request, admin=Depends(require_roles(Roles.SUPER_ADMI
         },
     )
 
-@router.post("/{license_id}/renew")
+@router.post("/{license_id:uuid}/renew")
 def renew_license_page(
     license_id: UUID,
     request: Request,
@@ -126,7 +126,7 @@ def renew_license_page(
         status_code=303,
     )
 
-@router.post("/{license_id}/suspend")
+@router.post("/{license_id:uuid}/suspend")
 def suspend_license_page(
     license_id: UUID,
     request: Request,
@@ -147,7 +147,7 @@ def suspend_license_page(
         status_code=303,
     )
 
-@router.post("/{license_id}/reactivate")
+@router.post("/{license_id:uuid}/reactivate")
 def reactivate_license_page(
     license_id: UUID,
     request: Request,
@@ -168,7 +168,7 @@ def reactivate_license_page(
         status_code=303,
     )
 
-@router.post("/{license_id}/revoke")
+@router.post("/{license_id:uuid}/revoke")
 def revoke_license_page(
     license_id: UUID,
     request: Request,
@@ -189,7 +189,7 @@ def revoke_license_page(
         status_code=303,
     )
 
-@router.get("/{license_id}/download")
+@router.get("/{license_id:uuid}/download")
 def download_license(
     license_id: UUID,
     admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),
@@ -203,14 +203,14 @@ def download_license(
 
     return Response(
         content=contents,
-        media_type="application/octet-stream",
+        media_type="application/json",
         headers={
             "Content-Disposition":
                 f'attachment; filename="{filename}"'
         },
     )
 
-@router.post("/{license_id}/delete")
+@router.post("/{license_id:uuid}/delete")
 def delete_license_page(
     license_id: UUID,
     request: Request,

@@ -1,39 +1,30 @@
-from datetime import datetime
+from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    status,
-)
-
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-
+from app.repositories import activation_token_repository
 from app.schemas.activation import (
-    ActivationRequest,
-    ActivationResponse,
+    ActivationTokenRequest,
+    ActivationTokenResponse,
+    LicenseValidationResponse,
 )
-
-from app.repositories import (
-    activation_token_repository,
-    activation_repository,
-    license_repository,
+from app.schemas.public_activation import PublicRenewalCheckRequest
+from app.schemas.purchase_session import (
+    CompletePaymentRequest,
+    PublicActivationStartRequest,
+    PublicStatusResponse,
+    PurchaseSessionRead,
 )
-
-from app.services.activation_token_service import (
-    validate_token,
-    validate_machine,
-    consume_token,
-)
-
-from app.services.license_signing_service import (
-    export_license,
-)
-
-from app.services.audit_service import (
-    record_audit_event,
+from app.services.activation_service import validate_license_for_machine
+from app.services.activation_token_service import validate_machine, validate_token
+from app.services.public_activation_service import complete_activation_from_token
+from app.services.purchase_session_service import (
+    complete_purchase_session,
+    get_purchase_status,
+    get_purchase_status_by_reference,
+    start_purchase,
 )
 
 router = APIRouter(
@@ -41,114 +32,103 @@ router = APIRouter(
     tags=["Public Activation"],
 )
 
+
 @router.post(
-    "/activate",
-    response_model=ActivationResponse,
+    "/start-activation",
+    response_model=PurchaseSessionRead,
 )
-def activate(
-    request: ActivationRequest,
+def start_activation(
+    request: PublicActivationStartRequest,
     db: Session = Depends(get_db),
 ):
-        activation_token = (
-        activation_token_repository.get_by_token(
-            db,
-            request.activation_token,
-        )
-    )
+    return start_purchase(db, request)
 
-    if activation_token is None:
 
+@router.post("/complete-payment")
+def complete_payment(
+    request: CompletePaymentRequest,
+    db: Session = Depends(get_db),
+):
+    return complete_purchase_session(db, payload=request)
+
+
+@router.get(
+    "/status",
+    response_model=PublicStatusResponse,
+)
+def status_endpoint(
+    session_id: UUID | None = Query(default=None),
+    payment_reference: str | None = Query(default=None, max_length=100),
+    db: Session = Depends(get_db),
+):
+    if session_id is None and not payment_reference:
         raise HTTPException(
-            status_code=404,
-            detail="Activation token not found.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="session_id or payment_reference is required.",
         )
+    if session_id is not None:
+        return get_purchase_status(db, session_id)
+    return get_purchase_status_by_reference(db, payment_reference.strip())
 
-    validate_token(
-        activation_token,
-    )
 
-    validate_machine(
-
-        activation_token,
-
-        request.machine_fingerprint,
-
-    )
-
-    license = (
-        license_repository.get_by_id(
-            db,
-            activation_token.license_id,
-        )
-    )
-
-    if license is None:
-
-        raise HTTPException(
-            status_code=404,
-            detail="License not found.",
-        )
-
-    if license.status != "active":
-
-    raise HTTPException(
-        status_code=403,
-        detail="License is inactive.",
-    )
-
-        signed_license = export_license(
-        license,
-    )
-
-    activation = activation_repository.create(
-
-        db=db,
-
-        license_id=license.id,
-
-        machine_fingerprint=request.machine_fingerprint,
-
-        ip_address=request.ip_address,
-
-        activated_at=datetime.utcnow(),
-
-    )
-
-    consume_token(
-
+@router.get(
+    "/license",
+    response_model=ActivationTokenResponse,
+)
+def download_license(
+    activation_token: str = Query(min_length=20, max_length=255),
+    fingerprint: str = Query(min_length=5, max_length=255),
+    ip_address: str | None = Query(default=None, max_length=50),
+    db: Session = Depends(get_db),
+):
+    return complete_activation_from_token(
         db,
-
-        activation_token,
-
-    )
-
-    license.activation_count += 1
-
-    db.commit()
-
-    record_audit_event(
-
-        db=db,
-
-        action="license_activated",
-
-        entity_type="license",
-
-        entity_id=str(license.id),
-
-        description=(
-            "License activated "
-            "using activation token."
+        ActivationTokenRequest(
+            activation_token=activation_token,
+            machine_fingerprint=fingerprint,
+            ip_address=ip_address,
         ),
-
     )
 
-    return ActivationResponse(
 
-        success=True,
+@router.post(
+    "/check-renewal",
+    response_model=LicenseValidationResponse,
+)
+def check_renewal(
+    request: PublicRenewalCheckRequest,
+    db: Session = Depends(get_db),
+):
+    license_id = None
+    if request.activation_token:
+        activation_token = activation_token_repository.get_by_token(db, request.activation_token)
+        validate_token(activation_token)
+        validate_machine(activation_token, request.machine_fingerprint)
+        license_id = activation_token.license_id
+    elif request.license_key:
+        try:
+            license_id = UUID(request.license_key)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid license key.") from exc
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="license_key or activation_token is required.",
+        )
 
-        message="Activation successful.",
-
-        license=signed_license,
-
+    return validate_license_for_machine(
+        db,
+        license_id,
+        request.machine_fingerprint,
     )
+
+
+@router.post(
+    "/activate",
+    response_model=ActivationTokenResponse,
+)
+def activate(
+    request: ActivationTokenRequest,
+    db: Session = Depends(get_db),
+):
+    return complete_activation_from_token(db, request)

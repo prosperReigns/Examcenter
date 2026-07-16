@@ -28,7 +28,7 @@ settings = get_settings()
 from app.web.templates import templates
 
 
-@router.get("/{activation_id}", response_class=HTMLResponse,)
+@router.get("/{activation_id:uuid}", response_class=HTMLResponse,)
 def activation_details(
     request: Request,
     activation_id: UUID,
@@ -79,7 +79,7 @@ def activations_page(request: Request, admin=Depends(require_roles(Roles.SUPER_A
         },
     )
 
-@router.post("/{activation_id}/deactivate")
+@router.post("/{activation_id:uuid}/deactivate")
 def deactivate_activation_submit(
     activation_id: str,
     request: Request,

@@ -18,6 +18,7 @@ from .public import router as public_router
 from .webhook import router as webhook_router
 from .activation import router as activation_router
 from .devices import router as devices_router
+from .purchase_sessions import router as purchase_sessions_router
 from .license_renewals import router as license_renewals_router
 from .invoices import router as invoices_router
 from .notifications import router as notification_router
@@ -32,6 +33,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(customers_router)
     app.include_router(licenses_router)
     app.include_router(payments_router)
+    app.include_router(purchase_sessions_router)
     app.include_router(schools_router)
     app.include_router(settings_router)
     app.include_router(activation_router)
@@ -46,9 +48,8 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(idempotency_router)
     app.include_router(admin_router)
     app.include_router(webhook_router)
-    api_router.include_router(
-    public_activation_router,
-)
+    app.include_router(public_activation_router)
+
 
 __all__ = [
     "activation_router",
@@ -66,6 +67,7 @@ __all__ = [
     "notifications_router",
     "outbox_router",
     "payments_router",
+    "purchase_sessions_router",
     "receipts_router",
     "schools_router",
     "settings_router",
@@ -76,4 +78,5 @@ __all__ = [
     "system_router",
     "webhook_router",
     "public_router",
+    "public_activation_router"
 ]

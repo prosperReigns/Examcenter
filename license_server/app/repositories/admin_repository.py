@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -9,12 +11,16 @@ def get_admin_by_email(db: Session, email: str) -> Admin | None:
     return db.scalar(statement)
 
 
-def get_admin_by_id(db: Session, admin_id: int) -> Admin | None:
+def get_admin_by_id(db: Session, admin_id: UUID) -> Admin | None:
     return db.get(Admin, admin_id)
 
 
 def get_admin_count(db: Session) -> int:
     return db.scalar(select(func.count()).select_from(Admin)) or 0
+
+
+def get_active_admin_count(db: Session) -> int:
+    return db.scalar(select(func.count()).select_from(Admin).where(Admin.is_active.is_(True))) or 0
 
 
 def create_admin(

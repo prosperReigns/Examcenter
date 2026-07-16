@@ -1,4 +1,5 @@
 from app.celery_app import celery_app
+from app.tasks.notification_tasks import queue_notification
 
 
 @celery_app.task(
@@ -11,8 +12,6 @@ def send_email_task(
     self,
     notification_id,
 ):
-    """
-    Load the notification from the database,
-    send the email, update its status,
-    and record success or failure.
-    """
+    """Send an email notification through the common notification worker."""
+
+    return queue_notification(notification_id)

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -56,12 +58,22 @@ def list_admins_endpoint(
     return items
 
 @router.get(
+    "/statistics",
+    summary="Administrator Statistics",
+)
+def statistics_endpoint(
+    db: Session = Depends(get_db),
+    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
+):
+    return admin_statistics(db)
+
+@router.get(
     "/{admin_id}",
     response_model=AdminRead,
     summary="Get Administrator",
 )
 def get_admin_endpoint(
-    admin_id: int,
+    admin_id: UUID,
     db: Session = Depends(get_db),
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
 ):
@@ -95,7 +107,7 @@ def create_admin_endpoint(
     summary="Update Administrator",
 )
 def update_admin_endpoint(
-    admin_id: int,
+    admin_id: UUID,
     payload: AdminUpdate,
     request: Request,
     db: Session = Depends(get_db),
@@ -115,7 +127,7 @@ def update_admin_endpoint(
     summary="Delete Administrator",
 )
 def delete_admin_endpoint(
-    admin_id: int,
+    admin_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
@@ -133,7 +145,7 @@ def delete_admin_endpoint(
     summary="Activate Administrator",
 )
 def activate_admin_endpoint(
-    admin_id: int,
+    admin_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
@@ -151,7 +163,7 @@ def activate_admin_endpoint(
     summary="Deactivate Administrator",
 )
 def deactivate_admin_endpoint(
-    admin_id: int,
+    admin_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
@@ -168,7 +180,7 @@ def deactivate_admin_endpoint(
     summary="Change Administrator Password",
 )
 def change_password_endpoint(
-    admin_id: int,
+    admin_id: UUID,
     payload: ChangePasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -188,7 +200,7 @@ def change_password_endpoint(
     summary="Reset Administrator Password",
 )
 def reset_password_endpoint(
-    admin_id: int,
+    admin_id: UUID,
     payload: ResetPasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
@@ -202,12 +214,3 @@ def reset_password_endpoint(
         request=request,
     )
 
-@router.get(
-    "/statistics",
-    summary="Administrator Statistics",
-)
-def statistics_endpoint(
-    db: Session = Depends(get_db),
-    admin=Depends(require_roles(Roles.SUPER_ADMIN)),
-):
-    return admin_statistics(db)

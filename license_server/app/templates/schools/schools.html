@@ -52,7 +52,7 @@
 
             <tr>
 
-                <th>Centre No.</th>
+                <th>Code</th>
 
                 <th>School</th>
 
@@ -72,11 +72,11 @@
 
             <tr>
 
-                <td>{{ school.center_number }}</td>
+                <td>{{ school.code or "-" }}</td>
 
                 <td>{{ school.name }}</td>
 
-                <td>{{ school.customer.full_name }}</td>
+                <td>{{ school.customer.name if school.customer else "-" }}</td>
 
                 <td>
 

@@ -1,11 +1,13 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.repositories.customer_repository import get_customer_by_id
-from app.repositories.school_repository import create_school, get_school_by_id, list_schools, soft_delete_school, persist_school
+from app.models.school import School
+from app.repositories.school_repository import create_school, get_school_by_id, get_school_by_name, list_schools, soft_delete_school, persist_school
 from app.schemas.school import SchoolCreate, SchoolUpdate
 from app.services.audit_service import record_audit_event
 
@@ -195,8 +197,42 @@ def deactivate_school(
 
     return school
 
-def school_statistics():
-    pass
+def school_statistics(db: Session) -> dict:
+    total = db.scalar(
+        select(func.count())
+        .select_from(School)
+        .where(School.deleted_at.is_(None))
+    ) or 0
+    active = db.scalar(
+        select(func.count())
+        .select_from(School)
+        .where(School.deleted_at.is_(None), School.is_active.is_(True))
+    ) or 0
+    deleted = db.scalar(
+        select(func.count())
+        .select_from(School)
+        .where(School.deleted_at.is_not(None))
+    ) or 0
 
-def create_school_if_not_exists():
-    pass
+    return {
+        "total": total,
+        "active": active,
+        "inactive": total - active,
+        "deleted": deleted,
+    }
+
+def create_school_if_not_exists(
+    db: Session,
+    payload: SchoolCreate,
+    *,
+    admin=None,
+    request=None,
+):
+    existing = get_school_by_name(
+        db,
+        payload.name,
+        customer_id=payload.customer_id,
+    )
+    if existing is not None:
+        return existing
+    return create_school_record(db, payload, admin=admin, request=request)

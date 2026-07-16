@@ -1,150 +1,89 @@
-from uuid import UUID
 from datetime import datetime, timezone
+from uuid import UUID
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.activation import Activation
-from app.repositories.activation_repository import count_active_activations, create_activation_record, deactivate_activation, get_activation_by_id, get_activation_for_machine, upsert_license_device, activation_statistics
+from app.repositories.activation_repository import (
+    activation_statistics,
+    count_active_activations,
+    create_activation_record,
+    deactivate_activation,
+    get_activation_by_id,
+    get_activation_for_machine,
+    upsert_license_device,
+)
 from app.repositories.license_repository import get_license_by_id, persist_license
-from app.schemas.activation import ActivationRequest, LicenseValidationResponse
-from app.services.license_service import is_activation_allowed, verify_signed_license
+from app.schemas.activation import ActivationRequest, ActivationTokenRequest, LicenseValidationResponse
 from app.services.audit_service import record_audit_event
+from app.services.license_service import is_activation_allowed, verify_signed_license
+
 
 def validate_license_for_machine(db: Session, license_id: UUID, machine_id: str) -> LicenseValidationResponse:
     license_obj = get_license_by_id(db, license_id)
-
     if license_obj is None or license_obj.deleted_at is not None:
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License not found.",
+        return LicenseValidationResponse(valid=False, status="not_found", message="License not found", renewal_required=True)
+
+    if license_obj.status in {"revoked", "suspended"}:
+        return LicenseValidationResponse(
+            valid=False,
+            status=license_obj.status,
+            message=f"License is {license_obj.status}.",
+            renewal_required=True,
         )
-        return LicenseValidationResponse(valid=False, status="not found", message="License not found", renewal_required=True,)
-    
+
     if license_obj.status != "active":
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License suspended.",
-        )
-        return LicenseValidationResponse(valid=False, status="inactive", message=f"License is {license_obj.status}")
-    
-    if license_obj.status == "revoked":
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License has been revoked.",
-        )
-        return LicenseValidationResponse(
-            valid=False,
-            status="revoked",
-            message="This license has been revoked.",renewal_required=True,
-        )
-    if license_obj.status == "suspended":
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License suspended.",
-        )
+        return LicenseValidationResponse(valid=False, status=license_obj.status, message=f"License is {license_obj.status}.")
 
-        return LicenseValidationResponse(
-            valid=False,
-            status="suspended",
-            message="This license is currently suspended.", renewal_required=True)
-    
-    if (
-    license_obj.expiry_at is not None
-    and license_obj.expiry_at < datetime.now(timezone.utc)
-):
+    if license_obj.expiry_at is not None and license_obj.expiry_at < datetime.now(timezone.utc):
         license_obj.status = "expired"
-
         persist_license(db, license_obj)
-
         db.commit()
-
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License has expired.",
-        )
-        
         return LicenseValidationResponse(
             valid=False,
             status="expired",
             message="License has expired.",
             expires_at=license_obj.expiry_at,
-            renewal_required=True)
+            renewal_required=True,
+        )
 
     verification = verify_signed_license(license_obj.signed_license)
-
     if not verification.valid:
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License verification failed.",
+        return LicenseValidationResponse(
+            valid=False,
+            status="verification_failed",
+            message=verification.error or "License verification failed.",
         )
-        return LicenseValidationResponse(valid=False, status="verification failed", message=verification.error or "License verification failed")
 
     if verification.payload and verification.payload.machine != machine_id:
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: fingerprint mismatch.",
-        )
-        return LicenseValidationResponse(valid=False, status="fingerprint mismatch", message="Machine fingerprint mismatch")
-
-    # if license_obj.machine_fingerprint != payload.machine_id:
-    #     return LicenseValidationResponse(
-    #         valid=False,
-    #         message="Machine fingerprint mismatch."
-    #     )
+        return LicenseValidationResponse(valid=False, status="fingerprint_mismatch", message="Machine fingerprint mismatch.")
 
     existing_activation = get_activation_for_machine(db, license_id, machine_id)
     if existing_activation is not None:
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License already activated.",
+        return LicenseValidationResponse(
+            valid=True,
+            status="already_activated",
+            message="License already activated on this machine.",
             renewal_required=False,
+            license_id=license_obj.id,
+            school_id=license_obj.school_id,
+            remaining_activations=max(license_obj.max_activations - license_obj.activation_count, 0),
         )
-        return LicenseValidationResponse(valid=True, status="already activated", message="License already activated on this machine",renewal_required=False)
 
     current_activation_count = count_active_activations(db, license_id)
+    if not is_activation_allowed(current_activation_count, license_obj.max_activations):
+        return LicenseValidationResponse(valid=False, status="limit_reached", message="Activation limit reached.", renewal_required=True)
 
-    if not is_activation_allowed(current_activation_count):
-        record_audit_event(
-            db,
-            action="license_validation_failed",
-            entity_type="license",
-            entity_id=str(license_id),
-            description="Validation failed: License activation limit exceeded.",
-        )
-        return LicenseValidationResponse(valid=False, status="limit reached",message="Activation limit reached",renewal_required=True)
-
-    record_audit_event(
-        db,
-        action="license_validation_succeeded",
-        entity_type="license",
-        entity_id=str(license_id),
-        description="Validation failed: License invalid for activation.",
+    return LicenseValidationResponse(
+        valid=True,
+        status="valid",
+        message="License is valid for activation.",
+        renewal_required=False,
+        license_id=license_obj.id,
+        school_id=license_obj.school_id,
+        remaining_activations=max(license_obj.max_activations - current_activation_count, 0),
     )
-    return LicenseValidationResponse(valid=True, status="valid for activation", message="License is valid for activation",renewal_required=True)
 
 
 def activate_license(db: Session, license_id: UUID, payload: ActivationRequest) -> Activation:
@@ -156,44 +95,14 @@ def activate_license(db: Session, license_id: UUID, payload: ActivationRequest) 
     if license_obj is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="License not found")
 
-    if license_obj.status == "revoked":
-        raise HTTPException(
-            status_code=403,
-            detail="License has been revoked."
-        )
-
-    if license_obj.status == "suspended":
-        raise HTTPException(
-            status_code=403,
-            detail="License has been suspended."
-        )
-
-    if (
-        license_obj.expiry_at
-        and license_obj.expiry_at < datetime.now(timezone.utc)
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail="License has expired."
-        )
-
     existing_activation = get_activation_for_machine(db, license_id, payload.machine_id)
     if existing_activation is not None:
         return existing_activation
 
-    activation = create_activation_record(
-        db,
-        license_id=license_id,
-        device_id=device.id,
-        school_id=license_obj.school_id,
-        machine_id=payload.machine_id,
-        computer_name=payload.computer_name,
-        ip_address=payload.ip_address,
-    )
     device = upsert_license_device(
         db,
         license_id=license_obj.id,
-        # device_id=payload.
+        device_id=None,
         machine_id=payload.machine_id,
         computer_name=payload.computer_name,
         windows_version=payload.windows_version,
@@ -204,12 +113,21 @@ def activate_license(db: Session, license_id: UUID, payload: ActivationRequest) 
         ip_address=payload.ip_address,
         last_user=payload.last_user,
     )
-
     if device.blacklisted:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This device has been blacklisted.",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This device has been blacklisted.")
+
+    activation = create_activation_record(
+        db,
+        license_id=license_id,
+        device_id=device.id,
+        school_id=license_obj.school_id,
+        machine_id=payload.machine_id,
+        computer_name=payload.computer_name,
+        ip_address=payload.ip_address,
+    )
+    license_obj.activation_count += 1
+    license_obj.last_activation_at = datetime.now(timezone.utc)
+    persist_license(db, license_obj)
     record_audit_event(
         db,
         action="license_activated",
@@ -236,20 +154,68 @@ def deactivate_license_activation(db: Session, activation_id: UUID) -> Activatio
         db,
         action="license_deactivated",
         entity_type="license",
-        entity_id=str(license.id),
-        description=f"Deactivated on ",
+        entity_id=str(activation.license_id),
+        description=f"Deactivated activation {activation.id}",
     )
     db.commit()
     db.refresh(activation)
     return activation
 
-def get_activation_statistics(
-    db: Session,
-):
 
+def get_activation_statistics(db: Session):
     return activation_statistics(db)
 
-def validate_public_license():
-    pass
-def create_activation():
-    pass
+
+def validate_public_license(
+    db: Session,
+    *,
+    license_key: str,
+    machine_id: str,
+    fingerprint: str,
+):
+    try:
+        license_id = UUID(license_key)
+    except ValueError:
+        return {"valid": False, "status": "invalid", "expires_at": None, "message": "Invalid license key."}
+
+    result = validate_license_for_machine(db, license_id, machine_id or fingerprint)
+    return {
+        "valid": result.valid,
+        "status": result.status,
+        "expires_at": result.expires_at.isoformat() if result.expires_at else None,
+        "message": result.message,
+    }
+
+
+def activate_from_token(
+    db: Session,
+    payload: ActivationTokenRequest,
+    *,
+    verify_only: bool = False,
+):
+    from app.services.public_activation_service import complete_activation_from_token
+
+    if verify_only:
+        return {"valid": True, "message": "Activation token format accepted."}
+    return complete_activation_from_token(db, payload)
+
+
+def create_activation(
+    db: Session,
+    *,
+    license_id: UUID,
+    device_id: UUID,
+    school_id: UUID,
+    machine_id: str,
+    computer_name: str | None = None,
+    ip_address: str | None = None,
+) -> Activation:
+    return create_activation_record(
+        db,
+        license_id=license_id,
+        device_id=device_id,
+        school_id=school_id,
+        machine_id=machine_id,
+        computer_name=computer_name,
+        ip_address=ip_address,
+    )

@@ -16,6 +16,39 @@
 
 <div class="row">
 
+<div class="col-md-12 mb-3">
+
+<label>
+
+Customer
+
+</label>
+
+<select
+class="form-select"
+name="customer_id"
+required
+>
+
+<option value="">Select customer</option>
+
+{% for customer in customers|default([]) %}
+
+<option
+value="{{ customer.id }}"
+{% if school and school.customer_id == customer.id %}
+selected
+{% endif %}
+>
+{{ customer.name }}
+</option>
+
+{% endfor %}
+
+</select>
+
+</div>
+
 <div class="col-md-6 mb-3">
 
 <label>
@@ -37,14 +70,14 @@ required
 
 <label>
 
-Centre Number
+Code
 
 </label>
 
 <input
 class="form-control"
-name="center_number"
-value="{{ school.center_number if school else '' }}"
+name="code"
+value="{{ school.code if school else '' }}"
 required
 >
 
@@ -61,8 +94,8 @@ Email
 <input
 type="email"
 class="form-control"
-name="email"
-value="{{ school.email if school else '' }}"
+name="contact_email"
+value="{{ school.contact_email if school else '' }}"
 >
 
 </div>
@@ -77,8 +110,8 @@ Phone
 
 <input
 class="form-control"
-name="phone"
-value="{{ school.phone if school else '' }}"
+name="contact_phone"
+value="{{ school.contact_phone if school else '' }}"
 >
 
 </div>
@@ -96,6 +129,36 @@ class="form-control"
 rows="4"
 name="address"
 >{{ school.address if school else '' }}</textarea>
+
+</div>
+
+<div class="col-md-6 mb-3">
+
+<label>
+
+Active
+
+</label>
+
+<div class="form-check mt-2">
+
+<input
+class="form-check-input"
+type="checkbox"
+name="is_active"
+value="true"
+{% if not school or school.is_active %}
+checked
+{% endif %}
+>
+
+<label class="form-check-label">
+
+School is active
+
+</label>
+
+</div>
 
 </div>
 

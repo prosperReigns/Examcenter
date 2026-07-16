@@ -288,5 +288,8 @@ def device_statistics(
         "blacklisted": blacklisted,
     }
 
-def get_device_by_fingerprint():
-    pass
+def get_device_by_fingerprint(
+    db: Session,
+    fingerprint: str,
+) -> LicenseDevice | None:
+    return get_device_by_machine_id(db, fingerprint)

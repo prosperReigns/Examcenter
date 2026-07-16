@@ -2,8 +2,11 @@ from __future__ import annotations
 from uuid import UUID
 
 import hmac
+import json
+import logging
 import secrets
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
@@ -12,6 +15,7 @@ from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.enums.purchase_status import PurchaseStatus
 from app.models.payment import Payment
 from app.models.invoice import Invoice
 from app.repositories.customer_repository import get_customer_by_id
@@ -42,11 +46,12 @@ from app.services.receipt_service import (
 )
 from app.utils.invoice import build_invoice_payload, save_invoice_document
 
-from app.services.purchase_service import (
-    PurchaseContext,
-    complete_purchase,
-)
+from app.repositories.purchase_session_repository import get_purchase_session_by_reference
+from app.repositories.purchase_session_repository import save_purchase_session
+from app.services.purchase_state_machine import validate_transition
+from app.tasks.purchase_tasks import orchestrate_purchase
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 LICENSE_PRICE_MAP = {
     "demo": 0,
@@ -403,27 +408,101 @@ def payment_is_processable(
 
     return payment.status == "pending"
 
-def handle_flutterwave_webhook(db: Session, request: Request, payload: FlutterwaveWebhookPayload) -> dict[str, Any]:
+
+def queue_purchase_orchestration(
+    *,
+    session_id: UUID,
+    payment_reference: str,
+) -> str:
+    try:
+        async_result = orchestrate_purchase.apply_async(
+            kwargs={
+                "session_id": str(session_id),
+                "payment_reference": payment_reference,
+            },
+        )
+    except Exception as exc:
+        logger.exception("Failed to enqueue purchase orchestration for session %s", session_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Purchase orchestration queue unavailable",
+        ) from exc
+
+    return str(async_result.id)
+
+
+async def handle_flutterwave_webhook(db: Session, request: Request, payload: FlutterwaveWebhookPayload) -> dict[str, Any]:
     header_hash = request.headers.get(settings.flutterwave_webhook_secret_header, "")
     if not header_hash or not hmac.compare_digest(header_hash, settings.flutterwave_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
 
     event = (payload.event or "").lower()
-    if event not in {"charge.completed", "transfer.completed", "refund.completed"}:
+    if event != "charge.completed":
         return {"status": "ignored", "event": event}
 
     data = payload.data
-    tx_ref = str(data.get("tx_ref") or "")
-    transaction_id = str(data.get("id") or data.get("flw_ref") or "")
-    payment = get_payment_by_tx_ref(db, tx_ref) if tx_ref else None
-    if payment is None and transaction_id:
-        payment = get_payment_by_transaction_id(db, transaction_id)
-    if payment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    tx_ref = str(data.get("tx_ref") or data.get("payment_reference") or "").strip()
+    if not tx_ref:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing payment reference")
 
-    verify_payload = PaymentVerifyRequest(tx_ref=payment.flutterwave_tx_ref, transaction_id=transaction_id or payment.flutterwave_transaction_id)
-    verified_payment = verify_payment(db, verify_payload, admin=None, request=request)
-    return {"status": "processed", "payment_id": str(verified_payment.id)}
+    purchase_session = get_purchase_session_by_reference(db, tx_ref)
+    if purchase_session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase session not found")
+    if purchase_session.completed:
+        return {
+            "status": "processed",
+            "session_id": str(purchase_session.id),
+            "license_id": str(purchase_session.license_id) if purchase_session.license_id else None,
+        }
+
+    payment_status = str(data.get("status") or "").lower()
+    if payment_status != "successful":
+        if purchase_session.status != PurchaseStatus.PAYMENT_PENDING.value:
+            validate_transition(purchase_session.status, PurchaseStatus.PAYMENT_PENDING)
+            purchase_session.status = PurchaseStatus.PAYMENT_PENDING.value
+        save_purchase_session(db, purchase_session)
+        db.commit()
+        return {"status": "ignored", "event": event, "payment_status": payment_status}
+
+    try:
+        paid_amount = Decimal(str(data.get("amount", "0")))
+    except (InvalidOperation, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment amount") from exc
+
+    paid_currency = str(data.get("currency") or "").upper()
+    if paid_amount != Decimal(purchase_session.amount) or paid_currency != purchase_session.currency.upper():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment verification failed")
+
+    transaction_id = str(data.get("id") or "").strip() or None
+    gateway_reference = str(data.get("flw_ref") or data.get("reference") or "").strip() or None
+
+    if purchase_session.status != PurchaseStatus.PAYMENT_VERIFIED.value:
+        validate_transition(purchase_session.status, PurchaseStatus.PAYMENT_VERIFIED)
+        purchase_session.status = PurchaseStatus.PAYMENT_VERIFIED.value
+    purchase_session.payment_reference = tx_ref
+    purchase_session.gateway = "flutterwave"
+    purchase_session.gateway_reference = gateway_reference
+    purchase_session.gateway_transaction_id = transaction_id
+    purchase_session.gateway_response = json.dumps(data, default=str)
+    save_purchase_session(db, purchase_session)
+    record_audit_event(
+        db,
+        action="purchase_payment_verified",
+        entity_type="purchase_session",
+        entity_id=str(purchase_session.id),
+        description="Flutterwave webhook verified payment and queued orchestration.",
+    )
+    db.commit()
+
+    task_id = queue_purchase_orchestration(
+        session_id=purchase_session.id,
+        payment_reference=tx_ref,
+    )
+    return {
+        "status": "queued",
+        "session_id": str(purchase_session.id),
+        "task_id": task_id,
+    }
 
 def generate_payment_reference(
     db: Session,

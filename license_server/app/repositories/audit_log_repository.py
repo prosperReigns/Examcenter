@@ -1,3 +1,6 @@
+from datetime import datetime
+from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -7,7 +10,7 @@ from app.models.audit_log import AuditLog
 def create_audit_log(
     db: Session,
     *,
-    admin_id: int | None,
+    admin_id: UUID | None,
     action: str,
     entity_type: str | None = None,
     entity_id: str | None = None,
@@ -29,9 +32,40 @@ def create_audit_log(
     return audit_log
 
 
-def list_audit_logs(db: Session, *, offset: int = 0, limit: int = 20) -> tuple[list[AuditLog], int]:
-    statement = joinedload(AuditLog.admin)
+def list_audit_logs(
+    db: Session,
+    *,
+    action: str | None = None,
+    entity_type: str | None = None,
+    admin_id: UUID | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[AuditLog], int]:
+    statement = select(AuditLog).options(joinedload(AuditLog.admin))
     count_statement = select(func.count()).select_from(AuditLog)
+
+    if action:
+        statement = statement.where(AuditLog.action == action)
+        count_statement = count_statement.where(AuditLog.action == action)
+
+    if entity_type:
+        statement = statement.where(AuditLog.entity_type == entity_type)
+        count_statement = count_statement.where(AuditLog.entity_type == entity_type)
+
+    if admin_id:
+        statement = statement.where(AuditLog.admin_id == admin_id)
+        count_statement = count_statement.where(AuditLog.admin_id == admin_id)
+
+    if start_date:
+        statement = statement.where(AuditLog.occurred_at >= start_date)
+        count_statement = count_statement.where(AuditLog.occurred_at >= start_date)
+
+    if end_date:
+        statement = statement.where(AuditLog.occurred_at <= end_date)
+        count_statement = count_statement.where(AuditLog.occurred_at <= end_date)
+
     total = db.scalar(count_statement) or 0
     items = db.scalars(statement.order_by(AuditLog.occurred_at.desc()).offset(offset).limit(limit)).all()
     return items, total

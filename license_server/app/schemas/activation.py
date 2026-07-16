@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -64,10 +65,17 @@ class ActivationResponse(BaseModel):
     message: str
     license: str
 
-class ActivationRequest(BaseModel):
 
+class ActivationTokenRequest(BaseModel):
     activation_token: str
-
     machine_fingerprint: str
-
     ip_address: str | None = None
+
+
+class ActivationTokenResponse(BaseModel):
+    success: bool
+    message: str
+    license: str
+    license_package: dict[str, Any] | None = None
+    expires_at: datetime | None = None
+    activation_id: UUID | None = None

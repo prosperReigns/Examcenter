@@ -127,7 +127,7 @@ def generate_receipt_pdf(
             ["Invoice", str(receipt.invoice_id)],
             ["Payment", str(receipt.payment_id)],
             ["School", str(receipt.school.name)],
-            ["Customer", str(receipt.customer.full_name)],
+            ["Customer", str(receipt.customer.name)],
             ["Amount", f"{receipt.currency} {receipt.amount:,.2f}"],
             ["Status", receipt.status.title()],
         ],

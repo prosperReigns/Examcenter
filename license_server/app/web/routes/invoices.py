@@ -51,7 +51,7 @@ def invoices_page(
         },
     )
 
-@router.get("/{invoice_id}", response_class=HTMLResponse)
+@router.get("/{invoice_id:uuid}", response_class=HTMLResponse)
 def invoice_details_page(
     invoice_id: UUID,
     request: Request,
@@ -77,7 +77,7 @@ def invoice_details_page(
     )
 
 
-@router.post("/{invoice_id}/pay")
+@router.post("/{invoice_id:uuid}/pay")
 def pay_invoice_submit(
     invoice_id: UUID,
     request: Request,
@@ -104,7 +104,7 @@ def pay_invoice_submit(
         status_code=303,
     )
 
-@router.post("/{invoice_id}/cancel")
+@router.post("/{invoice_id:uuid}/cancel")
 def cancel_invoice_submit(
     invoice_id: UUID,
     request: Request,
@@ -130,7 +130,7 @@ def cancel_invoice_submit(
         status_code=303,
     )
 
-@router.get("/{invoice_id}/pdf")
+@router.get("/{invoice_id:uuid}/pdf")
 def download_invoice_pdf(
     invoice_id: UUID,
     admin=Depends(require_roles(Roles.SUPER_ADMIN, Roles.STAFF)),

@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -112,5 +113,26 @@ def delete_customer_record(db: Session, customer_id: UUID, *, admin=None, reques
     )
     db.commit()
 
-def customer_statistics():
-    pass
+def customer_statistics(db: Session) -> dict:
+    total = db.scalar(
+        select(func.count())
+        .select_from(Customer)
+        .where(Customer.deleted_at.is_(None))
+    ) or 0
+    active = db.scalar(
+        select(func.count())
+        .select_from(Customer)
+        .where(Customer.deleted_at.is_(None), Customer.is_active.is_(True))
+    ) or 0
+    deleted = db.scalar(
+        select(func.count())
+        .select_from(Customer)
+        .where(Customer.deleted_at.is_not(None))
+    ) or 0
+
+    return {
+        "total": total,
+        "active": active,
+        "inactive": total - active,
+        "deleted": deleted,
+    }

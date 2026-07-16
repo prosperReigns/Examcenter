@@ -13,7 +13,8 @@ from app.repositories.license_device_repository import (
     unblacklist_device,
     update_device_notes,
     device_statistics,
-    get_device_by_machine_id
+    get_device_by_machine_id,
+    create_device,
 )
 from app.services.audit_service import record_audit_event
 from app.repositories.activation_repository import reset_device_activation
@@ -310,7 +311,7 @@ def reset_device(
     )
 
     db.commit()
-    db.refesh()
+    db.refresh(device)
 
     return device
 
@@ -357,5 +358,37 @@ def heartbeat_device(
 
     }
 
-def register_device():
-    pass
+def register_device(
+    db: Session,
+    *,
+    license_id: UUID,
+    machine_id: str,
+    computer_name: str | None = None,
+    ip_address: str | None = None,
+    windows_version: str | None = None,
+    cpu_id: str | None = None,
+    motherboard_serial: str | None = None,
+    disk_serial: str | None = None,
+    mac_address: str | None = None,
+    last_user: str | None = None,
+) -> LicenseDevice:
+    existing = get_device_by_machine_id(db, machine_id)
+    if existing is not None:
+        return existing
+
+    device = create_device(
+        db,
+        license_id=license_id,
+        machine_id=machine_id,
+        computer_name=computer_name,
+        ip_address=ip_address,
+        windows_version=windows_version,
+        cpu_id=cpu_id,
+        motherboard_serial=motherboard_serial,
+        disk_serial=disk_serial,
+        mac_address=mac_address,
+        last_user=last_user,
+    )
+    db.commit()
+    db.refresh(device)
+    return device

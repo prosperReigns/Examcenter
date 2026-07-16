@@ -205,11 +205,59 @@ def total_revenue(
 
     return db.scalar(statement) or 0
 
-def create_payment_record():
-    pass
-def get_payment_by_transaction_id():
-    pass
-def get_payment_by_tx_ref():
-    pass
-def get_payment_by_id():
-    pass
+def create_payment_record(
+    db: Session,
+    *,
+    customer_id: UUID,
+    school_id: UUID | None,
+    invoice_id: UUID,
+    payment_reference: str,
+    gateway: str | None,
+    amount,
+    currency: str,
+    payment_type: str,
+    status: str = "pending",
+    gateway_reference: str | None = None,
+    gateway_transaction_id: str | None = None,
+    gateway_payment_url: str | None = None,
+    payment_method: str | None = None,
+    raw_payload: str | None = None,
+) -> Payment:
+    payment = Payment(
+        customer_id=customer_id,
+        school_id=school_id,
+        invoice_id=invoice_id,
+        amount=amount,
+        currency=currency,
+        status=status,
+        payment_type=payment_type,
+        payment_reference=payment_reference,
+        gateway=gateway or "manual",
+        gateway_reference=gateway_reference,
+        gateway_transaction_id=gateway_transaction_id,
+        gateway_payment_url=gateway_payment_url,
+        payment_method=payment_method,
+        raw_payload=raw_payload,
+    )
+    return create_payment(db, payment)
+
+
+def get_payment_by_transaction_id(
+    db: Session,
+    transaction_id: str,
+) -> Payment | None:
+    return get_payment_by_gateway_transaction_id(db, transaction_id)
+
+
+def get_payment_by_tx_ref(
+    db: Session,
+    tx_ref: str,
+) -> Payment | None:
+    return get_payment_by_reference(db, tx_ref)
+
+
+def get_payment_by_id(
+    db: Session,
+    payment_id: UUID,
+) -> Payment | None:
+    return get_payment(db, payment_id)

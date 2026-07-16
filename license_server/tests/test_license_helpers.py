@@ -1,7 +1,14 @@
 from datetime import datetime, timezone, timedelta
 
 import app.auth.security as security
-from app.services.license_service import build_license_expiry, create_signed_license, is_activation_allowed, normalize_license_type, verify_signed_license
+from app.services.license_service import (
+    build_license_expiry,
+    create_license_package,
+    create_signed_license,
+    is_activation_allowed,
+    normalize_license_type,
+    verify_signed_license,
+)
 
 
 def test_password_hash_round_trip():
@@ -37,6 +44,39 @@ def test_license_signature_rejects_tampering():
     tampered["machine"] = "OTHER-MACHINE"
 
     verification = verify_signed_license(tampered)
+    assert verification.valid is False
+
+
+def test_license_package_sign_and_verify_round_trip():
+    issued_at = datetime.now(timezone.utc)
+    package = create_license_package(
+        school="Example School",
+        machine="MACHINE-123",
+        license_type="annual",
+        plan_name="Annual",
+        duration_months=12,
+        features={"offline": True, "max_candidates": 500},
+        issued_at=issued_at,
+    )
+
+    verification = verify_signed_license(package.model_dump())
+    assert verification.valid is True
+    assert verification.payload is not None
+    assert verification.payload.school == "Example School"
+    assert verification.payload.machine == "MACHINE-123"
+    assert verification.payload.features["offline"] is True
+    assert verification.metadata["package_type"] == "cbt_offline_license"
+
+
+def test_license_package_signature_rejects_nested_tampering():
+    package = create_license_package(
+        school="Example School",
+        machine="MACHINE-123",
+        license_type="monthly",
+    ).model_dump()
+    package["license"]["machine"] = "OTHER-MACHINE"
+
+    verification = verify_signed_license(package)
     assert verification.valid is False
 
 

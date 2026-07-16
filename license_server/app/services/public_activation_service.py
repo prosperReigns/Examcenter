@@ -1,167 +1,123 @@
-from datetime import datetime
+import json
+from datetime import datetime, timezone
 
-import jwt
-
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from fastapi import HTTPException
-
-from app.core.config import get_settings
-
-from app.models.license import License
-
-from app.repositories.license_repository import (
-    get_license_by_id,
+from app.repositories import activation_token_repository
+from app.repositories.activation_repository import (
+    count_active_activations,
+    create_activation_record,
+    get_activation_for_machine,
 )
-
-from app.services.license_download_service import (
-    build_signed_license,
+from app.repositories.license_device_repository import (
+    create_device,
+    get_device_by_machine_id,
+    save_device,
 )
+from app.repositories.license_repository import get_license_by_id, persist_license
+from app.schemas.activation import ActivationTokenRequest, ActivationTokenResponse
+from app.services.activation_token_service import consume_token, validate_machine, validate_token
+from app.services.audit_service import record_audit_event
+from app.services.license_package_service import license_package_document
+from app.services.license_service import is_activation_allowed
 
-settings = get_settings()
 
-def verify_activation_token(
-    token: str,
-):
-    """
-    Validate the activation token.
-    """
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
-    try:
 
-        payload = jwt.decode(
-            token,
-            settings.secret_key,
-            algorithms=["HS256"],
-        )
+def _as_aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
-    except jwt.ExpiredSignatureError:
 
-        raise HTTPException(
-            401,
-            "Activation token expired.",
-        )
+def _load_valid_license(db: Session, license_id):
+    license_obj = get_license_by_id(db, license_id)
+    if license_obj is None or license_obj.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="License not found.")
+    if license_obj.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="License is inactive.")
+    if license_obj.revoked_at is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="License is revoked.")
+    if license_obj.suspended_at is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="License is suspended.")
+    if license_obj.expiry_at is not None and _as_aware(license_obj.expiry_at) < _utcnow():
+        license_obj.status = "expired"
+        persist_license(db, license_obj)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="License has expired.")
+    if not license_obj.signed_license:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signed license not found.")
+    return license_obj
 
-    except jwt.InvalidTokenError:
 
-        raise HTTPException(
-            401,
-            "Invalid activation token.",
-        )
-
-    return payload
-
-def validate_machine(
-    payload,
-    fingerprint: str,
-):
-    """
-    Ensure token belongs
-    to this machine.
-    """
-
-    if payload["fingerprint"] != fingerprint:
-
-        raise HTTPException(
-            403,
-            "Machine fingerprint mismatch.",
-        )
-    
-def load_license(
+def complete_activation_from_token(
     db: Session,
-    payload,
-) -> License:
+    payload: ActivationTokenRequest,
+) -> ActivationTokenResponse:
+    activation_token = activation_token_repository.get_by_token(db, payload.activation_token)
+    validate_token(activation_token)
+    validate_machine(activation_token, payload.machine_fingerprint)
 
-    license = get_license_by_id(
+    license_obj = _load_valid_license(db, activation_token.license_id)
+    activation = get_activation_for_machine(
         db,
-        payload["license_id"],
+        license_obj.id,
+        payload.machine_fingerprint,
     )
 
-    if license is None:
+    if activation is None:
+        current_activation_count = count_active_activations(db, license_obj.id)
+        if not is_activation_allowed(current_activation_count, license_obj.max_activations):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Activation limit reached.")
 
-        raise HTTPException(
-            404,
-            "License not found.",
+        device = get_device_by_machine_id(db, payload.machine_fingerprint)
+        if device is None:
+            device = create_device(
+                db,
+                license_id=license_obj.id,
+                machine_id=payload.machine_fingerprint,
+            )
+        else:
+            device.license_id = license_obj.id
+            save_device(db, device)
+
+        if device.blacklisted:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This device has been blacklisted.")
+
+        activation = create_activation_record(
+            db,
+            license_id=license_obj.id,
+            device_id=device.id,
+            school_id=license_obj.school_id,
+            machine_id=payload.machine_fingerprint,
+            computer_name=None,
+            ip_address=payload.ip_address,
         )
+        license_obj.activation_count += 1
+        license_obj.last_activation_at = _utcnow()
+        device.activation_count += 1
+        db.add_all([license_obj, device])
 
-    return license
-
-def validate_license(
-    license: License,
-):
-    """
-    Validate license.
-    """
-
-    if not license.is_active:
-
-        raise HTTPException(
-            403,
-            "License inactive.",
-        )
-
-    if license.is_revoked:
-
-        raise HTTPException(
-            403,
-            "License revoked.",
-        )
-
-    if license.expiry_at < datetime.utcnow():
-
-        raise HTTPException(
-            403,
-            "License expired.",
-        )
-
-def generate_license(
-    license: License,
-):
-    """
-    Build signed license.
-    """
-
-    return build_signed_license(
-        license,
-    )
-
-def activate(
-    db: Session,
-    activation_token: str,
-    fingerprint: str,
-):
-    """
-    Activate CBT installation.
-    """
-
-    payload = verify_activation_token(
-        activation_token,
-    )
-
-    validate_machine(
-        payload,
-        fingerprint,
-    )
-
-    license = load_license(
+    package_document = license_package_document(license_obj)
+    consume_token(db, activation_token)
+    record_audit_event(
         db,
-        payload,
+        action="activation_token_consumed",
+        entity_type="license",
+        entity_id=str(license_obj.id),
+        description="Signed license downloaded through public activation API.",
+        ip_address=payload.ip_address,
     )
+    db.commit()
+    db.refresh(activation)
 
-    validate_license(
-        license,
+    return ActivationTokenResponse(
+        success=True,
+        message="Activation successful.",
+        license=package_document,
+        license_package=json.loads(package_document),
+        expires_at=license_obj.expiry_at,
+        activation_id=activation.id,
     )
-
-    signed_license = generate_license(
-        license,
-    )
-
-    return {
-
-        "status": "success",
-
-        "license": signed_license,
-
-        "expires_at": license.expiry_at,
-
-    }

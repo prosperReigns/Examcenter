@@ -6,7 +6,25 @@ ALLOWED_TRANSITIONS = {
 
     PurchaseStatus.PENDING: {
 
+        PurchaseStatus.PAYMENT_PENDING,
+
         PurchaseStatus.PAYMENT_VERIFIED,
+
+        PurchaseStatus.CANCELLED,
+
+        PurchaseStatus.EXPIRED,
+
+        PurchaseStatus.FAILED,
+
+    },
+
+    PurchaseStatus.PAYMENT_PENDING: {
+
+        PurchaseStatus.PAYMENT_VERIFIED,
+
+        PurchaseStatus.CANCELLED,
+
+        PurchaseStatus.EXPIRED,
 
         PurchaseStatus.FAILED,
 
@@ -37,6 +55,24 @@ ALLOWED_TRANSITIONS = {
     },
 
     PurchaseStatus.LICENSE_CREATED: {
+
+        PurchaseStatus.INVOICE_CREATED,
+
+        PurchaseStatus.FAILED,
+
+    },
+
+    PurchaseStatus.INVOICE_CREATED: {
+
+        PurchaseStatus.PAYMENT_RECORDED,
+
+        PurchaseStatus.DEVICE_REGISTERED,
+
+        PurchaseStatus.FAILED,
+
+    },
+
+    PurchaseStatus.PAYMENT_RECORDED: {
 
         PurchaseStatus.DEVICE_REGISTERED,
 
@@ -70,12 +106,20 @@ ALLOWED_TRANSITIONS = {
 
     PurchaseStatus.COMPLETED: set(),
 
-    PurchaseStatus.FAILED: set(),
+    PurchaseStatus.CANCELLED: set(),
+
+    PurchaseStatus.EXPIRED: set(),
+
+    PurchaseStatus.FAILED: {
+
+        PurchaseStatus.PAYMENT_VERIFIED,
+
+    },
 
 }
 
 def validate_transition(
-    current_status: PurchaseStatus,
+    current_status: PurchaseStatus | str,
     next_status: PurchaseStatus,
 ) -> None:
     """
@@ -83,8 +127,13 @@ def validate_transition(
     valid lifecycle states.
     """
 
+    current = PurchaseStatus(current_status)
+
+    if current == next_status:
+        return
+
     allowed = ALLOWED_TRANSITIONS.get(
-        current_status,
+        current,
         set(),
     )
 
@@ -94,7 +143,7 @@ def validate_transition(
             status_code=400,
             detail=(
                 f"Invalid purchase transition "
-                f"{current_status.value} -> "
+                f"{current.value} -> "
                 f"{next_status.value}"
             ),
         )
@@ -112,6 +161,6 @@ def transition_purchase(
         next_status,
     )
 
-    purchase.status = next_status
+    purchase.status = next_status.value
 
     return purchase

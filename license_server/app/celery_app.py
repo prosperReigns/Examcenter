@@ -35,9 +35,63 @@ celery_app.conf.update(
 
     broker_connection_retry_on_startup=True,
 
+    imports=(
+        "app.tasks.activation_token_tasks",
+        "app.tasks.analytics_tasks",
+        "app.tasks.backup_tasks",
+        "app.tasks.email_tasks",
+        "app.tasks.invoice_tasks",
+        "app.tasks.notification_tasks",
+        "app.tasks.outbox_tasks",
+        "app.tasks.payment_tasks",
+        "app.tasks.purchase_tasks",
+        "app.tasks.receipt_tasks",
+        "app.tasks.renewal_tasks",
+    ),
+
 )
 
 celery_app.conf.beat_schedule = {
+
+    "recover-pending-purchases": {
+
+        "task": "purchases.recover_pending",
+
+        "schedule": crontab(minute="*/5"),
+
+    },
+
+    "process-outbox-events": {
+
+        "task": "outbox.process_pending",
+
+        "schedule": crontab(minute="*/1"),
+
+    },
+
+    "cleanup-processed-outbox-events": {
+
+        "task": "outbox.cleanup_processed",
+
+        "schedule": crontab(hour=1, minute=30),
+
+    },
+
+    "expire-licenses": {
+
+        "task": "renewals.expire_licenses",
+
+        "schedule": crontab(minute=15),
+
+    },
+
+    "send-expiry-reminders": {
+
+        "task": "renewals.send_expiry_reminders",
+
+        "schedule": crontab(hour=8, minute=0),
+
+    },
 
     "purge-expired-activation-tokens": {
 
@@ -78,6 +132,30 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(
             minute="*/30",
         ),
+
+    },
+
+    "activation-token-cleanup-audit": {
+
+        "task": "activation_tokens.audit_cleanup",
+
+        "schedule": crontab(hour=3, minute=30),
+
+    },
+
+    "analytics-daily-snapshot": {
+
+        "task": "analytics.snapshot",
+
+        "schedule": crontab(hour=0, minute=15),
+
+    },
+
+    "database-metadata-backup": {
+
+        "task": "backups.database_metadata",
+
+        "schedule": crontab(hour=2, minute=30),
 
     },
 

@@ -229,7 +229,7 @@ def download_license_endpoint(
 
     return Response(
         content=contents,
-        media_type="application/octet-stream",
+        media_type="application/json",
         headers={
             "Content-Disposition": (
                 f'attachment; filename="{filename}"'

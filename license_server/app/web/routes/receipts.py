@@ -49,7 +49,7 @@ def receipts_page(
         },
     )
 
-@router.get("/{receipt_id}", response_class=HTMLResponse)
+@router.get("/{receipt_id:uuid}", response_class=HTMLResponse)
 def receipt_details_page(
     receipt_id: UUID,
     request: Request,
@@ -80,7 +80,7 @@ def receipt_details_page(
 
 
 
-@router.get("/{receipt_id}/download")
+@router.get("/{receipt_id:uuid}/download")
 def download_receipt(
     receipt_id: UUID,
     admin=Depends(
@@ -103,7 +103,7 @@ def download_receipt(
         media_type="application/pdf",
     )
 
-@router.post("/{receipt_id}/email")
+@router.post("/{receipt_id:uuid}/email")
 def email_receipt_page(
     receipt_id: UUID,
     request: Request,

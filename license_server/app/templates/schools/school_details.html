@@ -37,9 +37,9 @@ Back
 
 <tr>
 
-<th>Centre Number</th>
+<th>Code</th>
 
-<td>{{ school.center_number }}</td>
+<td>{{ school.code or "-" }}</td>
 
 </tr>
 
@@ -47,7 +47,7 @@ Back
 
 <th>Customer</th>
 
-<td>{{ school.customer.full_name }}</td>
+<td>{{ school.customer.name if school.customer else "-" }}</td>
 
 </tr>
 
@@ -55,7 +55,7 @@ Back
 
 <th>Email</th>
 
-<td>{{ school.email }}</td>
+<td>{{ school.contact_email or "-" }}</td>
 
 </tr>
 
@@ -63,7 +63,7 @@ Back
 
 <th>Phone</th>
 
-<td>{{ school.phone }}</td>
+<td>{{ school.contact_phone or "-" }}</td>
 
 </tr>
 

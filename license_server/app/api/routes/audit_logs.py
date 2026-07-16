@@ -1,4 +1,6 @@
 from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -19,7 +21,7 @@ def list_audit_logs_endpoint(
     admin=Depends(require_roles(Roles.SUPER_ADMIN)),
     action: str | None = Query(None),
     entity_type: str | None = Query(None),
-    admin_id: int | None = Query(None),
+    admin_id: UUID | None = Query(None),
     start_date: datetime | None = Query(None),
     end_date: datetime | None = Query(None),
 ):

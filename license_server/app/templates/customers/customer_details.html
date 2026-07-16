@@ -31,7 +31,7 @@
 
                 <th>Name</th>
 
-                <td>{{ customer.full_name }}</td>
+                <td>{{ customer.name }}</td>
 
             </tr>
 
@@ -53,9 +53,9 @@
 
             <tr>
 
-                <th>Address</th>
+                <th>Country</th>
 
-                <td>{{ customer.address }}</td>
+                <td>{{ customer.country or "-" }}</td>
 
             </tr>
 

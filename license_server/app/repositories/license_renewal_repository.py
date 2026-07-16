@@ -52,6 +52,20 @@ def get_latest_license_renewal(
 
     return db.scalar(statement)
 
+
+def get_license_renewal_by_payment(
+    db: Session,
+    payment_id: UUID,
+) -> LicenseRenewal | None:
+    statement = (
+        select(LicenseRenewal)
+        .where(LicenseRenewal.payment_id == payment_id)
+        .order_by(desc(LicenseRenewal.renewed_at))
+        .limit(1)
+    )
+
+    return db.scalar(statement)
+
 def renewal_statistics(
     db: Session,
 ):
@@ -61,35 +75,20 @@ def renewal_statistics(
         .select_from(LicenseRenewal)
     ) or 0
 
-    successful = db.scalar(
-        select(func.count())
-        .select_from(LicenseRenewal)
-        .where(LicenseRenewal.status == "completed")
-    ) or 0
-
-    failed = db.scalar(
-        select(func.count())
-        .select_from(LicenseRenewal)
-        .where(LicenseRenewal.status == "failed")
-    ) or 0
-
-    pending = db.scalar(
-        select(func.count())
-        .select_from(LicenseRenewal)
-        .where(LicenseRenewal.status == "pending")
-    ) or 0
-
     return {
 
         "total": total,
 
-        "completed": successful,
+        "completed": total,
 
-        "failed": failed,
+        "failed": 0,
 
-        "pending": pending,
+        "pending": 0,
 
     }
 
-def get_license_renewal():
-    pass
+def get_license_renewal(
+    db: Session,
+    renewal_id: UUID,
+) -> LicenseRenewal | None:
+    return db.get(LicenseRenewal, renewal_id)

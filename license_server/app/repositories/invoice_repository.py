@@ -155,13 +155,51 @@ def get_total_invoice_amount(
 
     return db.scalar(statement) or 0
 
-def mark_invoice_cancelled():
-    pass
-def mark_invoice_paid():
-    pass
-def persist_invoice():
-    pass
-def get_invoice_by_id():
-    pass
-def get_invoice_by_payment():
-    pass
+def mark_invoice_cancelled(
+    db: Session,
+    invoice: Invoice,
+) -> Invoice:
+    invoice.status = "cancelled"
+    db.add(invoice)
+    db.flush()
+    return invoice
+
+
+def mark_invoice_paid(
+    db: Session,
+    invoice: Invoice,
+) -> Invoice:
+    invoice.status = "paid"
+    db.add(invoice)
+    db.flush()
+    return invoice
+
+
+def persist_invoice(
+    db: Session,
+    invoice: Invoice,
+) -> Invoice:
+    db.add(invoice)
+    db.flush()
+    return invoice
+
+
+def get_invoice_by_id(
+    db: Session,
+    invoice_id: UUID,
+) -> Invoice | None:
+    return db.get(Invoice, invoice_id)
+
+
+def get_invoice_by_payment(
+    db: Session,
+    payment_id: UUID,
+) -> Invoice | None:
+    from app.models.payment import Payment
+
+    statement = (
+        select(Invoice)
+        .join(Payment, Payment.invoice_id == Invoice.id)
+        .where(Payment.id == payment_id)
+    )
+    return db.scalar(statement)

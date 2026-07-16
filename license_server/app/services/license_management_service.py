@@ -410,5 +410,26 @@ def revoke_license(
 
     return license_obj
 
-def renew_license():
-    pass
+def renew_license(
+    db: Session,
+    license_id: UUID,
+    payload=None,
+    *,
+    plan: str | None = None,
+    payment_id: UUID | None = None,
+    notes: str | None = None,
+    admin=None,
+    request=None,
+) -> License:
+    from app.services.license_renewal_service import renew_license as renew_license_service
+
+    return renew_license_service(
+        db,
+        license_id,
+        payload,
+        plan=plan,
+        payment_id=payment_id,
+        notes=notes,
+        admin=admin,
+        request=request,
+    )

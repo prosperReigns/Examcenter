@@ -67,5 +67,16 @@ def persist_school(
 
     return school
 
-def get_school_by_name():
-    pass
+def get_school_by_name(
+    db: Session,
+    name: str,
+    *,
+    customer_id: UUID | None = None,
+) -> School | None:
+    statement = select(School).where(
+        School.name == name.strip(),
+        School.deleted_at.is_(None),
+    )
+    if customer_id is not None:
+        statement = statement.where(School.customer_id == customer_id)
+    return db.scalar(statement)

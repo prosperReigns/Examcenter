@@ -98,50 +98,6 @@ def revoke_stale_tokens():
         db.close()
 
 @celery_app.task(
-    name="activation_tokens.revoke_stale",
-)
-def revoke_stale_tokens():
-    """
-    Revoke activation tokens that have remained
-    unused beyond the configured lifetime.
-    """
-
-    db = SessionLocal()
-
-    try:
-
-        tokens = (
-            activation_token_repository
-            .find_stale_tokens(
-                db=db,
-                older_than_hours=24,
-            )
-        )
-
-        count = 0
-
-        for token in tokens:
-
-            activation_token_repository.revoke(
-                db,
-                token,
-            )
-
-            count += 1
-
-        db.commit()
-
-        return {
-
-            "revoked": count,
-
-        }
-
-    finally:
-
-        db.close()
-
-@celery_app.task(
     name="activation_tokens.audit_cleanup",
 )
 def audit_activation_cleanup():
