@@ -19,3 +19,7 @@ from .receipt import *
 from .school import *
 from .setting import *
 from .public_activation import *
+from .purchase_session import *
+from .purchase_status import *
+from .purchase_poll import *
+from .pricing import *

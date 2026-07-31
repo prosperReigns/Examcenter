@@ -1,6 +1,3 @@
-import asyncio
-
-from app.core.roles import Roles
 from sqlalchemy import select
 from app.auth.security import get_password_hash
 from app.database.session import SessionLocal
@@ -8,7 +5,7 @@ from app.models.customer import Customer
 
 CUSTOMER ={
     "name":"test customer",
-    "email": "customern@examcenter.com",
+    "email": "customer@examcenter.com",
     "password": "customer123",
     "role": "customer"
 }
@@ -23,7 +20,7 @@ def seed():
         if customer:
             print("customer already exists")
             return 
-        customer = Customer(full_name=CUSTOMER["full_name"],
+        customer = Customer(full_name=CUSTOMER["name"],
                     email=CUSTOMER["email"],
                     password_hash=get_password_hash(CUSTOMER["password"]),
                     role=CUSTOMER["role"],
@@ -32,7 +29,7 @@ def seed():
         db.add(customer)
         db.commit()
 
-        print("super Admin created successfully")
+        print("customer created successfully")
         print(f"email: {CUSTOMER['email']}")
         print(f"password: {CUSTOMER['password']}")
     finally:

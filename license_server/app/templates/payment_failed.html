@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8">
+
+<title>Payment Not Completed</title>
+
+<style>
+
+body{
+
+font-family:Arial;
+
+background:#f6f7fb;
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+height:100vh;
+
+margin:0;
+
+}
+
+.card{
+
+background:white;
+
+padding:40px;
+
+border-radius:12px;
+
+width:520px;
+
+text-align:center;
+
+box-shadow:0 8px 20px rgba(0,0,0,.1);
+
+}
+
+h1{
+
+color:#d32f2f;
+
+}
+
+p{
+
+color:#555;
+
+line-height:1.7;
+
+}
+
+.code{
+
+margin-top:20px;
+
+padding:12px;
+
+background:#f3f3f3;
+
+font-family:monospace;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>
+
+{% if status == "expired" %}
+
+Purchase Session Expired
+
+{% elif status == "cancelled" %}
+
+Payment Cancelled
+
+{% else %}
+
+Payment Not Completed
+
+{% endif %}
+
+</h1>
+
+<p>
+
+{% if status == "expired" %}
+
+Your purchase session has expired.
+
+Please start a new purchase from the desktop application.
+
+{% elif status == "cancelled" %}
+
+You cancelled the payment before it was completed.
+
+You can retry from the desktop application.
+
+{% else %}
+
+The payment could not be confirmed.
+
+If you believe payment was deducted,
+
+please contact support with your transaction reference.
+
+{% endif %}
+
+</p>
+
+{% if tx_ref %}
+
+<div class="code">
+
+Reference:
+
+<br>
+
+{{ tx_ref }}
+
+</div>
+
+{% endif %}
+
+<p>
+
+Return to the desktop application.
+
+You may retry the payment if necessary.
+
+</p>
+
+</div>
+
+</body>
+
+</html>

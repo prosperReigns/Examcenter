@@ -9,9 +9,12 @@ from fastapi import HTTPException
 from app.celery_app import celery_app
 from app.database.session import SessionLocal
 from app.repositories.purchase_session_repository import (
-    get_purchase_session_by_id,
+    get_purchase_session_by_id_for_update,
     get_purchase_session_by_reference,
+    expire_stale_purchase_sessions,
 )
+from app.repositories.payment_repository import delete_orphan_pending_payments, expire_stale_pending_payments
+
 from app.services.purchase_orchestration_service import complete_purchase
 from app.services.purchase_session_service import recover_pending_purchases
 
@@ -19,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(
+    queue="purchase",
     bind=True,
     name="purchases.orchestrate",
     max_retries=5,
@@ -38,7 +42,7 @@ def orchestrate_purchase(
     try:
         purchase_session = None
         if session_id is not None:
-            purchase_session = get_purchase_session_by_id(db, UUID(str(session_id)))
+            purchase_session = get_purchase_session_by_id_for_update(db, UUID(str(session_id)))
         if purchase_session is None and payment_reference is not None:
             purchase_session = get_purchase_session_by_reference(db, payment_reference)
         if purchase_session is None:
@@ -75,4 +79,76 @@ def recover_pending_purchase_sessions(self, *, limit: int = 50) -> dict[str, int
         logger.exception("Retrying pending purchase recovery task")
         raise self.retry(exc=exc, countdown=min(300, 60 * (self.request.retries + 1)))
     finally:
+        db.close()
+
+
+@celery_app.task(
+    bind=True,
+    name="purchase.maintenance",
+    max_retries=3,
+)
+def purchase_maintenance(
+    self,
+):
+
+    db = SessionLocal()
+
+    try:
+
+        expired_sessions = (
+            expire_stale_purchase_sessions(
+                db
+            )
+        )
+
+        expired_payments = (
+            expire_stale_pending_payments(
+                db
+            )
+        )
+
+        orphan_payments = (
+            delete_orphan_pending_payments(
+                db
+            )
+        )
+
+        activation_tokens = (
+            cleanup_activation_tokens(
+                db
+            )
+        )
+
+        db.commit()
+
+        return {
+
+            "expired_sessions":
+                expired_sessions,
+
+            "expired_payments":
+                expired_payments,
+
+            "deleted_orphan_payments":
+                orphan_payments,
+
+            "deleted_activation_tokens":
+                activation_tokens,
+
+        }
+
+    except Exception as exc:
+
+        db.rollback()
+
+        raise self.retry(
+
+            exc=exc,
+
+            countdown=60,
+
+        )
+
+    finally:
+
         db.close()

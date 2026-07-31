@@ -136,3 +136,9 @@ def customer_statistics(db: Session) -> dict:
         "inactive": total - active,
         "deleted": deleted,
     }
+
+def create_from_purchase(
+    self,
+    purchase,
+):
+    pass

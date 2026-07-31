@@ -9,50 +9,65 @@ from app.repositories.invoice_repository import get_invoice_by_id
 from app.services.invoice_pdf_service import generate_invoice_pdf
 from app.services.notification_service import create_notification_record
 
+from app.tasks.base import db_session
+
+from app.repositories.invoice_repository import (
+    get_invoice,
+)
+
+from app.services.invoice_pdf_service import (
+    generate_invoice_pdf,
+)
+
+from app.tasks.email_tasks import (
+    send_email_task,
+)
+
 INVOICE_DIR = Path("storage") / "invoices"
 
 
-@celery_app.task(name="invoices.generate_pdf")
-def generate_invoice_pdf_task(invoice_id: str) -> dict[str, str]:
-    """Generate the invoice PDF and store it under storage/invoices."""
+@celery_app.task(
+    queue="reports",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries":5},
+)
+def generate_invoice_pdf_task(
+    invoice_id: str,
+):
 
-    db = SessionLocal()
-    try:
-        invoice = get_invoice_by_id(db, UUID(str(invoice_id)))
-        if invoice is None:
-            return {"status": "missing", "invoice_id": invoice_id}
+    with db_session() as db:
 
-        INVOICE_DIR.mkdir(parents=True, exist_ok=True)
-        pdf_path = INVOICE_DIR / f"{invoice.invoice_number}.pdf"
-        pdf_path.write_bytes(generate_invoice_pdf(invoice))
-        return {"status": "generated", "invoice_id": str(invoice.id), "pdf_path": str(pdf_path)}
-    finally:
-        db.close()
-
-
-@celery_app.task(name="invoices.send")
-def send_invoice_task(invoice_id: str) -> dict[str, str]:
-    """Queue invoice delivery to the school's billing contact."""
-
-    db = SessionLocal()
-    try:
-        invoice = get_invoice_by_id(db, UUID(str(invoice_id)))
-        if invoice is None:
-            return {"status": "missing", "invoice_id": invoice_id}
-
-        recipient = invoice.school.contact_email if invoice.school else None
-        if not recipient:
-            return {"status": "skipped", "reason": "missing_recipient", "invoice_id": str(invoice.id)}
-
-        notification = create_notification_record(
+        invoice = get_invoice(
             db,
-            customer_id=invoice.school.customer_id if invoice.school else None,
-            school_id=invoice.school_id,
-            channel="email",
-            recipient=recipient,
-            subject=f"Invoice {invoice.invoice_number}",
-            message=f"Invoice {invoice.invoice_number} is ready for payment.",
+            UUID(invoice_id),
         )
-        return {"status": "queued", "notification_id": str(notification.id)}
-    finally:
-        db.close()
+
+        if invoice is None:
+
+            return
+
+        path = generate_invoice_pdf(
+            invoice,
+        )
+
+        invoice.pdf_path = str(path)
+
+        db.add(invoice)
+
+        return str(path)
+
+@celery_app.task(
+    queue="emails",
+)
+def send_invoice_task(
+    invoice_id: str,
+):
+
+    generate_invoice_pdf_task.delay(
+        invoice_id,
+    )
+
+    send_email_task.delay(
+        invoice_id,
+    )

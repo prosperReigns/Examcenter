@@ -1,0 +1,444 @@
+/* ==========================================================
+   MODAL SYSTEM
+   License Management Server
+   ========================================================== */
+
+:root{
+    --modal-radius:12px;
+    --modal-shadow:0 20px 50px rgba(0,0,0,.25);
+    --modal-border:#e5e7eb;
+    --modal-header:#f8fafc;
+    --modal-footer:#f9fafb;
+    --modal-backdrop:rgba(15,23,42,.55);
+    --transition:.25s ease;
+}
+
+/* ==========================================================
+   Backdrop
+   ========================================================== */
+
+.modal{
+
+    position:fixed;
+
+    inset:0;
+
+    display:none;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:var(--modal-backdrop);
+
+    z-index:3000;
+
+    padding:20px;
+
+    animation:fadeIn .2s ease;
+
+}
+
+/* ==========================================================
+   Visible
+   ========================================================== */
+
+.modal.show{
+
+    display:flex;
+
+}
+
+/* ==========================================================
+   Modal Window
+   ========================================================== */
+
+.modal-content{
+
+    background:#fff;
+
+    width:100%;
+
+    max-width:600px;
+
+    border-radius:var(--modal-radius);
+
+    border:1px solid var(--modal-border);
+
+    box-shadow:var(--modal-shadow);
+
+    overflow:hidden;
+
+    animation:modalSlide .25s ease;
+
+}
+
+/* ==========================================================
+   Sizes
+   ========================================================== */
+
+.modal-sm{
+
+    max-width:400px;
+
+}
+
+.modal-lg{
+
+    max-width:900px;
+
+}
+
+.modal-xl{
+
+    max-width:1200px;
+
+}
+
+/* ==========================================================
+   Header
+   ========================================================== */
+
+.modal-header{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:18px 24px;
+
+    background:var(--modal-header);
+
+    border-bottom:1px solid var(--modal-border);
+
+}
+
+.modal-title{
+
+    font-size:1.1rem;
+
+    font-weight:600;
+
+    color:#111827;
+
+}
+
+/* ==========================================================
+   Close Button
+   ========================================================== */
+
+.modal-close{
+
+    width:36px;
+
+    height:36px;
+
+    border:none;
+
+    background:none;
+
+    cursor:pointer;
+
+    font-size:1.3rem;
+
+    color:#6b7280;
+
+    border-radius:50%;
+
+    transition:.2s;
+
+}
+
+.modal-close:hover{
+
+    background:#e5e7eb;
+
+    color:#111827;
+
+}
+
+/* ==========================================================
+   Body
+   ========================================================== */
+
+.modal-body{
+
+    padding:24px;
+
+    max-height:70vh;
+
+    overflow-y:auto;
+
+}
+
+/* ==========================================================
+   Footer
+   ========================================================== */
+
+.modal-footer{
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    gap:12px;
+
+    padding:18px 24px;
+
+    background:var(--modal-footer);
+
+    border-top:1px solid var(--modal-border);
+
+}
+
+/* ==========================================================
+   Scrollable
+   ========================================================== */
+
+.modal-scroll{
+
+    overflow-y:auto;
+
+}
+
+/* ==========================================================
+   Confirmation Dialog
+   ========================================================== */
+
+.modal-confirm{
+
+    text-align:center;
+
+}
+
+.modal-confirm-icon{
+
+    width:70px;
+
+    height:70px;
+
+    margin:0 auto 20px;
+
+    border-radius:50%;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    font-size:2rem;
+
+    background:#fef3c7;
+
+    color:#d97706;
+
+}
+
+.modal-confirm-title{
+
+    font-size:1.25rem;
+
+    font-weight:700;
+
+    margin-bottom:10px;
+
+}
+
+.modal-confirm-text{
+
+    color:#6b7280;
+
+    line-height:1.6;
+
+}
+
+/* ==========================================================
+   Loading Modal
+   ========================================================== */
+
+.modal-loading{
+
+    text-align:center;
+
+    padding:40px;
+
+}
+
+.modal-spinner{
+
+    width:48px;
+
+    height:48px;
+
+    margin:auto;
+
+    border:4px solid #dbeafe;
+
+    border-top-color:#2563eb;
+
+    border-radius:50%;
+
+    animation:spin .8s linear infinite;
+
+}
+
+.modal-loading-text{
+
+    margin-top:20px;
+
+    font-weight:600;
+
+}
+
+/* ==========================================================
+   Success State
+   ========================================================== */
+
+.modal-success{
+
+    border-top:5px solid #16a34a;
+
+}
+
+/* ==========================================================
+   Warning State
+   ========================================================== */
+
+.modal-warning{
+
+    border-top:5px solid #d97706;
+
+}
+
+/* ==========================================================
+   Danger State
+   ========================================================== */
+
+.modal-danger{
+
+    border-top:5px solid #dc2626;
+
+}
+
+/* ==========================================================
+   Info State
+   ========================================================== */
+
+.modal-info{
+
+    border-top:5px solid #0891b2;
+
+}
+
+/* ==========================================================
+   Fade Animation
+   ========================================================== */
+
+@keyframes fadeIn{
+
+from{
+
+opacity:0;
+
+}
+
+to{
+
+opacity:1;
+
+}
+
+}
+
+/* ==========================================================
+   Slide Animation
+   ========================================================== */
+
+@keyframes modalSlide{
+
+from{
+
+opacity:0;
+
+transform:translateY(-25px) scale(.97);
+
+}
+
+to{
+
+opacity:1;
+
+transform:translateY(0) scale(1);
+
+}
+
+}
+
+/* ==========================================================
+   Spinner
+   ========================================================== */
+
+@keyframes spin{
+
+from{
+
+transform:rotate(0deg);
+
+}
+
+to{
+
+transform:rotate(360deg);
+
+}
+
+}
+
+/* ==========================================================
+   Mobile
+   ========================================================== */
+
+@media(max-width:768px){
+
+.modal{
+
+padding:10px;
+
+}
+
+.modal-content{
+
+max-width:100%;
+
+}
+
+.modal-header{
+
+padding:16px;
+
+}
+
+.modal-body{
+
+padding:18px;
+
+}
+
+.modal-footer{
+
+padding:16px;
+
+flex-direction:column;
+
+}
+
+.modal-footer .btn{
+
+width:100%;
+
+}
+
+}

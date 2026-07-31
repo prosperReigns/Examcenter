@@ -4,8 +4,8 @@ import json
 from datetime import datetime, timezone
 
 from app.celery_app import celery_app
-from app.core.config import get_settings
 from app.database.session import SessionLocal
+from app.core.config import get_settings
 from app.enums.purchase_status import PurchaseStatus
 from app.gateways.flutterwave import FlutterwaveGateway
 from app.gateways.paystack import PaystackGateway
@@ -15,10 +15,34 @@ from app.repositories.payment_repository import (
     persist_payment,
 )
 from app.repositories.purchase_session_repository import get_purchase_session_by_reference, save_purchase_session
+
+from app.repositories.payment_repository import PaymentRepository
 from app.services.license_renewal_service import renew_license_from_payment
 from app.services.purchase_state_machine import validate_transition
 from app.tasks.purchase_tasks import orchestrate_purchase
+from uuid import UUID
 
+from app.tasks.base import db_session
+
+from app.services.payment_service import (
+    verify_payment
+)
+
+from app.services.invoice_service import (
+    mark_invoice_paid,
+)
+
+from app.services.receipt_service import (
+    create_receipt_from_payment,
+)
+
+from app.services.license_renewal_service import (
+    renew_license_after_payment,
+)
+
+from app.tasks.notification_tasks import (
+    queue_notification,
+)
 settings = get_settings()
 
 
@@ -71,73 +95,166 @@ def _mark_payment_successful(db, *, reference: str, transaction_id: str | None, 
 
 
 @celery_app.task(
-    name="payments.verify_flutterwave",
+    queue="payments",
+    bind=True,
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_kwargs={"max_retries": 5},
+    retry_kwargs={"max_retries":5},
 )
-def verify_flutterwave_payment(transaction_id: str) -> dict[str, str | None]:
-    """Verify a Flutterwave transaction and continue purchase or renewal processing."""
+def verify_flutterwave_payment(
+    self,
+    transaction_id: str,
+):
 
-    gateway = FlutterwaveGateway(
-        secret_key=settings.flutterwave_secret_key,
-        base_url=settings.flutterwave_base_url,
-    )
-    response = gateway.verify_payment(transaction_id)
-    data = response.get("data", response)
-    if str(data.get("status", "")).lower() != "successful":
-        return {"status": "ignored", "reason": "payment_not_successful"}
+    with db_session() as db:
 
-    reference = str(data.get("tx_ref") or data.get("payment_reference") or "").strip()
-    if not reference:
-        return {"status": "ignored", "reason": "missing_reference"}
-
-    db = SessionLocal()
-    try:
-        task_id = _mark_purchase_session_paid(db, reference=reference, gateway="flutterwave", data=data)
-        payment_id = _mark_payment_successful(
+        payment = verify_payment(
             db,
-            reference=reference,
-            transaction_id=str(data.get("id") or transaction_id),
-            gateway="flutterwave",
-            data=data,
+            transaction_id,
         )
-        return {"status": "processed", "task_id": task_id, "payment_id": payment_id}
-    finally:
-        db.close()
 
+        if payment is None:
+
+            return
+
+        invoice = mark_invoice_paid(
+            db,
+            payment,
+        )
+
+        receipt = create_receipt_from_payment(
+            db,
+            payment,
+        )
+
+        renew_license_after_payment(
+            db,
+            payment,
+        )
+
+        queue_notification.delay(
+            str(receipt.notification_id)
+        )
+
+        return str(receipt.id)
+@celery_app.task(
+    queue="payments",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries":5},
+)
+def verify_paystack_payment(
+    self,
+    reference: str,
+):
+
+    with db_session() as db:
+
+        payment = verify_payment(
+            db,
+            reference,
+        )
+
+        if payment is None:
+
+            return
+
+        invoice = mark_invoice_paid(
+            db,
+            payment,
+        )
+
+        receipt = create_receipt_from_payment(
+            db,
+            payment,
+        )
+
+        renew_license_after_payment(
+            db,
+            payment,
+        )
+
+        queue_notification.delay(
+            str(receipt.notification_id)
+        )
+
+        return str(receipt.id)
 
 @celery_app.task(
-    name="payments.verify_paystack",
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_kwargs={"max_retries": 5},
+    queue="payments",
 )
-def verify_paystack_payment(reference: str) -> dict[str, str | None]:
-    """Verify a Paystack transaction and continue purchase or renewal processing."""
+def retry_payment_verification(
+    payment_id: str,
+):
 
-    gateway = PaystackGateway(
-        secret_key=settings.paystack_secret_key,
-        base_url=settings.paystack_base_url,
-        webhook_secret=settings.paystack_webhook_secret,
-    )
-    response = gateway.verify_payment(reference)
-    data = response.get("data", response)
-    if str(data.get("status", "")).lower() not in {"success", "successful"}:
-        return {"status": "ignored", "reason": "payment_not_successful"}
+    with db_session() as db:
 
-    resolved_reference = str(data.get("reference") or reference).strip()
-    db = SessionLocal()
-    try:
-        task_id = _mark_purchase_session_paid(db, reference=resolved_reference, gateway="paystack", data=data)
-        transaction_id = str(data.get("id") or data.get("transaction_id") or "").strip() or None
-        payment_id = _mark_payment_successful(
-            db,
-            reference=resolved_reference,
-            transaction_id=transaction_id,
-            gateway="paystack",
-            data=data,
+        from app.repositories.payment_repository import (
+            get_payment_by_id,
         )
-        return {"status": "processed", "task_id": task_id, "payment_id": payment_id}
+
+        payment = get_payment_by_id(
+            db,
+            UUID(payment_id),
+        )
+
+        if payment is None:
+
+            return
+
+        if payment.gateway == "flutterwave":
+
+            verify_flutterwave_payment.delay(
+                payment.gateway_transaction_id
+            )
+
+        elif payment.gateway == "paystack":
+
+            verify_paystack_payment.delay(
+                payment.gateway_reference
+            )
+
+@celery_app.task(
+    queue="payments",
+)
+def verify_pending_payments():
+
+    with db_session() as db:
+
+        from app.repositories.payment_repository import (
+            list_pending_payments,
+        )
+
+        payments = list_pending_payments(db)
+
+        for payment in payments:
+
+            if payment.gateway == "flutterwave":
+
+                verify_flutterwave_payment.delay(
+                    payment.gateway_transaction_id
+                )
+
+            elif payment.gateway == "paystack":
+
+                verify_paystack_payment.delay(
+                    payment.gateway_reference
+                )
+
+@celery_app.task(
+    name="payments.expire_pending",
+)
+def expire_pending_payments():
+
+    db = SessionLocal()
+
+    try:
+
+        repo = PaymentRepository(db)
+
+        return repo.expire_pending_payments()
+
     finally:
+
         db.close()

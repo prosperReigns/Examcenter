@@ -5,7 +5,7 @@ from app.database.session import SessionLocal
 from app.services.outbox_service import cleanup_processed_events, process_pending_outbox_events
 
 
-@celery_app.task(
+@celery_app.task(queue="outbox",
     name="outbox.process_pending",
     autoretry_for=(Exception,),
     retry_backoff=True,

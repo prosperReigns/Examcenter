@@ -65,3 +65,28 @@ class PublicStatusResponse(BaseModel):
     session: PurchaseSessionRead
     license_ready: bool = False
     activation_token: str | None = None
+
+class PurchaseInitializationRequest(BaseModel):
+
+    product_slug: str
+
+    plan_slug: str
+
+    fingerprint: str
+
+    installation_id: str
+
+    computer_name: str
+
+    metadata: dict | None = None
+
+
+class PurchaseInitializationResponse(BaseModel):
+
+    purchase_id: str
+
+    checkout_url: str
+
+    poll_token: str
+
+    expires_at: str

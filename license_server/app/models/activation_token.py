@@ -58,6 +58,25 @@ class ActivationToken(Base):
         DateTime(timezone=True),
     )
 
+    download_nonce: Mapped[str | None] = mapped_column(
+        String(128),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
+    download_nonce_expires_at: Mapped[
+        datetime | None
+    ] = mapped_column(
+        DateTime(timezone=True),
+    )
+
+    download_nonce_used_at: Mapped[
+        datetime | None
+    ] = mapped_column(
+        DateTime(timezone=True),
+    )
+
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
     )
@@ -67,6 +86,6 @@ class ActivationToken(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    purchase_session = relationship("PurchaseSession")
+    purchase_session = relationship("PurchaseSession", foreign_keys="ActivationToken.purchase_session_id")
 
     license = relationship("License")

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Payment Received</title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <style>
+
+        body{
+
+            margin:0;
+
+            font-family:Arial,Helvetica,sans-serif;
+
+            background:#f4f6f9;
+
+            display:flex;
+
+            justify-content:center;
+
+            align-items:center;
+
+            height:100vh;
+
+        }
+
+        .card{
+
+            width:520px;
+
+            max-width:92%;
+
+            background:#fff;
+
+            border-radius:12px;
+
+            padding:40px;
+
+            box-shadow:0 10px 25px rgba(0,0,0,.08);
+
+            text-align:center;
+
+        }
+
+        .icon{
+
+            font-size:64px;
+
+            margin-bottom:20px;
+
+        }
+
+        .success{
+
+            color:#0f9d58;
+
+        }
+
+        .pending{
+
+            color:#f4b400;
+
+        }
+
+        .failed{
+
+            color:#d93025;
+
+        }
+
+        h1{
+
+            margin-bottom:10px;
+
+        }
+
+        p{
+
+            color:#555;
+
+            line-height:1.7;
+
+        }
+
+        .reference{
+
+            margin-top:25px;
+
+            padding:12px;
+
+            background:#f7f7f7;
+
+            border-radius:8px;
+
+            font-family:monospace;
+
+            word-break:break-word;
+
+        }
+
+        .footer{
+
+            margin-top:30px;
+
+            font-size:14px;
+
+            color:#888;
+
+        }
+
+        .spinner {
+
+            width:40px;
+
+            height:40px;
+
+            border:4px solid #ddd;
+
+            border-top-color:#2563eb;
+
+            border-radius:50%;
+
+            animation:spin 1s linear infinite;
+
+            margin:auto;
+
+        }
+
+        @keyframes spin {
+
+            from {
+
+                transform:rotate(0deg);
+
+            }
+
+            to {
+
+                transform:rotate(360deg);
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+{% if status == "successful" %}
+
+    <div class="icon success">
+
+        ✓
+
+    </div>
+
+    <h1>Payment Received</h1>
+
+    <p id="status">
+
+        Thank you.
+
+        Your payment has been received and is now being verified.
+
+    </p>
+
+    <p>
+
+        Your license is being generated automatically.
+
+    </p>
+    <div class="spinner"></div>
+{% elif status == "cancelled" %}
+
+    <div class="icon failed">
+
+        ✕
+
+    </div>
+
+    <h1>Payment Cancelled</h1>
+
+    <p>
+
+        Your payment was cancelled.
+
+        Return to the desktop application if you wish to try again.
+
+    </p>
+
+{% else %}
+
+    <div class="icon pending">
+
+        ⏳
+
+    </div>
+
+    <h1>Processing Payment</h1>
+
+    <p>
+
+        We are confirming your payment.
+
+        This usually takes only a few seconds.
+
+    </p>
+
+{% endif %}
+
+{% if tx_ref %}
+
+<div class="reference">
+
+Reference:<br>
+
+<strong>{{ tx_ref }}</strong>
+
+</div>
+
+{% endif %}
+
+<div class="footer">
+
+You may now return to the desktop application.
+
+The application will automatically detect when your license is ready.
+
+</div>
+
+</div>
+
+<script>
+
+const pollToken = "{{ poll_token }}";
+let retries = 0;
+
+const MAX_RETRIES = 40;
+async function checkStatus() {
+
+     retries++;
+
+    if (retries > MAX_RETRIES) {
+
+        document.getElementById("status").innerText =
+            "Still preparing your license. You may safely close this page and reopen it later using the purchase link.";
+
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            `/api/public/purchase/${pollToken}`
+        );
+
+        const result = await response.json();
+
+        if (result.status === "completed") {
+
+            window.location.href =
+                `/download/${pollToken}`;
+
+            return;
+        }
+
+       switch(result.status){
+
+        case "payment_verified":
+
+            status.innerText =
+                "Payment verified...";
+
+            break;
+
+        case "customer_created":
+
+            status.innerText =
+                "Creating customer...";
+
+            break;
+
+        case "school_created":
+
+            status.innerText =
+                "Creating school...";
+
+            break;
+
+        case "license_created":
+
+            status.innerText =
+                "Generating license...";
+
+            break;
+
+        case "receipt_created":
+
+            status.innerText =
+                "Finalizing...";
+
+            break;
+
+        }
+
+    } catch (err) {
+
+        console.error(err);
+
+    }
+
+    setTimeout(checkStatus, 3000);
+
+}
+
+checkStatus();
+
+</script>
+</body>
+</html>

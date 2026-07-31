@@ -1,6 +1,8 @@
 from uuid import UUID
+import json
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, delete
 from sqlalchemy.orm import Session
 
 from app.models.payment import Payment
@@ -261,3 +263,182 @@ def get_payment_by_id(
     payment_id: UUID,
 ) -> Payment | None:
     return get_payment(db, payment_id)
+
+def mark_paid(
+    self,
+    payment,
+    gateway_response,
+):
+
+    payment.status = "paid"
+
+    payment.gateway_response = gateway_response
+
+    self.db.commit()
+
+    self.db.refresh(payment)
+
+    return payment
+
+
+def mark_failed(
+    self,
+    payment,
+    gateway_response=None,
+):
+
+    payment.status = "failed"
+
+    payment.gateway_response = gateway_response
+
+    self.db.commit()
+
+    self.db.refresh(payment)
+
+    return payment
+
+
+def expire_stale_pending_payments(
+    db: Session,
+    *,
+    older_than_hours: int = 24,
+) -> int:
+
+    cutoff = (
+        datetime.now(timezone.utc)
+        - timedelta(hours=older_than_hours)
+    )
+
+    payments = db.scalars(
+
+        select(Payment).where(
+
+            Payment.status == "pending",
+
+            Payment.created_at < cutoff,
+
+        )
+
+    ).all()
+
+    for payment in payments:
+
+        payment.status = "expired"
+
+        db.add(payment)
+
+    db.flush()
+
+    return len(payments)
+
+def delete_orphan_pending_payments(
+    db: Session,
+) -> int:
+
+    result = db.execute(
+
+        delete(Payment).where(
+
+            Payment.status == "expired",
+
+            Payment.license_id.is_(None),
+
+        )
+
+    )
+
+    return result.rowcount or 0
+
+def get_pending_by_purchase_session(
+    db: Session,
+    purchase_session_id,
+) -> Payment | None:
+
+    statement = (
+
+        select(Payment)
+
+        .where(
+
+            Payment.purchase_session_id
+            == purchase_session_id,
+
+            Payment.status == "pending",
+
+        )
+
+        .order_by(
+            Payment.created_at.desc()
+        )
+
+    )
+
+    return db.scalar(statement)
+
+def get_pending_by_purchase(
+    self,
+    purchase_id,
+):
+    return (
+        self.db.query(Payment)
+        .filter(
+            Payment.purchase_session_id == purchase_id,
+            Payment.status == "pending",
+        )
+        .first()
+    )
+
+def update_gateway_response(
+    self,
+    payment,
+    gateway_response,
+):
+    payment.gateway_response = json.dumps(
+        gateway_response
+    )
+
+    payment.authorization_url = (
+        gateway_response["data"]["authorization_url"]
+    )
+
+    self.db.commit()
+
+    self.db.refresh(payment)
+
+    return payment
+
+def expire_pending_payments(
+    self,
+):
+    cutoff = datetime.now(
+        timezone.utc
+    ) - timedelta(hours=24)
+
+    payments = (
+        self.db.query(Payment)
+        .filter(
+            Payment.status == "pending",
+            Payment.created_at < cutoff,
+        )
+        .all()
+    )
+
+    for payment in payments:
+
+        payment.status = "expired"
+
+    self.db.commit()
+
+    return len(payments)
+
+def get_by_idempotency_key(
+    self,
+    key,
+):
+    return (
+        self.db.query(Payment)
+        .filter(
+            Payment.idempotency_key == key
+        )
+        .first()
+    )

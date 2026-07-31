@@ -1,8 +1,10 @@
+import logging
 from app.repositories.admin_repository import get_admin_count, create_admin
-from app.core.config import get_settings
+from app.core.config import get_settings, validate_production_settings
 from app.auth.security import get_password_hash
 from app.database.session import SessionLocal
 
+logger = logging
 settings = get_settings()
 
 def bootstrap_application():
@@ -24,3 +26,18 @@ def bootstrap_application():
             )
 
             db.commit()
+
+async def production_startup_checks():
+    logger.info("Running production startup checks")
+
+    # Verify configuration
+    validate_production_settings(settings)
+
+    # Verify database connectivity
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+    finally:
+        db.close()
+
+    logger.info("Production startup checks completed successfully")

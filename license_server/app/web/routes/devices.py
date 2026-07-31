@@ -60,6 +60,7 @@ def device_list_page(
             "page": page,
             "status": status,
             "search": search,
+            "admin": admin
         },
     )
 
@@ -89,6 +90,7 @@ def device_details_page(
             "title": "Device Details",
             "admin": admin,
             "device": device,
+            
         },
     )
 

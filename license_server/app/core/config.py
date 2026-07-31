@@ -37,11 +37,10 @@ class Settings(BaseSettings):
     payment_callback_url: str = ""
     company_name: str = "Your Company"
     support_email: str = "support@example.com"
-    license_currency: str = "USD"
-    monthly_price: float = 0.0
-    quarterly_price: float = 0.0
-    annual_price: float = 0.0
-    lifetime_price: float = 0.0
+    license_currency: str = "NGN"
+    six_month_price: float = 0.0
+    one_year_price: float = 0.0
+    two_year_price: float = 0.0
     demo_license_duration_days: int = 7
     monthly_license_duration_days: int = 30
     quarterly_license_duration_days: int = 90
@@ -53,10 +52,26 @@ class Settings(BaseSettings):
     bootstrap_admin_password: str = ""
     bootstrap_admin_role: str = Roles.SUPER_ADMIN
 
+    
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
 
+def validate_production_settings(settings: Settings) -> None:
+        required = {
+            "flutterwave_secret_key": settings.flutterwave_secret_key,
+            "flutterwave_hash": settings.flutterwave_hash,
+            "payment_provider": settings.PAYMENT_PROVIDER,
+            "payment_callback_url": settings.PAYMENT_CALLBACK_URL,
+        }
+
+        missing = [key for key, value in required.items() if not value]
+
+        if missing:
+            raise RuntimeError(
+                f"Missing required production settings: {', '.join(missing)}"
+            )
 
 settings = get_settings()
+validate_production_settings(settings)

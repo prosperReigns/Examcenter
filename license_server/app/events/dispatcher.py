@@ -8,15 +8,15 @@ from app.events.handlers.payment_handlers import (
     renew_license_handler,
 )
 
-from app.events.handlers.receipt_handlers import (
+from license_server.app.events.handlers.receipt_handler import (
     generate_receipt_handler,
 )
 
-from app.events.handlers.notification_handlers import (
+from license_server.app.events.handlers.notification_handler import (
     notify_customer_handler,
 )
 
-from app.events.handlers.analytics_handlers import (
+from license_server.app.events.handlers.analytics_handler import (
     analytics_handler,
 )
 

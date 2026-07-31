@@ -1,0 +1,211 @@
+{% extends "base/base_public.html" %}
+
+{% block title %}
+Purchase License
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <div class="row justify-content-center">
+
+        <div class="col-lg-8">
+
+            <div class="card shadow-lg border-0">
+
+                <div class="card-header bg-primary text-white">
+
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+
+                            <h3 class="mb-0">
+
+                                <i class="fas fa-key"></i>
+
+                                Purchase License
+
+                            </h3>
+
+                            <small>
+
+                                Complete your purchase to activate your CBT software.
+
+                            </small>
+
+                        </div>
+
+                        <span class="badge bg-light text-dark">
+
+                            {{ purchase.status|capitalize }}
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+                <div class="card-body">
+
+                    <div class="alert alert-info">
+
+                        <strong>
+
+                            Purchase Number
+
+                        </strong>
+
+                        <br>
+
+                        {{ purchase.purchase_number }}
+
+                    </div>
+
+                    <table class="table table-bordered">
+
+                        <tr>
+
+                            <th width="35%">
+
+                                Product
+
+                            </th>
+
+                            <td>
+
+                                {{ purchase.product_name }}
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>
+
+                                Plan
+
+                            </th>
+
+                            <td>
+
+                                {{ purchase.plan_name }}
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>
+
+                                Duration
+
+                            </th>
+
+                            <td>
+
+                                {{ purchase.duration_months }}
+
+                                Month(s)
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>
+
+                                Price
+
+                            </th>
+
+                            <td>
+
+                                {{ purchase.currency }}
+
+                                {{ "{:,.2f}".format(purchase.price) }}
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>
+
+                                Computer
+
+                            </th>
+
+                            <td>
+
+                                {{ purchase.computer_name }}
+
+                            </td>
+
+                        </tr>
+
+                        <tr>
+
+                            <th>
+
+                                Session Expires
+
+                            </th>
+
+                            <td>
+
+                                {{ purchase.expires_at }}
+
+                            </td>
+
+                        </tr>
+
+                    </table>
+
+                    <hr>
+
+                    <div class="alert alert-warning">
+
+                        <i class="fas fa-lock"></i>
+
+                        Your license will be automatically activated on this computer after successful payment.
+
+                    </div>
+
+                    <div class="d-grid gap-2">
+
+                        <a
+
+                            href="/activation/{{ purchase.purchase_id }}/payment"
+
+                            class="btn btn-success btn-lg">
+
+                            <i class="fas fa-credit-card"></i>
+
+                            Continue To Payment
+
+                        </a>
+
+                    </div>
+
+                </div>
+
+                <div class="card-footer text-center text-muted">
+
+                    Secure payment powered by your License Server
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

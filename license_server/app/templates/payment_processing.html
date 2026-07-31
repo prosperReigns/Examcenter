@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8">
+
+<title>Processing Payment</title>
+
+<meta http-equiv="refresh" content="5">
+
+<style>
+
+body{
+
+font-family:Arial;
+
+background:#f7f8fc;
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+height:100vh;
+
+margin:0;
+
+}
+
+.card{
+
+background:white;
+
+padding:40px;
+
+border-radius:12px;
+
+width:520px;
+
+text-align:center;
+
+box-shadow:0 8px 20px rgba(0,0,0,.1);
+
+}
+
+.spinner{
+
+font-size:52px;
+
+margin-bottom:20px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<div class="spinner">
+
+⏳
+
+</div>
+
+<h2>
+
+Confirming Payment...
+
+</h2>
+
+<p>
+
+Flutterwave has redirected you back.
+
+We are waiting for secure confirmation
+from the payment gateway.
+
+</p>
+
+<p id="processing-message">
+
+Please keep this page open.
+
+Your payment is being securely verified.
+
+Your license will be generated automatically.
+
+</p>
+
+<div
+
+    id="timeout-message"
+
+    style="display:none; margin-top:25px;"
+
+>
+
+    <h3>
+
+        Still Processing...
+
+    </h3>
+
+    <p>
+
+        Your payment may still be processing.
+
+    </p>
+
+    <p>
+
+        You can safely close this browser window
+
+        and return to the desktop application.
+
+    </p>
+
+    <p>
+
+        The desktop application will continue
+
+        checking automatically and will notify
+
+        you when your license is ready.
+
+    </p>
+
+</div>
+
+</div>
+
+<script>
+
+const checkoutToken = "{{ checkout_token }}";
+
+async function pollPurchase(){
+
+    if(!checkoutToken){
+
+        return;
+
+    }
+
+    try{
+
+        const response = await fetch(
+
+            `/api/public/checkout/${checkoutToken}/status`
+
+        );
+
+        if(!response.ok){
+
+            return;
+
+        }
+
+        const data = await response.json();
+
+        if(
+
+            data.status === "completed"
+
+        ){
+
+            clearInterval(interval);
+
+            window.location.href =
+
+                `/api/public/payment/completed?checkout_token=${checkoutToken}`;
+
+        }
+        if(
+
+            data.status === "failed"
+
+        ){
+
+            clearInterval(interval);
+
+            window.location.href =
+
+                "/api/public/payment/callback?status=failed";
+
+        }
+
+        if(
+
+            data.status === "cancelled"
+
+        ){
+
+            clearInterval(interval);
+
+            window.location.href =
+
+                "/api/public/payment/callback?status=cancelled";
+
+        }
+
+        if(
+
+            data.status === "expired"
+
+        ){
+
+            clearInterval(interval);
+
+            window.location.href =
+
+                "/api/public/payment/callback?status=expired";
+
+        }
+
+    }
+
+    catch(e){
+
+        console.log(e);
+
+    }
+
+}
+
+let attempts = 0;
+
+const MAX_ATTEMPTS = 60;
+
+const interval = setInterval(
+
+    async () => {
+
+        attempts++;
+
+        await pollPurchase();
+
+        if(attempts >= MAX_ATTEMPTS){
+
+            clearInterval(interval);
+
+            document.getElementById(
+                "processing-message"
+            ).style.display = "none";
+
+            document.getElementById(
+                "timeout-message"
+            ).style.display = "block";
+
+        }
+
+    },
+
+    3000,
+
+);
+
+pollPurchase();
+
+</script>
+</body>
+
+</html>

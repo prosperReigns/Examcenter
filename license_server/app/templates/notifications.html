@@ -1,0 +1,111 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+Notifications
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+
+<h1>
+
+Notifications
+
+</h1>
+
+<a
+class="btn btn-primary"
+href="/notifications/compose"
+>
+
+Compose
+
+</a>
+
+</div>
+
+<div class="card">
+
+<table class="table">
+
+<thead>
+
+<tr>
+
+<th>Subject</th>
+
+<th>Channel</th>
+
+<th>Status</th>
+
+<th>Recipient</th>
+
+<th>Date</th>
+
+<th></th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for notification in notifications %}
+
+<tr>
+
+<td>
+
+{{ notification.subject }}
+
+</td>
+
+<td>
+
+{{ notification.channel }}
+
+</td>
+
+<td>
+
+{{ notification.status }}
+
+</td>
+
+<td>
+
+{{ notification.recipient }}
+
+</td>
+
+<td>
+
+{{ notification.created_at }}
+
+</td>
+
+<td>
+
+<a
+href="/notifications/{{ notification.id }}"
+class="btn btn-sm"
+>
+
+View
+
+</a>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% endblock %}

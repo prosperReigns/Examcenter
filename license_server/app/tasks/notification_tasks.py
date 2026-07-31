@@ -8,7 +8,7 @@ from app.database.session import SessionLocal
 from app.repositories.notification_repository import get_notification, persist_notification
 
 
-@celery_app.task(
+@celery_app.task(queue="notifications",
     name="notifications.dispatch",
     autoretry_for=(Exception,),
     retry_backoff=True,

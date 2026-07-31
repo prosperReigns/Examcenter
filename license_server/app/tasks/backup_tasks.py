@@ -11,7 +11,7 @@ from app.repositories.dashboard_repository import get_dashboard_stats
 BACKUP_DIR = Path("storage") / "backups"
 
 
-@celery_app.task(name="backups.database_metadata")
+@celery_app.task(name="backups.database_metadata", queue="backups")
 def database_metadata_backup() -> dict[str, str]:
     """Write a lightweight operational snapshot for backup monitoring."""
 
@@ -34,3 +34,15 @@ def database_metadata_backup() -> dict[str, str]:
         return {"status": "created", "path": str(path)}
     finally:
         db.close()
+
+def run_database_backup():
+    pass
+
+def cleanup_old_backups():
+    pass
+
+def verify_backup():
+    pass
+
+def backup_uploaded_files():
+    pass

@@ -1,0 +1,28 @@
+<div class="empty-state">
+
+    <h3>
+
+        {{ title }}
+
+    </h3>
+
+    <p>
+
+        {{ message }}
+
+    </p>
+
+    {% if button_url %}
+
+    <a
+        href="{{ button_url }}"
+        class="btn btn-primary"
+    >
+
+        {{ button_text }}
+
+    </a>
+
+    {% endif %}
+
+</div>

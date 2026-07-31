@@ -1,12 +1,17 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID as PyUUID
 from uuid import uuid4
+import secrets
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
+
+
+def generate_poll_token() -> str:
+    return secrets.token_urlsafe(32)
 
 
 class PurchaseSession(Base):
@@ -28,12 +33,16 @@ class PurchaseSession(Base):
     customer_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     customer_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     school_name: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
-    payment_reference: Mapped[str | None] = mapped_column(
-        String(100),
+    payment_reference: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
+    poll_token: Mapped[str] = mapped_column(
+        String(128),
         unique=True,
-        nullable=True,
+        nullable=False,
         index=True,
+        default=generate_poll_token,
     )
+    checkout_token: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    poll_token: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     gateway: Mapped[str | None] = mapped_column(String(50), nullable=True)
     gateway_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gateway_transaction_id: Mapped[str | None] = mapped_column(String(150), nullable=True)

@@ -1,0 +1,41 @@
+{% if status=="active" %}
+
+<span class="badge badge-success">
+
+Active
+
+</span>
+
+{% elif status=="expired" %}
+
+<span class="badge badge-danger">
+
+Expired
+
+</span>
+
+{% elif status=="trial" %}
+
+<span class="badge badge-warning">
+
+Trial
+
+</span>
+
+{% elif status=="suspended" %}
+
+<span class="badge badge-secondary">
+
+Suspended
+
+</span>
+
+{% else %}
+
+<span class="badge">
+
+{{ status }}
+
+</span>
+
+{% endif %}

@@ -1,8 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+import secrets
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from app.core.config import get_settings
+from app.core.pricing import (
+    get_plan,
+)
 
 from app.enums.purchase_status import PurchaseStatus
 from app.models.purchase_session import PurchaseSession
@@ -73,14 +78,20 @@ def start_purchase(db: Session, payload: PurchaseSessionCreate) -> PurchaseSessi
             raise HTTPException(status_code=status.HTTP_410_GONE, detail="Purchase session has expired.")
         return _read_with_token(db, existing)
 
+    checkout_token = secrets.token_urlsafe(32)
+    poll_token = secrets.token_urlsafe(32)
+
+    plan = get_plan(
+                payload.plan_code
+            )
     purchase_session = PurchaseSession(
         fingerprint=payload.fingerprint.strip(),
         product_code=payload.product_code.strip(),
         version=payload.version.strip(),
         plan_code=payload.plan_code.strip().lower(),
-        duration_months=payload.duration_months,
-        amount=payload.amount,
-        currency=payload.currency.strip().upper(),
+        duration_months=plan.duration_months,
+        amount=plan.price,
+        currency=plan.currency,
         customer_name=payload.customer_name.strip(),
         customer_email=str(payload.customer_email).lower().strip(),
         customer_phone=payload.customer_phone.strip() if payload.customer_phone else None,
@@ -91,6 +102,8 @@ def start_purchase(db: Session, payload: PurchaseSessionCreate) -> PurchaseSessi
         completed=False,
         retry_count=0,
         expires_at=_utcnow() + timedelta(hours=24),
+        checkout_token=checkout_token,
+        poll_token=secrets.token_urlsafe(32),
     )
     create_purchase_session(db, purchase_session)
     record_audit_event(
@@ -98,10 +111,13 @@ def start_purchase(db: Session, payload: PurchaseSessionCreate) -> PurchaseSessi
         action="purchase_session_started",
         entity_type="purchase_session",
         entity_id=str(purchase_session.id),
-        description="Self-service purchase session started.",
+        description=("Self-service purchase session started.",
+        f"Started {plan.name} purchase "
+        f"({plan.price} {plan.currency})")
     )
     db.commit()
     db.refresh(purchase_session)
+    # poll_token is now available on the returned model
     return purchase_session
 
 

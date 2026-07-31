@@ -11,7 +11,7 @@ from app.models.notification import Notification
 from app.services.audit_service import record_audit_event
 
 
-@celery_app.task(name="renewals.expire_licenses")
+@celery_app.task(name="renewals.expire_licenses", queue="renewals")
 def expire_licenses() -> dict[str, int]:
     """Mark active, time-limited licenses as expired once their expiry passes."""
 
@@ -48,7 +48,7 @@ def expire_licenses() -> dict[str, int]:
         db.close()
 
 
-@celery_app.task(name="renewals.send_expiry_reminders")
+@celery_app.task(name="renewals.send_expiry_reminders", queue="renewals")
 def send_expiry_reminders(*, days: int = 30) -> dict[str, int]:
     """Create email notifications for active licenses expiring soon."""
 
@@ -126,3 +126,15 @@ def send_expiry_reminders(*, days: int = 30) -> dict[str, int]:
         raise
     finally:
         db.close()
+
+def renew_trial_license():
+    pass
+
+def auto_generate_invoice():
+    pass
+
+def renew_license_after_payment():
+    pass
+
+def expire_trials():
+    pass

@@ -14,6 +14,9 @@ from .health import router as health_router
 from .devices import router as devices_router
 from .auth import router as auth_router
 from .audit_logs import router as audit_logs_router
+from .notifications import router as notifications_router
+from .outbox import router as outbox_router
+from .public_activation import router as public_activation_router
 
 def register_web_routes(app: FastAPI):
     app.include_router(dashboard_router)
@@ -30,3 +33,6 @@ def register_web_routes(app: FastAPI):
     app.include_router(devices_router)
     app.include_router(receipts_router)
     app.include_router(audit_logs_router)
+    app.include_router(notifications_router)
+    app.include_router(outbox_router)
+    app.include_router(public_activation_router)

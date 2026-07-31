@@ -17,6 +17,9 @@
     <link rel="stylesheet" href="{{ url_for('static', path='css/badges.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/alerts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/modals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/modal.css') }}">
 </head>
 <body class="app-shell">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary">
@@ -60,7 +63,31 @@
             </div>
         {% endif %}
         {% block content %}{% endblock %}
+        <div class="wrapper">
+
+    {% include "partials/sidebar.html" %}
+
+    <div class="main">
+
+        {% include "partials/topbar.html" %}
+
+        <main class="content">
+
+            {% block main %}
+
+            {% endblock %}
+
+        </main>
+
+        {% include "partials/footer.html" %}
+
+    </div>
+
+</div>
     </main>
+    {% include "components/modal_confirm.html" %}
+    {% include "components/status_badge.html" %}
+{% include "components/loading_spinner.html" %}
 
     <script src="{{ url_for('static', path='js/app.js') }}"></script>
     <script src="{{ url_for('static', path='js/sidebar.js') }}"></script>
@@ -81,6 +108,11 @@
 
 <script src="{{ url_for('static', path='js/activation_tokens.js') }}"></script>
 
+<script src="{{ url_for('static', path='js/modal.js') }}"></script>
+
+<script src="{{ url_for('static', path='js/forms.js') }}"></script>
+
+<script src="/static/js/search.js"></script>
 {% endblock %}
 </body>
 </html>

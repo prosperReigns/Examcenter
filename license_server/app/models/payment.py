@@ -64,6 +64,11 @@ class Payment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         String(40),
         nullable=True,
     )
+    authorization_url: Mapped[str | None] =mapped_column(
+        String(500),
+        nullable=True,
+    )
+    idempotency_key = mapped_column(String(500), nullable=True)
     invoice_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     raw_payload: Mapped[str | None] = mapped_column(Text, nullable=True)

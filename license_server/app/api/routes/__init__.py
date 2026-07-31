@@ -25,6 +25,7 @@ from .notifications import router as notification_router
 from .public_activation import router as public_activation_router
 
 
+
 def register_routes(app: FastAPI) -> None:
     app.include_router(auth_router)
     app.include_router(devices_router)
@@ -49,6 +50,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(admin_router)
     app.include_router(webhook_router)
     app.include_router(public_activation_router)
+    
 
 
 __all__ = [

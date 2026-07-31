@@ -17,3 +17,5 @@ from .receipt_repository import *
 from .school_repository import *
 from .setting_repository import *
 from .webhook_repository import *
+from .webhook_event_repository import *
+from .purchase_session_repository import *

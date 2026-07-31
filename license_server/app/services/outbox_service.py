@@ -189,3 +189,8 @@ def cleanup_processed_events(db,):
     db.commit()
 
     return deleted
+
+def get_outbox_list():
+    pass
+def get_outbox_message():
+    pass

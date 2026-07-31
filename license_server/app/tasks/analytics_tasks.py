@@ -5,7 +5,7 @@ from app.database.session import SessionLocal
 from app.repositories.dashboard_repository import get_dashboard_stats
 
 
-@celery_app.task(name="analytics.snapshot")
+@celery_app.task(name="analytics.snapshot", queue="analytics")
 def analytics_snapshot() -> dict:
     """Return a compact dashboard snapshot for scheduled monitoring."""
 
@@ -14,3 +14,18 @@ def analytics_snapshot() -> dict:
         return get_dashboard_stats(db)
     finally:
         db.close()
+
+def generate_daily_statistics():
+    pass
+    
+def generate_monthly_statistics():
+    pass
+
+def generate_revenue_report():
+    pass
+
+def generate_activation_report():
+    pass
+
+def generate_customer_growth_report():
+    pass

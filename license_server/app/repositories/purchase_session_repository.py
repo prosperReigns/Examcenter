@@ -5,7 +5,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models.purchase_session import PurchaseSession
-
+from app.enums.purchase_status import PurchaseStatus
 
 def create_purchase_session(db: Session, purchase_session: PurchaseSession) -> PurchaseSession:
     db.add(purchase_session)
@@ -20,12 +20,58 @@ def save_purchase_session(db: Session, purchase_session: PurchaseSession) -> Pur
     return purchase_session
 
 
+def get_purchase_session_by_id_for_update(
+    db: Session,
+    session_id: UUID,
+) -> PurchaseSession | None:
+
+    statement = (
+        select(PurchaseSession)
+        .where(
+            PurchaseSession.id == session_id
+        )
+        .with_for_update()
+    )
+
+    return db.scalar(statement)
+
+
 def get_purchase_session_by_id(db: Session, session_id: UUID) -> PurchaseSession | None:
     return db.get(PurchaseSession, session_id)
+
+def get_purchase_session_for_update(
+    db: Session,
+    payment_reference: str,
+) -> PurchaseSession | None:
+
+    statement = (
+        select(PurchaseSession)
+        .where(
+            PurchaseSession.payment_reference
+            == payment_reference
+        )
+        .with_for_update()
+    )
+
+    return db.scalar(statement)
 
 
 def get_purchase_session_by_reference(db: Session, payment_reference: str) -> PurchaseSession | None:
     statement = select(PurchaseSession).where(PurchaseSession.payment_reference == payment_reference)
+    return db.scalar(statement)
+
+def get_purchase_session_by_poll_token(
+    db: Session,
+    poll_token: str,
+) -> PurchaseSession | None:
+
+    statement = (
+        select(PurchaseSession)
+        .where(
+            PurchaseSession.poll_token == poll_token
+        )
+    )
+
     return db.scalar(statement)
 
 
@@ -121,5 +167,129 @@ def expire_stale_purchase_sessions(
     ).all()
     for purchase_session in sessions:
         purchase_session.status = "expired"
+        purchase_session.completed = False
+
+        purchase_session.updated_at = datetime.now(
+            timezone.utc
+        )
+
         save_purchase_session(db, purchase_session)
     return len(sessions)
+
+def mark_paid(
+    self,
+    purchase,
+):
+
+    purchase.status = PurchaseStatus.PAYMENT_VERIFIED.value
+
+    self.db.commit()
+
+    self.db.refresh(
+        purchase
+    )
+
+    return purchase
+
+
+def mark_completed(
+    self,
+    purchase,
+):
+
+    purchase.status = PurchaseStatus.COMPLETED.value
+
+    self.db.commit()
+
+    self.db.refresh(
+        purchase
+    )
+
+    return purchase
+
+class PurchaseSessionRepository:
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_checkout_token(
+        self,
+        checkout_token: str,
+    ):
+        statement = (
+            select(PurchaseSession)
+            .where(
+                PurchaseSession.checkout_token == checkout_token
+            )
+        )
+
+        return self.db.scalar(statement)
+
+    def mark_payment_pending(
+        self,
+        purchase,
+    ):
+
+        purchase.status = PurchaseStatus.PAYMENT_PENDING.value
+
+        save_purchase_session(
+            self.db,
+            purchase,
+        )
+
+        self.db.commit()
+
+        self.db.refresh(
+            purchase,
+        )
+
+        return purchase
+
+    def save(
+        self,
+        purchase,
+    ):
+
+        save_purchase_session(
+            self.db,
+            purchase,
+        )
+
+        self.db.commit()
+
+        self.db.refresh(
+            purchase,
+        )
+
+        return purchase
+
+    def increment_retry(
+        self,
+        purchase,
+    ):
+
+        increment_retry_count(
+            self.db,
+            purchase,
+        )
+
+        self.db.commit()
+
+        self.db.refresh(
+            purchase,
+        )
+
+        return 
+
+    def get_checkout_session(
+        db: Session,
+        checkout_token: str,
+    ):
+
+        statement = select(
+            PurchaseSession
+        ).where(
+            PurchaseSession.checkout_token == checkout_token
+        )
+
+        return db.scalar(statement)

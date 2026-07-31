@@ -14,6 +14,21 @@ from app.services.audit_service import (
     record_audit_event,
 )
 
+from app.services.activation_token_service import (
+    ActivationTokenService,
+)
+
+from app.repositories.activation_token_repository import (
+
+    delete_expired,
+    delete_used_before,
+
+)
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 def get_db() -> Session:
     """
     Create a database session for background tasks.
@@ -202,6 +217,105 @@ def activation_token_statistics():
             "used": activation_token_repository.count_used(db),
 
         }
+
+    finally:
+
+        db.close()
+
+@celery_app.task(
+
+    bind=True,
+
+    autoretry_for=(Exception,),
+
+    retry_backoff=True,
+
+    retry_kwargs={"max_retries": 5},
+
+)
+def generate_activation_token_task(
+
+    self,
+
+    purchase_session_id: str,
+
+):
+
+    db = SessionLocal()
+
+    try:
+
+        service = (
+            ActivationTokenService(
+                db
+            )
+        )
+
+        token = (
+            service.create_for_purchase(
+                purchase_session_id
+            )
+        )
+
+        return {
+
+            "token_id":
+            str(token.id),
+
+            "status":
+            "success",
+
+        }
+
+    finally:
+
+        db.close()
+
+@celery_app.task(
+
+    bind=True,
+
+    name="activation.cleanup",
+
+)
+
+def cleanup_activation_tokens(self):
+
+    db = SessionLocal()
+
+    try:
+
+        expired = delete_expired(db)
+
+        old_used = delete_used_before(
+
+            db,
+
+            datetime.now(timezone.utc)
+
+            - timedelta(days=30),
+
+        )
+
+        db.commit()
+
+        logger.info(
+            "Activation cleanup complete. "
+            "Expired=%s Used=%s",
+            expired,
+            old_used,
+        )
+
+        return {
+            "expired": expired,
+            "used": old_used,
+        }
+
+    except Exception:
+
+        db.rollback()
+
+        raise
 
     finally:
 

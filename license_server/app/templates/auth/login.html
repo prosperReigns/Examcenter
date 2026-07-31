@@ -1,101 +1,11 @@
-{% extends "base/base_guest.html" %}
+{% extends "layouts/auth.html" %}
+
+{% block title %}
+Login
+{% endblock %}
 
 {% block content %}
 
-<div class="card shadow mt-5">
-
-    <div class="card-body p-4">
-
-        <div class="text-center mb-4">
-
-            <h3>
-
-                {{ settings.app_name }}
-
-            </h3>
-
-            <p class="text-muted">
-
-                Administrator Login
-
-            </p>
-
-        </div>
-
-        <form
-            action="/login"
-            method="post"
-        >
-
-            <div class="mb-3">
-
-                <label class="form-label">
-
-                    Email
-
-                </label>
-
-                <input
-                    class="form-control"
-                    type="email"
-                    name="email"
-                    required
-                >
-
-            </div>
-
-            <div class="mb-4">
-
-                <label class="form-label">
-
-                    Password
-
-                </label>
-
-                <input
-                    class="form-control"
-                    type="password"
-                    name="password"
-                    required
-                >
-
-            </div>
-
-            <div class="form-check mb-4">
-
-                <input
-                    class="form-check-input"
-                    type="checkbox"
-                    name="remember_me"
-                    id="remember"
-                >
-
-                <label
-                    class="form-check-label"
-                    for="remember"
-                >
-
-                    Remember Me
-
-                </label>
-
-            </div>
-
-            <button
-                class="btn btn-primary w-100"
-                type="submit"
-            >
-
-                <i class="bi bi-box-arrow-in-right"></i>
-
-                Login
-
-            </button>
-
-        </form>
-
-    </div>
-
-</div>
+{% include "components/login_card.html" %}
 
 {% endblock %}
