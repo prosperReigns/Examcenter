@@ -7,6 +7,7 @@
 
 class MachineFingerprint
 {
+    public const VERSION = 2;
     /**
      * Execute Windows command safely
      */
@@ -135,29 +136,72 @@ class MachineFingerprint
      */
     public static function generate()
     {
+        static $fingerprint = null;
+
+        if ($fingerprint !== null) {
+            return $fingerprint;
+        }
+
         $parts = array_filter([
-            self::getUUID(),
-            self::getBoardSerial(),
-            self::getBiosSerial(),
-            self::getVolumeSerial(),
+            self::normalize(
+                self::getUUID()
+            ),
+
+            self::normalize(
+                self::getBoardSerial()
+            ),
+
+            self::normalize(
+                self::getBiosSerial()
+            ),
+
+            self::normalize(
+                self::getVolumeSerial()
+            )
 
         ]);
+
         $parts = array_filter($parts);
 
-        if (count($parts) < 2) {
-            throw new RuntimeException(
-                "Unable to generate a reliable machine fingerprint."
-            );
+        if (
+            count($parts) < 2
+        ) {
+            $fallback = [
 
+                php_uname("n"),
+
+                php_uname("s"),
+
+                php_uname("m")
+
+            ];
+
+            $parts =
+                array_filter(
+                    $fallback
+                );
         }
-        $raw = implode("|", $parts);
+
+        $raw =
+            "FP"
+            .
+            self::VERSION
+            .
+            "|"
+            .
+            implode(
+                "|",
+                $parts
+            );
 
         if ($raw === "") {
             $raw = php_uname();
         }
         
-        return strtoupper(hash('sha256', $raw));
+        $fingerprint = strtoupper(hash('sha256', $raw));
+        return $fingerprint;
     }
+
     public static function details(): array
     {
         return [
@@ -172,8 +216,39 @@ class MachineFingerprint
 
             "volume_serial" => self::getVolumeSerial(),
 
-            "fingerprint" => self::generate()
+            "fingerprint" => self::generate(),
 
-        ];
+            "fingerprint_version" =>
+            self::VERSION,
+
+            "os" => php_uname("s"),
+
+            "os_version" => php_uname("r"),
+
+            "architecture" => php_uname("m")
+                    ];
+    }
+
+    private static function normalize(
+        string $value
+    ): string
+    {
+
+        $value =
+            strtoupper(
+                trim($value)
+            );
+
+
+        $value =
+            preg_replace(
+                '/[^A-Z0-9]/',
+                '',
+                $value
+            );
+
+
+        return $value ?? "";
+
     }
 }

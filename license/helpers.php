@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . "/../db.php";
+require_once __DIR__ . "/LicenseStorage.php";
+require_once __DIR__ . "/installation.php";
 
 function config(string $file): array
 {
@@ -17,15 +19,25 @@ function config(string $file): array
 
 function getLicense()
 {
+    static $license = null;
+
+    if ($license !== null) {
+        return $license;
+    }
+
     $db = Database::getInstance()->getConnection();
 
-    $result = $db->query("SELECT * FROM licenses LIMIT 1");
+    $result = $db->query(
+        "SELECT * FROM licenses LIMIT 1"
+    );
 
-    if (!$result || $result->num_rows == 0) {
+    if (!$result || $result->num_rows === 0) {
         return null;
     }
 
-    return $result->fetch_assoc();
+    $license = $result->fetch_assoc();
+
+    return $license;
 }
 
 function licenseInstalled()
@@ -45,7 +57,18 @@ function licenseActive()
         return false;
     }
 
-    if (strtotime($license["expiry_date"]) < time()) {
+    if (
+        strtotime($license["expiry_date"])
+        < time()
+    ) {
+        return false;
+    }
+
+    if (
+        !verifyLicenseSignature(
+            $license
+        )
+    ) {
         return false;
     }
 
@@ -64,30 +87,230 @@ function daysRemaining()
 
     $expiry = new DateTime($license["expiry_date"]);
 
-    return (int)$today->diff($expiry)->format("%r%a");
+    $days = (int)$today->diff($expiry)->format("%r%a");
+    return max(0, $days);
 }
-function generateLicenseSignature(array $license): string
+
+function verifyLicenseSignature(
+    array $license
+): bool
 {
-    $config = config("app");
+    /*
+    |--------------------------------------------------------------------------
+    | Load stored license
+    |--------------------------------------------------------------------------
+    */
 
-    return hash_hmac(
+    if (
+        empty(LicenseStorage::get())
+    ) {
 
-        "sha256",
+        return false;
 
-        implode("|", [
+    }
 
-            $license["school_name"],
+    $licenseText =
+        LicenseStorage::get();
 
-            $license["machine_fingerprint"],
+    /*
+    |--------------------------------------------------------------------------
+    | Load public key
+    |--------------------------------------------------------------------------
+    */
 
-            $license["expiry_date"],
+    $config =
+        config("license");
 
-            $license["status"]
 
-        ]),
+    $keyFile =
+        $config["crypto"]["public_key"];
 
-        $config["license_secret"]
+    if (
+        !file_exists($keyFile)
+    ) {
+
+        return false;
+
+    }
+
+    $publicKey =
+        openssl_pkey_get_public(
+            file_get_contents(
+                $keyFile
+            )
+        );
+
+    if (
+        !$publicKey
+    ) {
+
+        return false;
+
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Decode license
+    |--------------------------------------------------------------------------
+    */
+
+    $decoded =
+        json_decode(
+
+            base64_decode(
+                $licenseText
+            ),
+
+            true
+
+        );
+
+    if (
+        empty($decoded["payload"])
+        ||
+        empty($decoded["signature"])
+    ) {
+
+        return false;
+
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Verify RSA signature
+    |--------------------------------------------------------------------------
+    */
+
+    $result =
+        openssl_verify(
+
+            $decoded["payload"],
+
+            base64_decode(
+                $decoded["signature"]
+            ),
+
+            $publicKey,
+
+            OPENSSL_ALGO_SHA256
+
+        );
+
+
+
+    return $result === 1;
+
+}
+
+function licenseExpired(): bool
+{
+    $license = getLicense();
+
+    if (!$license) {
+        return true;
+    }
+
+    return strtotime(
+        $license["expiry_date"]
+    ) < time();
+}
+
+function licenseStatus(): string
+{
+    $license = getLicense();
+
+    if (!$license) {
+        return "missing";
+    }
+
+    if (!verifyLicenseSignature($license)) {
+        return "tampered";
+    }
+
+    if (
+        $license["status"] !== "active"
+    ) {
+        return "inactive";
+    }
+
+    if (licenseExpired()) {
+        return "expired";
+    }
+
+    return "active";
+}
+
+function licenseInfo(): array
+{
+    $license = getLicense();
+
+    if (!$license) {
+        return [];
+    }
+
+    return [
+        "school" =>
+        $license["school_name"],
+
+
+        "expiry" =>
+        $license["expiry_date"],
+
+
+        "days_remaining" =>
+        daysRemaining(),
+
+
+        "status" =>
+        licenseStatus(),
+
+
+        "activation_date" =>
+        $license["activation_date"],
+
+
+        "last_verified" =>
+        $license["last_verified"],
+
+
+        "machine" =>
+        $license["machine_fingerprint"]
+
+    ];
+}
+
+function verifyInstallationBinding(): bool
+{
+
+    $license =
+        getLicense();
+
+
+    if (!$license) {
+
+        return false;
+
+    }
+
+
+    if (
+        empty(
+            $license["installation_id"]
+        )
+    ) {
+
+        return false;
+
+    }
+
+
+    return hash_equals(
+
+        $license["installation_id"],
+
+        InstallationIdentity::id()
 
     );
+
 }
 ?>

@@ -11,6 +11,10 @@ $license = getLicense();
 
 $daysRemaining = daysRemaining();
 
+function currentFingerprint(): string
+{
+    return MachineFingerprint::generate();
+}
 ?>
 <!DOCTYPE html>
 <html>

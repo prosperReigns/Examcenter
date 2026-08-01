@@ -3,6 +3,9 @@
 require_once __DIR__ . "/../db.php";
 require_once __DIR__ . "/helpers.php";
 require_once __DIR__ . "/fingerprint.php";
+require_once __DIR__ . "/Heartbeat.php";
+require_once __DIR__ . "/CloneDetector.php";
+require_once __DIR__ . "/SecurityLogger.php";
 
 $db = Database::getInstance()->getConnection();
 
@@ -24,11 +27,25 @@ $allowedPages = [
     "about.php"
 
 ];
-
+$config = config("app");
 $currentPage = basename($_SERVER["PHP_SELF"]);
 
 if (in_array($currentPage, $allowedPages)) {
     return;
+}
+
+
+
+function redirectLicenseError(
+    string $message
+): void
+{
+    header(
+        "Location: /EXAMCENTER/license/required.php?error="
+        . urlencode($message)
+    );
+
+    exit();
 }
 
 /*
@@ -37,17 +54,121 @@ if (in_array($currentPage, $allowedPages)) {
 |--------------------------------------------------------------------------
 */
 
-$result = $db->query("SELECT * FROM licenses LIMIT 1");
+$license = getLicense();
 
-if (!$result || $result->num_rows == 0) {
+if (!$license) {
 
-    header("Location: /EXAMCENTER/license/required.php");
-
-    exit();
+    redirectLicenseError(
+        "License integrity check failed."
+    );
 
 }
 
-$license = $result->fetch_assoc();
+/*
+|--------------------------------------------------------------------------
+| Verify installation binding
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !verifyInstallationBinding()
+) {
+    SecurityLogger::write(
+        "INSTALLATION_MISMATCH",
+        "Installation identity validation failed."
+    );
+
+    redirectLicenseError(
+        "Installation identity mismatch."
+    );
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Clone Detection
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !CloneDetector::verify()
+) {
+    SecurityLogger::write(
+        "CLONE_DETECTED",
+        "Possible duplicated ExamCenter installation."
+    );
+
+    redirectLicenseError(
+        "Installation clone detected."
+    );
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Runtime recovery handling
+|--------------------------------------------------------------------------
+*/
+
+
+$status =
+    Heartbeat::serverStatus();
+
+/*
+|--------------------------------------------------------------------------
+| Server revoked license
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $status === "revoked"
+) {
+
+    redirectLicenseError(
+        "License has been revoked."
+    );
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Server expired license
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $status === "expired"
+) {
+
+    redirectLicenseError(
+        "License has expired."
+    );
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Server unavailable
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $status === "unknown"
+) {
+
+    if (
+        !Heartbeat::withinGracePeriod()
+    ) {
+
+        redirectLicenseError(
+
+            "License verification unavailable. Please connect to the internet."
+
+        );
+
+    }
+
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -55,7 +176,7 @@ $license = $result->fetch_assoc();
 |--------------------------------------------------------------------------
 */
 
-$currentFingerprint = MachineFingerprint::generate();
+$currentFingerprint = currentFingerprint();
 
 if (
     !hash_equals(
@@ -70,15 +191,14 @@ if (
         LIMIT 1
     ");
 
-    header(
-        "Location: /EXAMCENTER/license/required.php?error=" .
-        urlencode(
-            "This license belongs to another computer."
-        )
+    SecurityLogger::write(
+        "FINGERPRINT_MISMATCH",
+        "License machine fingerprint mismatch."
     );
 
-    exit();
-
+    redirectLicenseError(
+        "This license belongs to another computer."
+    );
 }
 
 /*
@@ -99,7 +219,10 @@ if (!empty($license["last_system_time"])) {
     |--------------------------------------------------------------------------
     */
 
-    if ($currentTime + 300 < $lastTime) {
+    $rollbackWindow =
+    $config["clock_rollback_seconds"] ?? 300;
+
+    if ($currentTime + $rollbackWindow < $lastTime) {
 
         $db->query("
             UPDATE licenses
@@ -107,13 +230,9 @@ if (!empty($license["last_system_time"])) {
             LIMIT 1
         ");
 
-        header(
-            "Location: /EXAMCENTER/license/required.php?error=" .
-            urlencode("System clock manipulation detected.")
+        redirectLicenseError(
+            "System clock manipulation detected."
         );
-
-        exit();
-
     }
 
 }
@@ -124,14 +243,10 @@ if (!empty($license["last_system_time"])) {
 |--------------------------------------------------------------------------
 */
 
-$expected = generateLicenseSignature($license);
-
-if (!hash_equals($expected, $license["license_signature"])) {
-
-    header("Location: /EXAMCENTER/license/required.php?error=License has been modified.");
-
-    exit();
-
+if (!verifyLicenseSignature($license)) {
+    redirectLicenseError(
+        "License integrity check failed."
+    );
 }
 
 /*
@@ -140,20 +255,28 @@ if (!hash_equals($expected, $license["license_signature"])) {
 |--------------------------------------------------------------------------
 */
 
-if ($license["status"] === "revoked") {
+switch (licenseStatus()) {
 
-    header("Location: /EXAMCENTER/license/required.php");
+    case "tampered":
+        redirectLicenseError(
+            "License has been tampered with."
+        );
 
-    exit();
+    case "inactive":
+        redirectLicenseError(
+            "License is inactive."
+        );
 
-}
+    case "revoked":
+        redirectLicenseError(
+            "License has been revoked."
+        );
 
-if ($license["status"] === "inactive") {
 
-    header("Location: /EXAMCENTER/license/required.php");
-
-    exit();
-
+    case "expired":
+        redirectLicenseError(
+            "License has expired."
+        );
 }
 
 /*
@@ -164,12 +287,12 @@ if ($license["status"] === "inactive") {
 
 if (
     !empty($license["expiry_date"]) &&
-    strtotime($license["expiry_date"]) < time()
+    licenseExpired()
 ) {
 
-    header("Location: /EXAMCENTER/license/expired.php");
-
-    exit();
+    redirectLicenseError(
+        "License has reached expiry date."
+    );
 
 }
 

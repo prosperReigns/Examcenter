@@ -11,12 +11,28 @@ require_once "fingerprint.php";
 $fingerprint = MachineFingerprint::generate();
 
 $data = [
-    "fingerprint" => $fingerprint,
-    "computer_name" => getenv("COMPUTERNAME") ?: php_uname("n"),
-    "operating_system" => php_uname("s") . " " . php_uname("r"),
-    "php_version" => PHP_VERSION,
+
+    "product" => config("app")["name"],
+
+    "product_version" => config("app")["version"],
+
+    "fingerprint_version" => MachineFingerprint::VERSION,
+
+    "fingerprint" => MachineFingerprint::generate(),
+
+    "hardware" => MachineFingerprint::details(),
+
     "generated_at" => date("c")
+
 ];
+
+$data["checksum"] = hash(
+
+    "sha256",
+
+    json_encode($data)
+
+);
 
 /*
 |--------------------------------------------------------------------------

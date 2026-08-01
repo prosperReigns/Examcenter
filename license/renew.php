@@ -42,6 +42,13 @@ try {
         );
     }
 
+    file_put_contents(
+
+        __DIR__ . "/storage/license.lic",
+
+        trim($license)
+
+    );
     $verify = new LicenseVerifier();
 
     $verify->renew(trim($license));
