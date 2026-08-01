@@ -26,7 +26,7 @@ from app.core.purchase_messages import (
 
 router = APIRouter(
     prefix="/api/public/purchase",
-    tags=["Public Purchase"],
+    tags=["Public Purchase-status"],
 )
 
 

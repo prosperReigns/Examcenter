@@ -42,6 +42,7 @@ class PurchaseSession(Base):
         default=generate_poll_token,
     )
     checkout_token: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    checkout_url: Mapped[str] = mapped_column(String(50), nullable=False)
     poll_token: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     gateway: Mapped[str | None] = mapped_column(String(50), nullable=True)
     gateway_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)

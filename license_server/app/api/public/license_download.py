@@ -5,6 +5,21 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 
+# rate limiting
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    limiter = Limiter(key_func=get_remote_address)
+except Exception:
+    # Fallback no-op limiter if slowapi is not available
+    class _NoopLimiter:
+        def limit(self, *args, **kwargs):
+            def _decorator(func):
+                return func
+            return _decorator
+
+    limiter = _NoopLimiter()
+
 from app.repositories.activation_token_repository import (
     consume_download_token,
     get_valid_download_token,

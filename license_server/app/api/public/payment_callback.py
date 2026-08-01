@@ -24,7 +24,7 @@ router = APIRouter(
 
     prefix="/api/public/payment-callback",
 
-    tags=["Public Payment"],
+    tags=["Public Payment-callback"],
 
 )
 

@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Header
@@ -74,3 +76,21 @@ def poll_purchase_status(
     result.pop("last_modified", None)
 
     return result
+
+@router.post(
+    "/start"
+)
+def start_purchase(data: dict):
+    purchase_token = str(uuid4())
+
+    return {
+
+        "status":"created",
+
+        "purchase_token":
+            purchase_token,
+
+        "checkout_url":
+            f"https://license.seedofabraham.com/checkout/{purchase_token}"
+
+    }
