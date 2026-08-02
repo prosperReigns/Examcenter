@@ -1,4 +1,5 @@
 from .analytics_tasks import *
+from .base import *
 from .backup_tasks import *
 from .email_tasks import *
 from .invoice_tasks import *

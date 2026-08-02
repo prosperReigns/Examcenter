@@ -9,6 +9,20 @@ from app.database.session import get_db
 from app.repositories.purchase_session_repository import (
     PurchaseSessionRepository,
 )
+# rate limiting
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    limiter = Limiter(key_func=get_remote_address)
+except Exception:
+    # Fallback no-op limiter if slowapi is not available
+    class _NoopLimiter:
+        def limit(self, *args, **kwargs):
+            def _decorator(func):
+                return func
+            return _decorator
+
+    limiter = _NoopLimiter()
 
 from app.repositories.activation_token_repository import (
     ActivationTokenRepository,
@@ -29,6 +43,9 @@ router = APIRouter(
     tags=["Public Purchase-status"],
 )
 
+@limiter.limit(
+    "5/minute"
+)
 
 @router.get("/{checkout_token}")
 def purchase_status(

@@ -16,11 +16,29 @@ from app.repositories.activation_token_repository import (
     get_active_for_purchase,
 )
 
+# rate limiting
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    limiter = Limiter(key_func=get_remote_address)
+except Exception:
+    # Fallback no-op limiter if slowapi is not available
+    class _NoopLimiter:
+        def limit(self, *args, **kwargs):
+            def _decorator(func):
+                return func
+            return _decorator
+
+    limiter = _NoopLimiter()
+
 router = APIRouter(
     prefix="/api/public/payment-status",
     tags=["Public Payment Status"],
 )
 
+@limiter.limit(
+    "5/minute"
+)
 
 @router.get("/{checkout_token}")
 def payment_status(

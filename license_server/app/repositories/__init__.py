@@ -1,4 +1,5 @@
 from .activation_repository import *
+from .activation_token_repository import *
 from .admin_repository import *
 from .audit_log_repository import *
 from .customer_repository import *

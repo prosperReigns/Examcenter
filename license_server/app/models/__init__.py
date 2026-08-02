@@ -1,6 +1,8 @@
 from app.models.activation import Activation
+from app.models.activation_token import ActivationToken
 from app.models.admin import Admin
 from app.models.audit_log import AuditLog
+from app.models.base import Base
 from app.models.customer import Customer
 from app.models.license import License
 from app.models.license_device import LicenseDevice
@@ -18,11 +20,16 @@ from app.models.outbox_event import OutboxEvent
 from app.models.idempotency_key import IdempotencyKey
 from app.models.purchase_session import PurchaseSession
 from app.models.activation_token import ActivationToken
+from app.models.license_download import LicenseDownload
+from app.models.security_event import SecurityEvent
+from app.models.request_nonce import RequestNonce
 
 __all__ = [
 	"Activation",
+    "ActivationToken",
 	"Admin",
 	"AuditLog",
+    "Base",
 	"Customer",
 	"License",
 	"LicenseDevice",
@@ -40,4 +47,7 @@ __all__ = [
     "OutboxEvent",
     "PurchaseSession",
     "ActivationToken",
+    "LicenseDownload",
+    "SecurityEvent",
+    "RequestNonce"
 ]

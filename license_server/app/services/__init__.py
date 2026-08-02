@@ -56,4 +56,5 @@ from .receipt_pdf_service import *
 from .receipt_service import *
 from .school_service import *
 from .setting_service import *
-from .setting_service import *
+from .replay_protection import *
+
