@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS new_questions (
     subject VARCHAR(100),
     question_type VARCHAR(50),
     created_at DATETIME,
-    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE
+    FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE SET NULL
 )CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 8. fill_blank_questions
