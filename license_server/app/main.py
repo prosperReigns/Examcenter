@@ -4,7 +4,9 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.public import register_public_routes
 from app.api.routes import register_routes
 from app.web.routes import register_web_routes
 from app.web.templates import templates
@@ -28,6 +30,20 @@ limiter = Limiter(
 app.state.limiter = limiter
 
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, same_site=settings.access_token_cookie_samesite)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1",
+        "http://localhost",
+        "http://localhost:80",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+register_public_routes(app)
 register_routes(app)
 register_web_routes(app)
 print("\n========== REGISTERED ROUTES ==========")
@@ -38,9 +54,13 @@ for route in app.routes:
 
 print("=======================================\n")
 
+print("Gateway:", settings.payment_gateway)
+print("Secret:", settings.flutterwave_secret_key)
+print("Public:", settings.flutterwave_public_key)
+
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.on_event("startup")
-def startup():
+async def startup():
     bootstrap_application()
-    production_startup_checks()
+    await production_startup_checks()

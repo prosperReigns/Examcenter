@@ -18,6 +18,8 @@ from app.repositories.payment_repository import delete_orphan_pending_payments, 
 from app.services.purchase_orchestration_service import complete_purchase
 from app.services.purchase_session_service import recover_pending_purchases
 
+from app.tasks.activation_token_tasks import cleanup_activation_tokens
+
 logger = logging.getLogger(__name__)
 
 

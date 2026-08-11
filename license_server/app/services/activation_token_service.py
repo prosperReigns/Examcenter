@@ -1,21 +1,17 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 import secrets
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.activation_token import ActivationToken
+from app.repositories.purchase_session_repository import save_purchase_session
 from app.repositories import activation_token_repository
+from app.utils.time import as_aware, utcnow
 
 
 def generate_token() -> str:
     return secrets.token_urlsafe(48)
-
-
-def _as_aware(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
 
 
 def create_activation_token(
@@ -38,9 +34,47 @@ def create_activation_token(
         purchase_session_id=purchase_session.id,
         license_id=license.id,
         machine_fingerprint=fingerprint.strip(),
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes),
+        expires_at=utcnow() + timedelta(minutes=ttl_minutes),
     )
     return activation_token_repository.create(db, activation_token)
+
+
+class ActivationTokenService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_for_purchase(
+        self,
+        purchase_session_id,
+        *,
+        ttl_minutes: int = 15,
+    ) -> ActivationToken:
+        from app.models.license import License
+        from app.models.purchase_session import PurchaseSession
+
+        purchase_session = self.db.get(PurchaseSession, purchase_session_id)
+        if purchase_session is None:
+            raise ValueError("Purchase session not found.")
+
+        if purchase_session.license_id is None:
+            raise ValueError("Purchase session has no license.")
+
+        license_obj = self.db.get(License, purchase_session.license_id)
+        if license_obj is None:
+            raise ValueError("License not found.")
+
+        token = create_activation_token(
+            self.db,
+            purchase_session=purchase_session,
+            license=license_obj,
+            fingerprint=purchase_session.fingerprint,
+            ttl_minutes=ttl_minutes,
+        )
+        purchase_session.activation_token_id = token.id
+        save_purchase_session(self.db, purchase_session)
+        self.db.commit()
+        self.db.refresh(token)
+        return token
 
 
 def validate_token(activation_token: ActivationToken | None) -> None:
@@ -50,7 +84,7 @@ def validate_token(activation_token: ActivationToken | None) -> None:
         raise HTTPException(403, "Activation token revoked.")
     if activation_token.used_at:
         raise HTTPException(403, "Activation token already used.")
-    if _as_aware(activation_token.expires_at) < datetime.now(timezone.utc):
+    if as_aware(activation_token.expires_at) < utcnow():
         raise HTTPException(403, "Activation token expired.")
 
 

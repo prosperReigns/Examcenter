@@ -58,12 +58,25 @@ celery_app.conf.task_queues = (
 
     Queue("backups"),
     Queue("maintenance"),
+    Queue("purchase"),
 )
 
-celery_app.autodiscover_tasks(
-    [
-        "app.tasks",
-    ]
+celery_app.conf.imports = (
+    "app.tasks.purchase_tasks",
+    "app.tasks.payment_tasks",
+    "app.tasks.notification_tasks",
+    "app.tasks.activation_token_tasks",
+    "app.tasks.outbox_tasks",
+    "app.tasks.analytics_tasks",
+    "app.tasks.backup_tasks",
+    "app.tasks.cleanup_tasks",
+    "app.tasks.device_tasks",
+    "app.tasks.renewal_tasks",
+    "app.tasks.audit_tasks",
+    "app.tasks.webhook_tasks",
+    "app.tasks.license_tasks",
+    "app.tasks.receipt_tasks",
+    
 )
 celery_app.conf.beat_schedule = {
 
@@ -112,14 +125,6 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.backup_tasks.run_database_backup",
 
         "schedule": crontab(hour=3, minute=0),
-
-    },
-
-    "verify-pending-payments": {
-
-        "task": "app.tasks.payment_tasks.verify_pending_payments",
-
-        "schedule": 600,
 
     },
 

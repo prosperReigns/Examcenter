@@ -85,3 +85,26 @@ class FlutterwaveGateway(PaymentGateway):
             signature is not None
             and signature == settings.flutterwave_hash
         )
+
+    def initialize(
+        self,
+        *,
+        amount,
+        currency,
+        email,
+        reference,
+        callback_url,
+        metadata,
+    ):
+        payload = {
+            "tx_ref": reference,
+            "amount": amount,
+            "currency": currency,
+            "redirect_url": callback_url,
+            "customer": {
+                "email": email,
+            },
+            "meta": metadata or {},
+        }
+
+        return self.initialize_payment(payload)

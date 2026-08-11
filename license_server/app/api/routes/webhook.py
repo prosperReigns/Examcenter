@@ -15,8 +15,20 @@ async def flutterwave_webhook(
     request: Request,
     db=Depends(get_db),
 ):
-    return await handle_flutterwave_webhook(
-        db,
-        request,
-        payload,
-    )
+    try:
+        return await handle_flutterwave_webhook(
+            db,
+            request,
+            payload,
+        )
+
+    except Exception:
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.exception(
+            "Flutterwave webhook processing failed"
+        )
+
+        raise

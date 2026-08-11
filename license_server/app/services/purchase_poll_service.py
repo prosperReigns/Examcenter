@@ -1,12 +1,15 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+
 from sqlalchemy.orm import Session
 
 from app.repositories.purchase_session_repository import (
     get_purchase_session_by_poll_token,
 )
-
+from app.repositories.license_repository import ( 
+    get_license_by_id,
+)
 
 class PurchasePollService:
     """
@@ -168,11 +171,8 @@ class PurchasePollService:
         elif public_status in (
 
             "failed",
-
             "cancelled",
-
             "expired",
-
         ):
 
             poll_after = 0
@@ -194,7 +194,7 @@ class PurchasePollService:
             f'{purchase.updated_at.timestamp()}'
         )
 
-        return {
+        result = {
 
             "status": public_status,
 
@@ -216,3 +216,26 @@ class PurchasePollService:
                 purchase.updated_at,
 
         }
+
+        if purchase.completed and purchase.license_id is not None:
+
+            license_record = get_license_by_id(
+                self.db,
+                purchase.license_id,
+            )
+
+            if license_record is not None:
+
+                result["license"] = (
+                    license_record.signed_license
+                )
+
+            else:
+
+                result["license"] = None
+
+        else:
+
+            result["license"] = None
+
+        return result

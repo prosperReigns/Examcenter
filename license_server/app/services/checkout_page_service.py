@@ -1,9 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.repositories.purchase_session_repository import (
-    get_checkout_session,
-)
+from app.repositories.purchase_session_repository import PurchaseSessionRepository
 
 
 def get_checkout_page(
@@ -11,7 +9,7 @@ def get_checkout_page(
     checkout_token: str,
 ):
 
-    purchase = get_checkout_session(
+    purchase = PurchaseSessionRepository.get_checkout_session(
         db,
         checkout_token,
     )

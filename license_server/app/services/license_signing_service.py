@@ -94,6 +94,45 @@ def export_license(
 
     return signed
 
+
+class LicenseSigningService:
+    def __init__(self, db):
+        self.db = db
+
+    def issue_license(
+        self,
+        *,
+        purchase_session_id,
+    ):
+        from app.models.purchase_session import PurchaseSession
+        from app.repositories.license_repository import get_license_by_id
+        from app.services.purchase_orchestration_service import complete_purchase
+
+        purchase_session = self.db.get(
+            PurchaseSession,
+            purchase_session_id,
+        )
+        if purchase_session is None:
+            raise ValueError("Purchase session not found.")
+
+        if purchase_session.license_id:
+            license_obj = get_license_by_id(
+                self.db,
+                purchase_session.license_id,
+            )
+            if license_obj is not None:
+                return license_obj
+
+        complete_purchase(
+            self.db,
+            purchase_session,
+        )
+        self.db.refresh(purchase_session)
+        return get_license_by_id(
+            self.db,
+            purchase_session.license_id,
+        )
+
 def import_license(
     signed_license,
 ):

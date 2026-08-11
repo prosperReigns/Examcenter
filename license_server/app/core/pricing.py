@@ -8,47 +8,65 @@ settings = get_settings()
 # Every purchase in the system should obtain its
 # pricing information from this file.
 #
-
 LICENSE_PRICES = {
 
-    #
-    # Free demonstration license
-    #
-    "demo": {
-        "name": "Demo",
+    "trial": {
+
+        "name": "7-Day Trial",
+
         "duration_months": 0,
+
+        "duration_days": settings.trial_duration_days,
+
         "price": 0,
+
         "currency": settings.license_currency,
+
     },
 
-    #
-    # Six-month subscription
-    #
-    "6months": {
+
+    "6_months": {
+
         "name": "6 Months",
+
         "duration_months": 6,
+
+        "duration_days": settings.six_month_duration_days,
+
         "price": settings.six_month_price,
+
         "currency": settings.license_currency,
+
     },
 
-    #
-    # One-year subscription
-    #
-    "1year": {
-        "name": "1 Year",
+
+    "12_months": {
+
+        "name": "12 Months",
+
         "duration_months": 12,
+
+        "duration_days": settings.one_year_duration_days,
+
         "price": settings.one_year_price,
+
         "currency": settings.license_currency,
+
     },
 
-    #
-    # Two-year subscription
-    #
-    "2years": {
-        "name": "2 Years",
+
+    "24_months": {
+
+        "name": "24 Months",
+
         "duration_months": 24,
+
+        "duration_days": settings.two_year_duration_days,
+
         "price": settings.two_year_price,
+
         "currency": settings.license_currency,
+
     },
 
 }

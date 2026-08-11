@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
 
-
 def get_customer_by_id(db: Session, customer_id: UUID) -> Customer | None:
     return db.get(Customer, customer_id)
 

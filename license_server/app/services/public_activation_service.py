@@ -1,5 +1,4 @@
 import json
-from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -21,16 +20,7 @@ from app.services.activation_token_service import consume_token, validate_machin
 from app.services.audit_service import record_audit_event
 from app.services.license_package_service import license_package_document
 from app.services.license_service import is_activation_allowed
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _as_aware(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
+from app.utils.time import as_aware, utcnow
 
 
 def _load_valid_license(db: Session, license_id):
@@ -43,7 +33,7 @@ def _load_valid_license(db: Session, license_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="License is revoked.")
     if license_obj.suspended_at is not None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="License is suspended.")
-    if license_obj.expiry_at is not None and _as_aware(license_obj.expiry_at) < _utcnow():
+    if license_obj.expiry_at is not None and as_aware(license_obj.expiry_at) < utcnow():
         license_obj.status = "expired"
         persist_license(db, license_obj)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="License has expired.")
@@ -96,7 +86,7 @@ def complete_activation_from_token(
             ip_address=payload.ip_address,
         )
         license_obj.activation_count += 1
-        license_obj.last_activation_at = _utcnow()
+        license_obj.last_activation_at = utcnow()
         device.activation_count += 1
         db.add_all([license_obj, device])
 

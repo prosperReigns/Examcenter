@@ -10,6 +10,7 @@ from app.models.invoice import Invoice
 from app.repositories.invoice_repository import (
     create_invoice,
     get_invoice,
+    get_invoice_by_id,
     list_invoices,
     mark_invoice_cancelled,
     mark_invoice_paid,
@@ -93,6 +94,42 @@ def create_invoice_record(
     db.commit()
     db.refresh(invoice)
     return invoice
+
+
+class InvoiceService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_from_payment(
+        self,
+        *,
+        payment_id,
+        customer_id=None,
+    ) -> Invoice:
+        from app.repositories.payment_repository import get_payment_by_id
+
+        payment = get_payment_by_id(
+            self.db,
+            UUID(str(payment_id)),
+        )
+        if payment is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found.",
+            )
+
+        if payment.invoice_id:
+            existing = get_invoice_by_id(
+                self.db,
+                payment.invoice_id,
+            )
+            if existing is not None:
+                return existing
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment has no invoice.",
+        )
 
 def get_invoice_record(
     db: Session,

@@ -10,13 +10,15 @@ class PurchaseSessionCreate(BaseModel):
     product_code: str = Field(default="cbt", min_length=1, max_length=80)
     version: str = Field(default="1.0", min_length=1, max_length=50)
     plan_code: str = Field(min_length=1, max_length=50)
-    duration_months: int = Field(default=12, ge=0, le=120)
-    amount: Decimal = Field(ge=0)
-    currency: str = Field(default="NGN", min_length=3, max_length=10)
-    customer_name: str = Field(min_length=1, max_length=150)
-    customer_email: EmailStr
+    duration_months: int | None = None
+
+    amount: Decimal | None = None
+
+    currency: str | None = None
+    customer_name: str | None = Field(default=None, max_length=150)
+    customer_email: EmailStr | None = None
     customer_phone: str | None = Field(default=None, max_length=50)
-    school_name: str = Field(min_length=1, max_length=150)
+    school_name: str | None = Field(default=None, max_length=150)
     gateway: str | None = Field(default=None, max_length=50)
     payment_reference: str | None = Field(default=None, max_length=100)
 

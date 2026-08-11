@@ -5,11 +5,9 @@ from app.events.payment_completed import PaymentCompletedEvent
 
 from app.gateways.factory import PaymentGatewayFactory
 
-from app.repositories.payment_repository import PaymentRepository
-from app.repositories.purchase_session_repository import PurchaseSessionRepository
-from app.repositories.customer_repository import CustomerRepository
+from app.repositories.payment_repository import get_payment_by_reference
 
-from app.services.customer_service import CustomerService
+from app.services.customer_service import create_from_purchase
 
 
 class PaymentCompletionOrchestrationService:
@@ -20,16 +18,8 @@ class PaymentCompletionOrchestrationService:
     ):
 
         self.db = db
-
         self.gateway = PaymentGatewayFactory.create()
 
-        self.payment_repo = PaymentRepository(db)
-
-        self.purchase_repo = PurchaseSessionRepository(db)
-
-        self.customer_repo = CustomerRepository(db)
-
-        self.customer_service = CustomerService(db)
 
     def complete_payment(
         self,
@@ -40,7 +30,8 @@ class PaymentCompletionOrchestrationService:
         # Load payment
         #
 
-        payment = self.payment_repo.get_by_reference(
+        payment = get_payment_by_reference(
+            self.db,
             reference
         )
 
@@ -106,7 +97,8 @@ class PaymentCompletionOrchestrationService:
 
         if customer is None:
 
-            customer = self.customer_service.create_from_purchase(
+            customer =  create_from_purchase(
+                self.db,
                 purchase
             )
 

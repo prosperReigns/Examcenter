@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from fastapi import Request, HTTPException
-from app.database import get_db
+from app.database.session import get_db
 
 from app.services.replay_protection import (
     check_nonce,

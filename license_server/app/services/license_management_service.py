@@ -66,13 +66,21 @@ def issue_license(db: Session, payload: LicenseCreateRequest, *, admin=None, req
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="School not found")
 
     license_document = create_signed_license(
+        license_id=None,
+        school_id=school.id,
+        school_code=school.code if hasattr(school, "code") else None,
+
         school=school.name,
         machine=payload.machine_fingerprint,
+
         license_type=payload.license_type,
+
         plan_name=payload.plan_name,
         duration_months=payload.duration_months,
         is_trial=payload.is_trial,
+
         issued_at=datetime.now(timezone.utc),
+
         version=payload.version,
     )
 
@@ -433,3 +441,51 @@ def renew_license(
         admin=admin,
         request=request,
     )
+
+def get_license_for_activation(
+    db: Session,
+    token: str
+):
+
+    from app.models.activation_token import ActivationToken
+
+    activation = (
+        db.query(ActivationToken)
+        .filter(
+            ActivationToken.token == token
+        )
+        .first()
+    )
+
+
+    if activation is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Activation token invalid"
+        )
+
+
+    if activation.used_at:
+        raise HTTPException(
+            status_code=403,
+            detail="Activation token already used"
+        )
+
+
+    license_obj = (
+        db.query(License)
+        .filter(
+            License.id == activation.license_id
+        )
+        .first()
+    )
+
+
+    if license_obj is None:
+        raise HTTPException(
+            status_code=404,
+            detail="License not found"
+        )
+
+
+    return license_obj

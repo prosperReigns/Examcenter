@@ -1,4 +1,5 @@
 import logging
+from sqlalchemy import text
 from app.repositories.admin_repository import get_admin_count, create_admin
 from app.core.config import get_settings, validate_production_settings
 from app.auth.security import get_password_hash

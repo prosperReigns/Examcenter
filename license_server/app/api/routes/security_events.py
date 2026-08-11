@@ -5,7 +5,7 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database.session import get_db
 
 from app.models.security_event import (
     SecurityEvent

@@ -19,41 +19,26 @@ from app.core.config import get_settings
 from app.core.pricing import (
     get_plan,
     get_price,
+    LICENSE_PRICES
 )
 from app.enums.purchase_status import PurchaseStatus
 from app.models.payment import Payment
-from app.models.invoice import Invoice
 from app.models.webhook_event import WebhookEvent
-from app.repositories.customer_repository import get_customer_by_id
+
 from app.repositories.invoice_repository import (
-    get_invoice_by_id,
-    persist_invoice,
     list_invoices
 )
 from app.repositories.payment_repository import (
-    create_payment,
     get_payment,
-    list_payments,
-    create_payment_record,
+    get_payment_by_reference,
     get_payment_by_transaction_id,
-    get_payment_by_tx_ref,
-    persist_payment,
+    list_payments,
 )
 from app.repositories.webhook_event_repository import get_by_event_id, create
-from app.repositories.school_repository import get_school_by_id
-from app.schemas.license import LicenseCreateRequest
-from app.schemas.payment import FlutterwaveWebhookPayload, PaymentCreateRequest
-from app.services.audit_service import record_audit_event
-from app.services.license_management_service import issue_license, renew_license
-from app.services.invoice_service import (
-    mark_invoice_paid,
-)
-from app.services.receipt_service import (
-    generate_receipt,
-)
-from app.utils.invoice import build_invoice_payload, save_invoice_document
 
-from app.core.pricing import LICENSE_PRICES
+from app.schemas.payment import FlutterwaveWebhookPayload
+from app.services.audit_service import record_audit_event
+
 from app.repositories.purchase_session_repository import get_purchase_session_for_update
 from app.repositories.purchase_session_repository import save_purchase_session
 from app.services.purchase_state_machine import validate_transition
@@ -112,6 +97,42 @@ def payment_is_processable(
 
     return payment.status == "pending"
 
+async def verify_flutterwave_transaction(
+    transaction_id: str,
+) -> dict[str, Any]:
+
+    url = (
+        f"/transactions/"
+        f"{transaction_id}"
+        f"/verify"
+    )
+
+    async with httpx.AsyncClient(
+        base_url=settings.flutterwave_base_url,
+        headers={
+            "Authorization":
+            f"Bearer {settings.flutterwave_secret_key}"
+        },
+        timeout=30,
+    ) as client:
+
+        response = await client.get(url)
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=400,
+            detail="Flutterwave verification failed",
+        )
+
+    result = response.json()
+
+    if result.get("status") != "success":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Flutterwave transaction",
+        )
+
+    return result
 
 def queue_purchase_orchestration(
     *,
@@ -138,7 +159,27 @@ def queue_purchase_orchestration(
 
 async def handle_flutterwave_webhook(db: Session, request: Request, payload: FlutterwaveWebhookPayload) -> dict[str, Any]:
     header_hash = request.headers.get(settings.flutterwave_webhook_secret_header, "")
-    if not header_hash or not hmac.compare_digest(header_hash, settings.flutterwave_hash):
+
+    header_hash = (
+        request.headers.get(
+            settings.flutterwave_webhook_secret_header,
+            ""
+        )
+        .strip()
+    )
+
+    expected_hash = (
+        settings.flutterwave_hash
+        .strip()
+    )
+
+    if (
+        not header_hash
+        or not hmac.compare_digest(
+            header_hash,
+            expected_hash,
+        )
+    ):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
 
     event = (payload.event or "").lower()
@@ -149,10 +190,12 @@ async def handle_flutterwave_webhook(db: Session, request: Request, payload: Flu
 
     event_id = str(
         data.get("id")
-        or ""
+        or data.get("tx_ref")
+        or secrets.token_hex(16)
     ).strip()
 
     tx_ref = str(data.get("tx_ref") or data.get("payment_reference") or "").strip()
+
     if not tx_ref:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing payment reference")
 
@@ -172,6 +215,7 @@ async def handle_flutterwave_webhook(db: Session, request: Request, payload: Flu
         }
     
     purchase_session = get_purchase_session_for_update(db, tx_ref)
+
     if purchase_session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase session not found")
 
@@ -199,34 +243,108 @@ async def handle_flutterwave_webhook(db: Session, request: Request, payload: Flu
     )
     
     if payment_status != "successful":
-        if purchase_session.status != PurchaseStatus.PAYMENT_PENDING.value:
-            validate_transition(purchase_session.status, PurchaseStatus.PAYMENT_PENDING)
-            purchase_session.status = PurchaseStatus.PAYMENT_PENDING.value
-        save_purchase_session(db, purchase_session)
+
+        validate_transition(
+            purchase_session.status,
+            PurchaseStatus.PAYMENT_FAILED,
+        )
+
+        purchase_session.status = (
+            PurchaseStatus.PAYMENT_FAILED.value
+        )
+
+        save_purchase_session(
+            db,
+            purchase_session,
+        )
+
+        record_audit_event(
+            db,
+            action="payment_failed",
+            entity_type="purchase_session",
+            entity_id=str(
+                purchase_session.id
+            ),
+            description="Flutterwave reported unsuccessful payment.",
+        )
+
         db.commit()
-        return {"status": "ignored", "event": event, "payment_status": payment_status}
+
+        return {
+            "status":"failed",
+            "payment_status":payment_status,
+        }
+
+    transaction_id = (
+        str(data.get("id") or "")
+        .strip()
+        or None
+    )
+
+    if not transaction_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing Flutterwave transaction ID",
+        )
+
+    flutterwave_result = await verify_flutterwave_transaction(
+        transaction_id
+    )
+
+    verified_data = (
+        flutterwave_result
+        .get("data", {})
+    )
 
     try:
-        paid_amount = Decimal(str(data.get("amount", "0")))
+        paid_amount = Decimal(
+            str(
+                verified_data.get(
+                    "amount",
+                    "0"
+                )
+            )
+        )
     except (InvalidOperation, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment amount") from exc
 
-    paid_currency = str(data.get("currency") or "").upper()
+    paid_currency = (
+        str(
+            verified_data.get(
+                "currency"
+            )
+            or ""
+        )
+        .upper()
+    )
+
     if paid_amount != Decimal(purchase_session.amount) or paid_currency != purchase_session.currency.upper():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment verification failed")
 
-    transaction_id = str(data.get("id") or "").strip() or None
     gateway_reference = str(data.get("flw_ref") or data.get("reference") or "").strip() or None
 
-    if purchase_session.status != PurchaseStatus.PAYMENT_VERIFIED.value:
-        validate_transition(purchase_session.status, PurchaseStatus.PAYMENT_VERIFIED)
-        purchase_session.status = PurchaseStatus.PAYMENT_VERIFIED.value
+    if purchase_session.status == PurchaseStatus.PAYMENT_VERIFIED.value:
+        return {
+            "status": "already_verified",
+            "session_id": str(purchase_session.id),
+        }
+
+    validate_transition(
+        purchase_session.status,
+        PurchaseStatus.PAYMENT_VERIFIED,
+    )
+
+    purchase_session.status = PurchaseStatus.PAYMENT_VERIFIED.value
+
     purchase_session.payment_reference = tx_ref
     purchase_session.gateway = "flutterwave"
     purchase_session.gateway_reference = gateway_reference
+
     purchase_session.gateway_transaction_id = transaction_id
     purchase_session.gateway_response = json.dumps(data, default=str)
+
     save_purchase_session(db, purchase_session)
+
     record_audit_event(
         db,
         action="purchase_payment_verified",
@@ -263,16 +381,35 @@ async def handle_flutterwave_webhook(db: Session, request: Request, payload: Flu
             ),
     
         )
+
+    record_audit_event(
+        db,
+        action="flutterwave_webhook_received",
+        entity_type="webhook_event",
+        entity_id=event_id,
+        description="Flutterwave payment webhook stored successfully.",
+    )
     
     db.commit()
+
+    if purchase_session.status != PurchaseStatus.PAYMENT_VERIFIED.value:
+        return {
+            "status": "already processed",
+            "session_id": str(purchase_session.id),
+        }
+
 
     task_id = queue_purchase_orchestration(
         session_id=purchase_session.id,
         payment_reference=tx_ref,
     )
+
     return {
         "status": "queued",
-        "session_id": str(purchase_session.id),
+        "message": "Payment verified. Purchase processing started.",
+        "session_id": str(
+            purchase_session.id
+        ),
         "task_id": task_id,
     }
 
@@ -316,80 +453,6 @@ def get_payment_list(
         offset=offset,
         limit=page_size,
     )
-
-def create_payment_record(
-    db: Session,
-    payload: PaymentCreateRequest,
-    *,
-    gateway: str | None = None,
-    admin=None,
-    request=None,
-) -> Payment:
-
-    invoice = get_invoice_by_id(
-        db,
-        payload.invoice_id,
-    )
-
-    if invoice is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invoice not found",
-        )
-
-    if invoice.status != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invoice is not awaiting payment",
-        )
-
-    payment = Payment(
-
-        customer_id=invoice.customer_id,
-
-        school_id=invoice.school_id,
-
-        invoice_id=invoice.id,
-
-        payment_reference=generate_payment_reference(db),
-
-        gateway=gateway,
-
-        gateway_reference=None,
-
-        amount=invoice.amount,
-
-        currency=invoice.currency,
-
-        payment_method=payload.payment_method,
-
-        status="pending",
-
-    )
-
-    create_payment(
-        db,
-        payment,
-    )
-
-    db.commit()
-
-    db.refresh(payment)
-
-    record_audit_event(
-        db,
-        admin=admin,
-        action="payment_created",
-        entity_type="payment",
-        entity_id=str(payment.id),
-        description=f"Created payment {payment.payment_reference}",
-        ip_address=request.client.host if request and request.client else None,
-        user_agent=request.headers.get("user-agent") if request else None,
-    )
-
-    db.commit()
-
-    return payment
 
 def total_revenue(
     db: Session,
@@ -628,50 +691,3 @@ def top_paying_schools(db: Session, limit: int = 10):
     )
 
     return db.execute(statement).all()
-
-def initialize_invoice_payment(db, invoice, customer):
-    payment = Payment(
-
-        invoice_id=invoice.id,
-
-        customer_id=customer.id,
-
-        school_id=invoice.school_id,
-
-        amount=invoice.amount,
-
-        currency=invoice.currency,
-
-        status="pending",
-
-        payment_type="flutterwave",
-
-    )
-
-    gateway.initialize_payment(
-
-        invoice,
-
-        customer,
-
-    )
-
-"""
-Deprecated.
-
-Verification now occurs exclusively
-through provider webhooks.
-
-These stubs remain temporarily
-for backwards compatibility.
-"""
-def verify_flutterwave_transaction():
-    raise NotImplementedError(
-        "Deprecated. Use webhook verification."
-    )
-
-
-def verify_paystack_transaction():
-    raise NotImplementedError(
-        "Deprecated. Use webhook verification."
-    )

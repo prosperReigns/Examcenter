@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import HTTPException, Request, status
 
 from app.core.config import get_settings
-from app.gateways.factory import get_gateway
+from app.gateways.factory import PaymentGatewayFactory
 
 settings = get_settings()
 
@@ -18,7 +18,7 @@ class PaystackService:
     """
 
     def __init__(self):
-        self.gateway = get_gateway()
+        self.gateway = PaymentGatewayFactory.create()
 
     def initialize_payment(
         self,

@@ -3,16 +3,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
+from datetime import datetime, timezone
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from pydantic import ValidationError
 
 from app.schemas.license import LicensePackage, LicensePayload, LicenseVerificationResult, SignedLicenseResponse
+from app.utils.time import as_aware
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 KEYS_DIR = BASE_DIR / "keys"
@@ -26,12 +27,6 @@ def _canonical_json(data: dict[str, Any]) -> bytes:
 
 def _payload_checksum(payload: LicensePayload) -> str:
     return hashlib.sha256(_canonical_json(payload.model_dump(mode="json"))).hexdigest()
-
-
-def _as_aware(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
 
 
 def _load_private_key() -> Any:
@@ -52,8 +47,8 @@ def generate_license_package(
     license_id: UUID | str | None = None,
     school_id: UUID | str | None = None,
     school_code: str | None = None,
-    product_code: str = "cbt",
-    product_name: str = "CBT Examination Software",
+    product_code: str = "examcenter",
+    product_name: str = "ExamCenter CBT Examination System",
     plan_code: str | None = None,
     plan_name: str = "standard",
     duration_months: int = 0,
@@ -115,8 +110,8 @@ def generate_license(
     license_id: UUID | str | None = None,
     school_id: UUID | str | None = None,
     school_code: str | None = None,
-    product_code: str = "cbt",
-    product_name: str = "CBT Examination Software",
+    product_code: str = "examcenter",
+    product_name: str = "ExamCenter CBT Examination System",
     plan_code: str | None = None,
     plan_name: str = "standard",
     duration_months: int = 0,
@@ -244,7 +239,7 @@ def verify_license(license_document: str | dict[str, Any]) -> LicenseVerificatio
     except Exception as exc:  # noqa: BLE001
         return LicenseVerificationResult(valid=False, payload=payload, error=f"Signature verification failed: {exc}")
 
-    if payload.expiry is not None and _as_aware(payload.expiry) < datetime.now(timezone.utc):
+    if payload.expiry is not None and as_aware(payload.expiry) < datetime.now(timezone.utc):
         return LicenseVerificationResult(valid=False, payload=payload, error="License expired")
 
     return LicenseVerificationResult(

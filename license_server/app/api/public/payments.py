@@ -14,6 +14,9 @@ from app.services.payment_initialization_service import (
     PaymentInitializationService,
 )
 
+from app.repositories.purchase_session_repository import (
+    PurchaseSessionRepository,
+)
 from app.services.checkout_service import (
     CheckoutService,
 )
@@ -37,7 +40,7 @@ from app.web.templates import templates
 
 router = APIRouter(
 
-    prefix="/api/public/payment",
+    prefix="/api/public/payments",
 
     tags=["Public Payment"],
 
@@ -51,6 +54,7 @@ router = APIRouter(
     "/{checkout_token}"
 )
 def initialize_payment(
+    request: Request,
     checkout_token: str,
     db: Session = Depends(get_db),
 ):
@@ -58,79 +62,17 @@ def initialize_payment(
     service = PaymentInitializationService(
         db
     )
-
-    idempotency_key = request.headers.get(
-        "Idempotency-Key"
-    )
     return service.initialize_payment(
         checkout_token
     )
 
-# @router.get("/callback")
-# def payment_callback(
-#     request: Request,
-#     checkout_token: str = Query(...),
-#     status: str | None = Query(None),
-#     tx_ref: str | None = Query(None),
-#     transaction_id: str | None = Query(None),
-#     db: Session = Depends(get_db),
-# ):
-#     """
-#     Browser callback after Flutterwave redirects
-#     the customer back to the application.
-
-#     IMPORTANT:
-#     This endpoint does NOT verify payment.
-
-#     The webhook remains the source of truth.
-#     """
-
-#     checkout = CheckoutService(db)
-
-#     try:
-
-#         session = checkout.get_checkout_session(
-#             checkout_token
-#         )
-
-#     except HTTPException:
-
-#         raise HTTPException(
-#             status_code=404,
-#             detail="Invalid checkout session.",
-#         )
-
-#     return templates.TemplateResponse(
-
-#         request,
-
-#         "payment_pending.html",
-
-#         {
-
-#             "checkout_token": checkout_token,
-
-#             "purchase_number":
-#                 session.purchase_number,
-
-#             "status":
-#                 status,
-
-#             "tx_ref":
-#                 tx_ref,
-
-#             "transaction_id":
-#                 transaction_id,
-
-#         },
-
-#     )
 @router.get("/callback")
 def flutterwave_callback(
     request: Request,
     status: str | None = None,
     tx_ref: str | None = None,
     transaction_id: str | None = None,
+    db: Session = Depends(get_db),
 ):
     """
     Browser callback.
@@ -147,7 +89,22 @@ def flutterwave_callback(
 
     if payment_status == "successful":
 
-        template = "payment_success.html"
+        repo = PurchaseSessionRepository(db)
+
+        purchase = repo.get_by_payment_reference(tx_ref)
+
+        if not purchase:
+            raise HTTPException(
+                status_code=404,
+                detail="Purchase session not found.",
+            )
+
+        return RedirectResponse(
+            url=(
+                "http://127.0.0.1/Examcenter/license/waiting.php"
+                f"?poll_token={purchase.poll_token}"
+            )
+        )
 
     elif payment_status in (
 

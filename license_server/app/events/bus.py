@@ -28,4 +28,10 @@ class EventBus:
 
         for handler in handlers:
 
-            handler(event)
+            if hasattr(handler, "handle"):
+                handler.handle(event)
+            else:
+                handler(event)
+
+
+event_bus = EventBus()

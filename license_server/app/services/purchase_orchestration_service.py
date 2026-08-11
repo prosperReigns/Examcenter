@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -17,6 +16,7 @@ from app.models.payment import Payment
 from app.models.purchase_session import PurchaseSession
 from app.models.receipt import Receipt
 from app.models.school import School
+from app.models.license import License
 from app.repositories.activation_repository import (
     create_activation_record,
     get_activation_for_machine,
@@ -30,9 +30,9 @@ from app.repositories.license_device_repository import (
     save_device,
 )
 from app.repositories.license_history_repository import create_history_record
-from app.repositories.license_repository import create_license_record, get_license_by_id
+from app.repositories.license_repository import create_license_record, get_license_by_id, persist_license
 from app.repositories.payment_repository import (
-    create_payment_record,
+    create_payment_record as create_payment_record_repository,
     get_payment_by_reference,
 )
 from app.repositories.purchase_session_repository import (
@@ -48,27 +48,9 @@ from app.services.invoice_service import generate_invoice_number
 from app.services.license_service import create_signed_license, normalize_license_type
 from app.services.purchase_state_machine import validate_transition
 from app.services.receipt_service import generate_receipt_number
+from app.utils.time import is_expired, is_token_deliverable, utcnow
 
 logger = logging.getLogger(__name__)
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _as_aware(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
-
-
-def _is_token_deliverable(token) -> bool:
-    return (
-        token is not None
-        and token.used_at is None
-        and token.revoked_at is None
-        and _as_aware(token.expires_at) >= _utcnow()
-    )
 
 
 def _set_status(db: Session, purchase_session: PurchaseSession, status_value: PurchaseStatus) -> None:
@@ -76,6 +58,10 @@ def _set_status(db: Session, purchase_session: PurchaseSession, status_value: Pu
         return
     validate_transition(purchase_session.status, status_value)
     purchase_session.status = status_value.value
+
+    print(
+        f"STATUS: {purchase_session.id} -> {purchase_session.status}"
+    )
     save_purchase_session(db, purchase_session)
     record_audit_event(
         db,
@@ -87,7 +73,7 @@ def _set_status(db: Session, purchase_session: PurchaseSession, status_value: Pu
 
 
 def _ensure_not_expired(purchase_session: PurchaseSession) -> None:
-    if _as_aware(purchase_session.expires_at) < _utcnow():
+    if is_expired(purchase_session.expires_at):
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="Purchase session has expired.",
@@ -148,23 +134,34 @@ def _get_or_create_license(db: Session, purchase_session: PurchaseSession, schoo
         if license_obj is not None:
             return license_obj
 
-    license_type = normalize_license_type(purchase_session.plan_code)
-    issued_at = _utcnow()
-    signed_document = create_signed_license(
-        school=school.name,
-        machine=purchase_session.fingerprint,
-        license_type=license_type,
-        school_id=school.id,
-        school_code=school.code,
-        product_code=purchase_session.product_code,
-        product_name="CBT Examination Software",
-        plan_code=purchase_session.plan_code,
-        plan_name=purchase_session.plan_code,
-        duration_months=purchase_session.duration_months,
-        is_trial=license_type in {"demo", "trial"},
-        issued_at=issued_at,
-        version=1,
+    existing_license = db.scalar(
+        select(License).where(
+            License.school_id == school.id,
+            License.machine_fingerprint == purchase_session.fingerprint,
+        )
     )
+
+    if existing_license:
+        print("USING EXISTING LICENSE")
+
+        purchase_session.license_id = existing_license.id
+
+        save_purchase_session(
+            db,
+            purchase_session,
+        )
+
+        _set_status(
+            db,
+            purchase_session,
+            PurchaseStatus.LICENSE_CREATED,
+        )
+
+        return existing_license
+
+    license_type = normalize_license_type(purchase_session.plan_code)
+    issued_at = utcnow()
+
     license_obj = create_license_record(
         db,
         school_id=school.id,
@@ -173,18 +170,19 @@ def _get_or_create_license(db: Session, purchase_session: PurchaseSession, schoo
         plan_name=purchase_session.plan_code,
         duration_months=purchase_session.duration_months,
         is_trial=license_type in {"demo", "trial"},
-        issued_at=signed_document.issued_at,
-        expiry_at=signed_document.expiry,
+        issued_at=issued_at,
+        expiry_at=None,
         payment_status="paid",
         flutterwave_transaction_id=purchase_session.gateway_transaction_id,
         flutterwave_reference=purchase_session.payment_reference,
         amount_paid=purchase_session.amount,
         currency=purchase_session.currency,
-        signed_license=signed_document.model_dump_json(),
+        signed_license=None,
         activation_count=0,
         max_activations=1,
         version=1,
     )
+    
     signed_document = create_signed_license(
         license_id=license_obj.id,
         school_id=school.id,
@@ -202,9 +200,24 @@ def _get_or_create_license(db: Session, purchase_session: PurchaseSession, schoo
         expiry=license_obj.expiry_at,
         version=license_obj.version,
     )
+
     license_obj.signed_license = signed_document.model_dump_json()
-    db.add(license_obj)
-    db.flush()
+
+    license_obj.issued_at = signed_document.issued_at
+    license_obj.expiry_at = signed_document.expiry
+
+    persist_license(
+        db,
+        license_obj,
+    )
+
+    purchase_session.license_id = license_obj.id
+
+    save_purchase_session(
+        db,
+        purchase_session,
+    )
+
     create_history_record(
         db,
         license_id=license_obj.id,
@@ -225,6 +238,30 @@ def _get_or_create_invoice(db: Session, purchase_session: PurchaseSession, licen
         if invoice is not None:
             return invoice
 
+    existing_invoice = db.scalar(
+        select(Invoice).where(
+            Invoice.license_id == license_obj.id
+        )
+    )
+
+    if existing_invoice is not None:
+        print("USING EXISTING INVOICE")
+
+        purchase_session.invoice_id = existing_invoice.id
+
+        save_purchase_session(
+            db,
+            purchase_session,
+        )
+
+        _set_status(
+            db,
+            purchase_session,
+            PurchaseStatus.INVOICE_CREATED,
+        )
+
+        return existing_invoice
+
     invoice = Invoice(
         license_id=license_obj.id,
         school_id=license_obj.school_id,
@@ -234,7 +271,7 @@ def _get_or_create_invoice(db: Session, purchase_session: PurchaseSession, licen
         currency=purchase_session.currency,
         status="paid",
         due_date=None,
-        paid_at=_utcnow(),
+        paid_at=utcnow(),
     )
     create_invoice(db, invoice)
     purchase_session.invoice_id = invoice.id
@@ -245,15 +282,59 @@ def _get_or_create_invoice(db: Session, purchase_session: PurchaseSession, licen
 def _get_or_create_payment(db: Session, purchase_session: PurchaseSession, customer, school, invoice) -> Payment:
     if purchase_session.payment_id:
         payment = db.get(Payment, purchase_session.payment_id)
+
         if payment is not None:
             return payment
+
+    payment = db.scalar(
+        select(Payment).where(
+            Payment.invoice_id == invoice.id,
+            Payment.status == "pending",
+        )
+    )
+
+    if payment is not None:
+
+        payment.status = "successful"
+
+        payment.gateway_reference = purchase_session.gateway_reference
+
+        payment.gateway_transaction_id = (
+            purchase_session.gateway_transaction_id
+        )
+
+        payment.raw_payload = purchase_session.gateway_response
+
+        payment.verified_at = utcnow()
+
+        payment.paid_at = utcnow()
+
+        db.add(payment)
+
+        db.flush()
+
+        purchase_session.payment_id = payment.id
+
+        mark_invoice_paid(
+            db,
+            invoice,
+        )
+
+        _set_status(
+            db,
+            purchase_session,
+            PurchaseStatus.PAYMENT_RECORDED,
+        )
+
+        return payment
 
     if not purchase_session.payment_reference:
         purchase_session.payment_reference = f"PS-{purchase_session.id}"
 
     payment = get_payment_by_reference(db, purchase_session.payment_reference)
+
     if payment is None:
-        payment = create_payment_record(
+        payment = create_payment_record_repository(
             db,
             customer_id=customer.id,
             school_id=school.id,
@@ -268,15 +349,22 @@ def _get_or_create_payment(db: Session, purchase_session: PurchaseSession, custo
             gateway_transaction_id=purchase_session.gateway_transaction_id,
             raw_payload=purchase_session.gateway_response,
         )
-        payment.verified_at = _utcnow()
-        payment.paid_at = _utcnow()
+        payment.verified_at = utcnow()
+        payment.paid_at = utcnow()
         db.add(payment)
         db.flush()
     else:
         payment.status = "successful"
-        payment.verified_at = payment.verified_at or _utcnow()
-        payment.paid_at = payment.paid_at or _utcnow()
+        payment.verified_at = payment.verified_at or utcnow()
+        payment.paid_at = payment.paid_at or utcnow()
         payment.raw_payload = payment.raw_payload or purchase_session.gateway_response
+        payment.gateway = purchase_session.gateway
+        payment.gateway_reference = purchase_session.gateway_reference
+        payment.gateway_transaction_id = purchase_session.gateway_transaction_id
+        payment.currency = purchase_session.currency
+        payment.amount = purchase_session.amount
+        payment.payment_type = purchase_session.plan_code
+
         db.add(payment)
         db.flush()
 
@@ -303,9 +391,18 @@ def _get_or_create_device(db: Session, purchase_session: PurchaseSession, licens
     _set_status(db, purchase_session, PurchaseStatus.DEVICE_REGISTERED)
     return device
 
+def _get_or_create_activation(
+    db: Session,
+    purchase_session: PurchaseSession,
+    license_obj,
+    device,
+):
+    activation = get_activation_for_machine(
+        db,
+        license_obj.id,
+        purchase_session.fingerprint,
+    )
 
-def _get_or_create_activation(db: Session, purchase_session: PurchaseSession, license_obj, device):
-    activation = get_activation_for_machine(db, license_obj.id, purchase_session.fingerprint)
     if activation is None:
         activation = create_activation_record(
             db,
@@ -316,15 +413,33 @@ def _get_or_create_activation(db: Session, purchase_session: PurchaseSession, li
             computer_name=None,
             ip_address=None,
         )
-        license_obj.activation_count += 1
-        license_obj.last_activation_at = _utcnow()
-        device.activation_count += 1
-        db.add_all([license_obj, device])
-        db.flush()
-    purchase_session.activation_id = activation.id
-    _set_status(db, purchase_session, PurchaseStatus.ACTIVATED)
-    return activation
 
+        license_obj.activation_count = (
+            license_obj.activation_count or 0
+        ) + 1
+
+        license_obj.last_activation_at = utcnow()
+
+        device.activation_count = (
+            device.activation_count or 0
+        ) + 1
+
+        db.add_all([
+            license_obj,
+            device,
+        ])
+
+        db.flush()
+
+    purchase_session.activation_id = activation.id
+
+    _set_status(
+        db,
+        purchase_session,
+        PurchaseStatus.ACTIVATED,
+    )
+
+    return activation
 
 def _get_or_create_receipt(db: Session, purchase_session: PurchaseSession, payment) -> Receipt:
     if purchase_session.receipt_id:
@@ -333,6 +448,15 @@ def _get_or_create_receipt(db: Session, purchase_session: PurchaseSession, payme
             return receipt
 
     receipt = get_receipt_by_payment(db, payment.id)
+
+    if receipt is not None:
+        purchase_session.receipt_id = receipt.id
+        save_purchase_session(
+            db,
+            purchase_session,
+        )
+        return receipt
+
     if receipt is None:
         receipt = Receipt(
             receipt_number=generate_receipt_number(db),
@@ -364,7 +488,10 @@ def _queue_outbox_event(db: Session, purchase_session: PurchaseSession, payload:
         event_type="purchase.completed",
         aggregate_type="purchase_session",
         aggregate_id=purchase_session.id,
-        payload=json.dumps(payload),
+        payload=json.dumps(
+            payload,
+            default=str,
+        ),
         processed=False,
         retry_count=0,
     )
@@ -374,7 +501,7 @@ def _queue_outbox_event(db: Session, purchase_session: PurchaseSession, payload:
 
 def _get_or_create_activation_token(db: Session, purchase_session: PurchaseSession, license_obj):
     token = get_by_id(db, purchase_session.activation_token_id) if purchase_session.activation_token_id else None
-    if _is_token_deliverable(token):
+    if is_token_deliverable(token):
         return token
     if token is not None and (token.used_at is not None or token.revoked_at is not None):
         return token
@@ -407,23 +534,42 @@ def complete_purchase(
         return {
             "status": "completed",
             "session_id": str(purchase_session.id),
-            "activation_token": token.token if _is_token_deliverable(token) else None,
+            "activation_token": token.token if is_token_deliverable(token) else None,
             "license_id": str(purchase_session.license_id) if purchase_session.license_id else None,
         }
 
     try:
         _ensure_not_expired(purchase_session)
         _set_status(db, purchase_session, PurchaseStatus.PAYMENT_VERIFIED)
+
+        print("START STATUS:", purchase_session.status)
         customer = _get_or_create_customer(db, purchase_session)
+
+        
+        print("AFTER CUSTOMER:", purchase_session.status)
         school = _get_or_create_school(db, purchase_session, customer)
+
+        
+
+        print("AFTER SCHOOL:", purchase_session.status)
         license_obj = _get_or_create_license(db, purchase_session, school)
+
+        print("AFTER LICENSE:", purchase_session.status)
         invoice = _get_or_create_invoice(db, purchase_session, license_obj)
+
+        print("AFTER INVOICE:", purchase_session.status)
         payment = _get_or_create_payment(db, purchase_session, customer, school, invoice)
         device = _get_or_create_device(db, purchase_session, license_obj)
         activation = _get_or_create_activation(db, purchase_session, license_obj, device)
         receipt = _get_or_create_receipt(db, purchase_session, payment)
         activation_token = _get_or_create_activation_token(db, purchase_session, license_obj)
         mark_purchase_completed(db, purchase_session)
+        purchase_session.completed = True
+
+        save_purchase_session(
+            db,
+            purchase_session,
+        )
         _queue_outbox_event(
             db,
             purchase_session,
@@ -450,7 +596,6 @@ def complete_purchase(
             "session_id": str(purchase_session.id),
             "activation_token": activation_token.token,
             "license_id": str(license_obj.id),
-            "signed_license": license_obj.signed_license,
         }
     except HTTPException as exc:
         db.rollback()
@@ -476,6 +621,17 @@ def complete_purchase(
             increment_retry_count(db, failed_session)
             failed_session.status = PurchaseStatus.FAILED.value
             save_purchase_session(db, failed_session)
+
+            record_audit_event(
+                db,
+                action="purchase_failed",
+                entity_type="purchase_session",
+                entity_id=str(
+                    failed_session.id
+                ),
+                description="Automatic purchase orchestration failed.",
+            )
+            
             db.commit()
         logger.exception("Purchase orchestration failed for session %s", session_id)
         raise

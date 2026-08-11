@@ -7,7 +7,7 @@ from sqlalchemy import (
 
 from datetime import datetime
 
-from app.database import Base
+from app.database.base import Base
 
 
 

@@ -149,6 +149,44 @@ def create_receipt_record(
 
     return receipt
 
+
+def create_receipt_from_payment(
+    db: Session,
+    payment: Payment,
+    *,
+    admin=None,
+    request=None,
+) -> Receipt:
+    return create_receipt_record(
+        db,
+        payment,
+        admin=admin,
+        request=request,
+    )
+
+
+class ReceiptService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_from_payment(
+        self,
+        payment_id,
+    ) -> Receipt:
+        payment = get_payment(
+            self.db,
+            UUID(str(payment_id)),
+        )
+        if payment is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found.",
+            )
+        return create_receipt_record(
+            self.db,
+            payment,
+        )
+
 def get_receipt_list(
     db: Session,
     *,

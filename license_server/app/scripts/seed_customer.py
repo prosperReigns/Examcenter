@@ -6,8 +6,6 @@ from app.models.customer import Customer
 CUSTOMER ={
     "name":"test customer",
     "email": "customer@examcenter.com",
-    "password": "customer123",
-    "role": "customer"
 }
 
 def seed():
@@ -20,18 +18,14 @@ def seed():
         if customer:
             print("customer already exists")
             return 
-        customer = Customer(full_name=CUSTOMER["name"],
-                    email=CUSTOMER["email"],
-                    password_hash=get_password_hash(CUSTOMER["password"]),
-                    role=CUSTOMER["role"],
-                    is_active=True)
+        customer = Customer(name=CUSTOMER["name"],
+                    email=CUSTOMER["email"])
         
         db.add(customer)
         db.commit()
 
         print("customer created successfully")
         print(f"email: {CUSTOMER['email']}")
-        print(f"password: {CUSTOMER['password']}")
     finally:
         db.close()
 

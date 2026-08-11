@@ -5,25 +5,27 @@ from app.gateways.paystack import PaystackGateway
 
 settings = get_settings()
 
+class PaymentGatewayFactory:
 
-def get_gateway():
+    @staticmethod
+    def create():
 
-    if settings.payment_gateway.lower() == "paystack":
+        if settings.payment_gateway.lower() == "paystack":
 
-        return PaystackGateway(
+            return PaystackGateway(
 
-            secret_key=settings.paystack_secret_key,
+                secret_key=settings.paystack_secret_key,
 
-            base_url=settings.paystack_base_url,
+                base_url=settings.paystack_base_url,
 
-            webhook_secret=settings.paystack_webhook_secret,
+                webhook_secret=settings.paystack_webhook_secret,
+
+            )
+
+        return FlutterwaveGateway(
+
+            secret_key=settings.flutterwave_secret_key,
+
+            base_url=settings.flutterwave_base_url,
 
         )
-
-    return FlutterwaveGateway(
-
-        secret_key=settings.flutterwave_secret_key,
-
-        base_url=settings.flutterwave_base_url,
-
-    )

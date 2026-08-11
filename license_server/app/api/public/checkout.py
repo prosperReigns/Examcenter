@@ -27,6 +27,7 @@ from fastapi.responses import JSONResponse
 from app.services.checkout_page_service import (
     get_checkout_page,
 )
+from app.services.payment_initialization_service import PaymentInitializationService
 
 from app.web.templates import templates
 
@@ -53,25 +54,23 @@ def get_checkout(
 
     )
 
+    payment = PaymentInitializationService(db).initialize_payment(
+        checkout_token
+    )
+
     return templates.TemplateResponse(
-
         "public/checkout.html",
-
         {
-
             "request": request,
-
-            "checkout_url": purchase.checkout_url,
-
+            "checkout_url": payment["authorization_url"],
             "purchase": purchase,
-
         },
-
     )
 
 
 @router.get("/{checkout_token}/validate")
 def validate_checkout(
+    request: Request,
     checkout_token: str,
     db: Session = Depends(get_db),
 ):
@@ -94,8 +93,6 @@ def validate_checkout(
 
         "status": session.status,
 
-        "payment_status": session.payment_status,
-
         "expires_at": session.expires_at,
 
     }
@@ -103,6 +100,7 @@ def validate_checkout(
 
 @router.get("/{checkout_token}/summary")
 def purchase_summary(
+    request: Request,
     checkout_token: str,
     db: Session = Depends(get_db),
 ):
@@ -159,6 +157,7 @@ def purchase_summary(
 
 @router.get("/{checkout_token}/status")
 def purchase_status(
+    request: Request,
     checkout_token: str,
     db: Session = Depends(get_db),
 ):

@@ -1,0 +1,209 @@
+.public-shell {
+    min-height: 100vh;
+    margin: 0;
+    background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 36%),
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 28%),
+        linear-gradient(180deg, #f7faff 0%, #eef3fb 100%);
+    color: #102033;
+}
+
+.public-shell__content {
+    position: relative;
+    z-index: 1;
+    min-height: calc(100vh - 64px);
+    display: flex;
+    align-items: center;
+}
+
+.public-shell__glow {
+    position: fixed;
+    inset: auto;
+    width: 22rem;
+    height: 22rem;
+    border-radius: 50%;
+    filter: blur(30px);
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.public-shell__glow--one {
+    top: -6rem;
+    left: -4rem;
+    background: rgba(37, 99, 235, 0.22);
+}
+
+.public-shell__glow--two {
+    right: -5rem;
+    bottom: 1rem;
+    background: rgba(16, 185, 129, 0.16);
+}
+
+.public-card {
+    background: rgba(255, 255, 255, 0.84);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 28px;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(18px);
+    padding: 2rem;
+}
+
+.public-card--hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.public-card--hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent 52%);
+    pointer-events: none;
+}
+
+.public-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+.public-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    padding: 0.45rem 0.85rem;
+    background: rgba(15, 118, 110, 0.1);
+    color: #0f766e;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.public-icon {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    font-size: 1.7rem;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.12);
+}
+
+.public-icon--pulse {
+    animation: public-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes public-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.06);
+    }
+}
+
+.public-title {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #102033;
+}
+
+.public-lead {
+    max-width: 38rem;
+    margin-left: auto;
+    margin-right: auto;
+    color: #4b5563;
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
+
+.public-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-top: 1.75rem;
+}
+
+.public-summary > div {
+    text-align: left;
+    padding: 1rem 1.1rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.public-summary span {
+    display: block;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #6b7280;
+    margin-bottom: 0.35rem;
+}
+
+.public-summary strong {
+    display: block;
+    font-size: 1rem;
+    color: #0f172a;
+    word-break: break-word;
+}
+
+.public-progress {
+    height: 0.6rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(37, 99, 235, 0.12);
+}
+
+.public-progress__bar {
+    width: 35%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2563eb, #14b8a6);
+    animation: public-progress 1.8s ease-in-out infinite;
+}
+
+@keyframes public-progress {
+    0% {
+        transform: translateX(-25%);
+    }
+
+    50% {
+        transform: translateX(120%);
+    }
+
+    100% {
+        transform: translateX(260%);
+    }
+}
+
+.public-meta {
+    color: #64748b;
+    font-size: 0.95rem;
+}
+
+.public-footer {
+    position: relative;
+    z-index: 1;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.5);
+    color: #475569;
+    padding: 1rem 0;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 767.98px) {
+    .public-card {
+        padding: 1.35rem;
+        border-radius: 22px;
+    }
+
+    .public-summary > div {
+        padding: 0.9rem 1rem;
+    }
+}

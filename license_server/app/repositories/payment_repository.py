@@ -265,7 +265,7 @@ def get_payment_by_id(
     return get_payment(db, payment_id)
 
 def mark_paid(
-    self,
+    db: Session,
     payment,
     gateway_response,
 ):
@@ -274,15 +274,15 @@ def mark_paid(
 
     payment.gateway_response = gateway_response
 
-    self.db.commit()
+    db.commit()
 
-    self.db.refresh(payment)
+    db.refresh(payment)
 
     return payment
 
 
 def mark_failed(
-    self,
+    db: Session,
     payment,
     gateway_response=None,
 ):
@@ -291,9 +291,9 @@ def mark_failed(
 
     payment.gateway_response = gateway_response
 
-    self.db.commit()
+    db.commit()
 
-    self.db.refresh(payment)
+    db.refresh(payment)
 
     return payment
 
@@ -349,47 +349,16 @@ def delete_orphan_pending_payments(
 
     return result.rowcount or 0
 
-def get_pending_by_purchase_session(
-    db: Session,
-    purchase_session_id,
-) -> Payment | None:
-
+def list_pending_payments(db: Session) -> list[Payment]:
     statement = (
-
         select(Payment)
-
-        .where(
-
-            Payment.purchase_session_id
-            == purchase_session_id,
-
-            Payment.status == "pending",
-
-        )
-
-        .order_by(
-            Payment.created_at.desc()
-        )
-
+        .where(Payment.status == "pending")
+        .order_by(Payment.created_at.asc())
     )
-
-    return db.scalar(statement)
-
-def get_pending_by_purchase(
-    self,
-    purchase_id,
-):
-    return (
-        self.db.query(Payment)
-        .filter(
-            Payment.purchase_session_id == purchase_id,
-            Payment.status == "pending",
-        )
-        .first()
-    )
+    return list(db.scalars(statement).all())
 
 def update_gateway_response(
-    self,
+    db: Session,
     payment,
     gateway_response,
 ):
@@ -401,21 +370,17 @@ def update_gateway_response(
         gateway_response["data"]["authorization_url"]
     )
 
-    self.db.commit()
-
-    self.db.refresh(payment)
-
     return payment
 
 def expire_pending_payments(
-    self,
+    db: Session,
 ):
     cutoff = datetime.now(
         timezone.utc
     ) - timedelta(hours=24)
 
     payments = (
-        self.db.query(Payment)
+        db.query(Payment)
         .filter(
             Payment.status == "pending",
             Payment.created_at < cutoff,
@@ -427,16 +392,16 @@ def expire_pending_payments(
 
         payment.status = "expired"
 
-    self.db.commit()
+    db.commit()
 
     return len(payments)
 
 def get_by_idempotency_key(
-    self,
+   db: Session,
     key,
 ):
     return (
-        self.db.query(Payment)
+        db.query(Payment)
         .filter(
             Payment.idempotency_key == key
         )

@@ -8,8 +8,8 @@ from sqlalchemy import (
 )
 
 from datetime import datetime
-
-from app.database import Base
+from sqlalchemy.dialects.postgresql import UUID
+from app.database.base import Base
 
 
 
@@ -25,7 +25,7 @@ class SecurityEvent(Base):
 
 
     license_id = Column(
-        Integer,
+        UUID(as_uuid=True),
         ForeignKey(
             "licenses.id"
         ),

@@ -14,42 +14,43 @@ class Settings(BaseSettings):
 
     app_name: str = "License Management Server"
     debug: bool = False
-    secret_key: str = Field(default="change-me-please-secret", min_length=16)
-    jwt_secret: str = Field(default="change-me-please-jwt-secret", min_length=16)
-    jwt_algorithm: str = "HS256"
+    secret_key: str
+    jwt_secret: str 
+    jwt_algorithm: str
+    license_server_url: str = "https://5138-197-211-53-98.ngrok-free.app"
     access_token_expire_minutes: int = 60
-    access_token_cookie_name: str = "access_token"
-    access_token_cookie_secure: bool = False
-    access_token_cookie_samesite: str = "lax"
-    access_token_cookie_max_age_seconds: int = 3600
-    remember_me_max_age_seconds: int = 2592000
-    database_url: str = "postgresql+psycopg://examcenteradmin:examcenterpassword@localhost:5432/examcenterlicense"
-    flutterwave_public_key: str = ""
-    flutterwave_secret_key: str = ""
-    flutterwave_hash: str = ""
-    flutterwave_base_url: str = "https://api.flutterwave.com/v3"
-    flutterwave_webhook_secret_header: str = "verif-hash"
-    paystack_public_key: str = ""
-    paystack_secret_key: str = ""
-    paystack_base_url: str = "https://api.paystack.co"
-    paystack_webhook_secret: str = ""
-    payment_gateway: str = "flutterwave"
-    payment_callback_url: str = ""
-    company_name: str = "Your Company"
-    support_email: str = "support@example.com"
-    license_currency: str = "NGN"
-    six_month_price: float = 0.0
-    one_year_price: float = 0.0
-    two_year_price: float = 0.0
+    access_token_cookie_name: str
+    access_token_cookie_secure: bool
+    access_token_cookie_samesite: str
+    access_token_cookie_max_age_seconds: int
+    remember_me_max_age_seconds: int
+    database_url: str
+    flutterwave_public_key: str
+    flutterwave_secret_key: str 
+    flutterwave_hash: str
+    flutterwave_base_url: str
+    flutterwave_webhook_secret_header: str
+    paystack_public_key: str 
+    paystack_secret_key: str 
+    paystack_base_url: str
+    paystack_webhook_secret: str
+    payment_gateway: str
+    payment_callback_url: str
+    company_name: str
+    support_email: str
+    license_currency: str
+    six_month_price: float
+    one_year_price: float
+    two_year_price: float
     demo_license_duration_days: int = 7
-    monthly_license_duration_days: int = 30
-    quarterly_license_duration_days: int = 90
-    annual_license_duration_days: int = 365
-    lifetime_license_duration_days: int = 0
-    default_license_activation_limit: int = 1
-    bootstrap_admin_full_name: str = ""
-    bootstrap_admin_email: str = ""
-    bootstrap_admin_password: str = ""
+    trial_duration_days: int = 7
+    six_month_duration_days: int = 180
+    one_year_duration_days: int = 365
+    two_year_duration_days: int = 730
+    default_license_activation_limit: int
+    bootstrap_admin_full_name: str 
+    bootstrap_admin_email: str 
+    bootstrap_admin_password: str 
     bootstrap_admin_role: str = Roles.SUPER_ADMIN
 
     
@@ -62,8 +63,8 @@ def validate_production_settings(settings: Settings) -> None:
         required = {
             "flutterwave_secret_key": settings.flutterwave_secret_key,
             "flutterwave_hash": settings.flutterwave_hash,
-            "payment_provider": settings.PAYMENT_PROVIDER,
-            "payment_callback_url": settings.PAYMENT_CALLBACK_URL,
+            "payment_gateway": settings.payment_gateway,
+            "payment_callback_url": settings.payment_callback_url,
         }
 
         missing = [key for key, value in required.items() if not value]

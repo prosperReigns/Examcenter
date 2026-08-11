@@ -225,6 +225,24 @@ class PurchaseSessionRepository:
 
         return self.db.scalar(statement)
 
+    def get_by_id(
+        self,
+        purchase_session_id: UUID | str,
+    ) -> PurchaseSession | None:
+        return get_purchase_session_by_id(
+            self.db,
+            UUID(str(purchase_session_id)),
+        )
+
+    def get_by_poll_token(
+        self,
+        poll_token: str,
+    ) -> PurchaseSession | None:
+        return get_purchase_session_by_poll_token(
+            self.db,
+            poll_token,
+        )
+
     def mark_payment_pending(
         self,
         purchase,
@@ -293,3 +311,12 @@ class PurchaseSessionRepository:
         )
 
         return db.scalar(statement)
+
+    def get_by_payment_reference(
+        self,
+        payment_reference: str,
+    ):
+        return get_purchase_session_by_reference(
+            self.db,
+            payment_reference,
+        )

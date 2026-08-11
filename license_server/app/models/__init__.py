@@ -23,6 +23,8 @@ from app.models.activation_token import ActivationToken
 from app.models.license_download import LicenseDownload
 from app.models.security_event import SecurityEvent
 from app.models.request_nonce import RequestNonce
+from app.models.webhook_event import WebhookEvent
+
 
 __all__ = [
 	"Activation",
@@ -49,5 +51,6 @@ __all__ = [
     "ActivationToken",
     "LicenseDownload",
     "SecurityEvent",
-    "RequestNonce"
+    "RequestNonce",
+    "WebhookEvent"
 ]

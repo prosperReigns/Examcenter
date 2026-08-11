@@ -6,10 +6,10 @@ from sqlalchemy import (
     Boolean,
     ForeignKey
 )
-
+from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 
-from app.database import Base
+from app.database.base import Base
 
 
 
@@ -25,11 +25,9 @@ class LicenseDownload(Base):
 
 
     license_id = Column(
-        Integer,
-        ForeignKey(
-            "licenses.id"
-        ),
-        nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("licenses.id"),
+        nullable=False,
     )
 
 

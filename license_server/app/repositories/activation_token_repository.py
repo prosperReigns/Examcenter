@@ -60,6 +60,7 @@ def get_by_id(db: Session, token_id: UUID) -> ActivationToken | None:
 
 def get_active_for_purchase(db: Session, purchase_session_id: UUID) -> ActivationToken | None:
     now = datetime.now(timezone.utc)
+    print("Searching token for purchase:", purchase_session_id)
     statement = (
         select(ActivationToken)
         .where(
@@ -70,7 +71,12 @@ def get_active_for_purchase(db: Session, purchase_session_id: UUID) -> Activatio
         )
         .order_by(ActivationToken.created_at.desc())
     )
-    return db.scalar(statement)
+
+    result = db.scalar(statement)
+
+    print("Repository returned:", result)
+
+    return result
 
 def get_latest_for_purchase(
     db: Session,
@@ -140,6 +146,17 @@ def get_stale_tokens(db: Session, older_than_minutes: int = 60) -> list[Activati
         ActivationToken.revoked_at.is_(None),
     )
     return list(db.scalars(statement).all())
+
+
+def find_stale_tokens(
+    db: Session,
+    *,
+    older_than_hours: int = 24,
+) -> list[ActivationToken]:
+    return get_stale_tokens(
+        db,
+        older_than_minutes=older_than_hours * 60,
+    )
 
 
 def delete_used_before(db: Session, cutoff: datetime) -> int:
@@ -339,3 +356,20 @@ def create_download_token(
     db.refresh(token)
 
     return token
+
+
+class ActivationTokenRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_active_token(self, purchase_session_id: UUID) -> ActivationToken | None:
+        return get_active_for_purchase(self.db, purchase_session_id)
+
+    def get_by_token(self, token: str) -> ActivationToken | None:
+        return get_by_token(self.db, token)
+
+    def create(self, activation_token: ActivationToken) -> ActivationToken:
+        return create(self.db, activation_token)
+
+    def revoke(self, activation_token: ActivationToken) -> ActivationToken:
+        return revoke(self.db, activation_token)

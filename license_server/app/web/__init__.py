@@ -1,0 +1,1 @@
+"""Web UI package for templates and browser routes."""

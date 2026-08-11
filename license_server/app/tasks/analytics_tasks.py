@@ -15,6 +15,11 @@ def analytics_snapshot() -> dict:
     finally:
         db.close()
 
+
+@celery_app.task(name="analytics.update_sales", queue="analytics")
+def update_sales_analytics(**kwargs) -> dict:
+    return analytics_snapshot()
+
 def generate_daily_statistics():
     pass
     

@@ -11,15 +11,15 @@ from app.utils.license_crypto import generate_license, generate_license_package,
 settings = get_settings()
 
 LICENSE_DURATION_MAP = {
-    "demo": 7,
+
     "trial": 7,
-    "monthly": 30,
-    "quarterly": 90,
-    "annual": 365,
-    "lifetime": 0,
-    "6_month": 180,
-    "12_month": 365,
-    "24_month": 730
+
+    "6_months": 180,
+
+    "12_months": 365,
+
+    "24_months": 730
+
 }
 
 

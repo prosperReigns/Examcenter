@@ -8,6 +8,8 @@ from app.schemas.public_activation import (
     PublicLicenseValidationResponse,
 )
 
+from app.schemas.purchase_session import PurchaseInitializationResponse
+
 from app.schemas.license_device import (
     DeviceHeartbeatRequest,
 )
@@ -68,7 +70,7 @@ def heartbeat_endpoint(
         payload,
     )
 
-@router.post("/start-purchase")
+@router.post("/start-purchase",response_model=PurchaseInitializationResponse)
 def start_purchase_endpoint(
     payload: PurchaseSessionCreate,
     db: Session = Depends(get_db),

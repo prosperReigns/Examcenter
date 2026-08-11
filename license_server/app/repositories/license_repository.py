@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
@@ -81,6 +81,7 @@ def create_license_record(
     renewed_from: UUID | None = None,
 ) -> License:
     license_obj = License(
+        id=uuid4(),
         school_id=school_id,
         machine_fingerprint=machine_fingerprint.strip(),
         license_type=license_type.strip().lower(),
@@ -102,8 +103,7 @@ def create_license_record(
         renewed_from=renewed_from,
         version=version,
     )
-    db.add(license_obj)
-    db.flush()
+
     return license_obj
 
 
@@ -163,3 +163,20 @@ def soft_delete_license(
     db.flush()
 
     return license_obj
+
+
+def get_license(
+    db: Session,
+    license_id: UUID,
+) -> License | None:
+    return get_license_by_id(db, license_id)
+
+
+def list_expired_licenses(db: Session) -> list[License]:
+    now = datetime.now(timezone.utc)
+    statement = select(License).where(
+        License.deleted_at.is_(None),
+        License.expiry_at.is_not(None),
+        License.expiry_at < now,
+    )
+    return list(db.scalars(statement).all())

@@ -2,11 +2,11 @@ from app.core.config import settings
 from app.services.paystack_service import PaystackService
 from fastapi import HTTPException, status
 
-from app.gateways.factory import get_gateway
+from app.gateways.factory import PaymentGatewayFactory
 
 class FlutterwaveService:
     def __init__(self):
-        self.gateway = get_gateway()
+        self.gateway = PaymentGatewayFactory.create()
 
     def initialize_payment(
         self,

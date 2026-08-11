@@ -14,3 +14,5 @@ class PurchasePollResponse(BaseModel):
     poll_after: int
 
     server_time: str
+
+    license: str | None = None

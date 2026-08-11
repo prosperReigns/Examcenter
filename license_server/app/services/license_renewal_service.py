@@ -288,6 +288,21 @@ def renew_license_from_payment(
     }
 
 
+def renew_license_after_payment(
+    db: Session,
+    payment,
+    *,
+    admin=None,
+    request=None,
+):
+    return renew_license_from_payment(
+        db,
+        payment_id=payment.id,
+        admin=admin,
+        request=request,
+    )
+
+
 def get_available_renewal_plans():
 
     return [

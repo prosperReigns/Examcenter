@@ -1,117 +1,62 @@
-from datetime import datetime, timedelta
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-)
-from fastapi.responses import Response
-
-# rate limiting
-try:
-    from slowapi import Limiter
-    from slowapi.util import get_remote_address
-    limiter = Limiter(key_func=get_remote_address)
-except Exception:
-    # Fallback no-op limiter if slowapi is not available
-    class _NoopLimiter:
-        def limit(self, *args, **kwargs):
-            def _decorator(func):
-                return func
-            return _decorator
-
-    limiter = _NoopLimiter()
-
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.database.session import get_db
 
-from app.services.license_download_service import validate_download_token
+from app.database.session import get_db
+from app.repositories.activation_token_repository import (
+    get_valid_download_token
+)
+
+from app.services.activation_token_service import (
+    validate_token, consume_token
+)
 
 
 router = APIRouter(
-
-    prefix="/api/public/",
-
-    tags=["Public License"],
-
-)
-
-@limiter.limit(
-    "5/minute"
+    prefix="/api/public",
+    tags=["Public License"]
 )
 
 
-@router.get(
-    "/license/download/{token}"
-)
-def download_license(
 
-    token:str,
-
-    db:Session = Depends(get_db)
-
+@router.get("/license/{token}")
+def get_license(
+    token: str,
+    db: Session = Depends(get_db)
 ):
+    print("LICENSE ENDPOINT HIT: token={token[:12]}...")
 
+    activation_token = get_valid_download_token(
+        db,
+        token
+    )
 
-    download = (
+    print(
+        f"LICENSE TOKEN FOUND: "
+        f"{activation_token is not None}"
+    )
 
-        validate_download_token(
-
-            db,
-
-            token
-
-        )
-
+    validate_token(
+        activation_token
     )
 
 
-    if not download:
+    license_obj = activation_token.license
 
-        raise HTTPException(
+    license_data = license_obj.signed_license
 
-            status_code=403,
-
-            detail=
-            "Invalid or expired token"
-
-        )
-
-
-    license = download.license
-
-
-
-    license_file = generate_license_file(
-        license
-    )
-
-
-
-    download.downloaded = True
-
-    download.downloaded_at = (
-        datetime.utcnow()
-    )
-
+    consume_token(db, activation_token)
 
     db.commit()
 
-
-
-    return Response(
-
-        content=license_file,
-
-        media_type=
-        "application/octet-stream",
-
-        headers={
-
-        "Content-Disposition":
-        "attachment; filename=license.lic"
-
-        }
-
+    print(
+        f"LICENSE DELIVERED: "
+        f"license_id={license_obj.id}"
     )
+    return {
+
+        "success": True,
+
+        "license":
+            license_data
+
+    }
