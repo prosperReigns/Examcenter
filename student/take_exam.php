@@ -260,7 +260,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Take Exam - D-Portal</title>
+    <title>Take Exam | Examcenter</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../css/all.min.css">
@@ -295,7 +295,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h4>Exancenter Examination Hall</h4>
+                    <h4>Examcenter Examination Hall</h4>
                     <div class="d-flex gap-3">
                         <span><i class="bi bi-person-fill"></i> <?php echo htmlspecialchars($_SESSION['student_name']); ?></span>
                         <span><i class="bi bi-journal-text"></i> <?php echo htmlspecialchars($_SESSION['test_title']); ?></span>

@@ -286,7 +286,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $is_edit_mode ? 'Edit' : 'Add'; ?> Teacher | D-Portal CBT</title>
+    <title><?php echo $is_edit_mode ? 'Edit' : 'Add'; ?> Admin | Examcenter</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
@@ -334,7 +334,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-brand">
-            <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+            <h3><i class="fas fa-graduation-cap me-2"></i>Examcenter</h3>
             <div class="admin-info"><b>
                 <small>Welcome back,</small>
                 <h6><?php echo htmlspecialchars($user['username']); ?></h6></b>
@@ -352,6 +352,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <a href="manage_students.php"><i class="fas fa-users"></i>Manage Student</a>
             <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
             <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
+            <li>
+                <a href="../backup/backup_list.php">
+                    <i class="fas fa-database"></i>
+                    <span>Backups</span>
+                </a>
+            </li>
+
+            <li>
+                <a
+                    href="audit_logs.php"
+                >
+                    <i class="fas fa-history"></i>
+                    <span>Audit Logs</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="../license/index.php">
+                    <i class="fas fa-key"></i>
+                    <span>License</span>
+                </a>
+            </li>
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>

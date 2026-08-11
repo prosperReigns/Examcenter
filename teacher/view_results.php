@@ -353,7 +353,7 @@ $conn->close();
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>View Results | D-Portal CBT</title>
+        <title>View Results | Examcenter</title>
         <link href="../css/bootstrap.min.css" rel="stylesheet">
         <link rel="stylesheet" href="../css/all.css">
         <link rel="stylesheet" href="../css/admin-dashboard.css">
@@ -374,7 +374,7 @@ $conn->close();
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="sidebar-brand">
-                <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+                <h3><i class="fas fa-graduation-cap me-2"></i>Examcenter</h3>
                 <div class="admin-info">
                     <small>Welcome back,</small>
                     <h6><?php echo htmlspecialchars($teacher['last_name']); ?></h6>
