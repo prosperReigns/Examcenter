@@ -72,7 +72,7 @@ if (!empty($assigned_subjects)) {
         SELECT t.id, t.title, t.subject, t.duration, c.class_name
         FROM tests t
         JOIN classes c ON t.academic_level_id = c.academic_level_id
-        WHERE t.subject IN ($subject_list)
+        WHERE AND teacher_id = $teacher_id AND t.subject IN ($subject_list)
         ORDER BY t.id DESC
     ");
 
@@ -114,6 +114,10 @@ $conn->close();
             <a href="add_question.php">
                 <i class="fas fa-plus-circle"></i>
                 Add Questions
+            </a>
+            <a href="bank.php">
+                <i class="fas fa-database"></i>
+                Question Bank
             </a>
             <a href="view_questions.php">
                 <i class="fas fa-list"></i>

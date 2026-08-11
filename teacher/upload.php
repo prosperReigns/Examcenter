@@ -1,9 +1,24 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require '../db.php';
 require_once '../includes/system_guard.php';
 require_once __DIR__ . '/../license/license_guard.php';
 require '../vendor/autoload.php'; // PhpWord autoload
 use PhpOffice\PhpWord\IOFactory;
+
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'teacher') {
+    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    exit();
+}
+
+$teacher_id = (int)$_SESSION['user_id'];
+
+// Bulk upload can either build/append to a test (default) or
+// drop straight into the teacher's question bank.
+$isBankMode = isset($_POST['bank_mode']) && $_POST['bank_mode'] === '1';
 
 $conn = Database::getInstance()->getConnection();
 
@@ -94,6 +109,8 @@ try {
         }
 
         // Line 4: Duration
+        // (Still required as a header line to keep the file format
+        // consistent, even though question-bank uploads don't use it.)
         if (!preg_match('/^Duration:\s*\d+/i', $lines[3])) {
             fail(4, $lines[3], 'Use format: Duration: 30');
         }
@@ -216,61 +233,121 @@ try {
             die("Missing required test header information.");
         }
 
-        // --- Get academic year from form ---
-        if (empty($_POST['year'])) {
-            die("Academic year is required.");
-        }
-        $test_year = $_POST['year'];
-
-        // Get academic_level_id for the class name
-        $stmt = $conn->prepare("SELECT academic_level_id
-        FROM classes
-        WHERE class_name = ?
-        LIMIT 1");
-        $stmt->bind_param("s", $test_class);
+        // Confirm the teacher is assigned to the subject in the file.
+        $stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
+        $stmt->bind_param("i", $teacher_id);
         $stmt->execute() or die($stmt->error);
-        $stmt->bind_result($academic_level_id);
-        if (!$stmt->fetch()) {
-            die("❌ Invalid class: {$test_class}");
-        }
+        $assigned_subjects = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'subject');
         $stmt->close();
 
-        // Derive class level (JSS / SS)
-        $test_class_level = str_starts_with($test_class, 'SS') ? 'SS' : 'JSS';
-
-        // Validate subject against subject_levels
-        $stmt = $conn->prepare("
-            SELECT 1
-            FROM subjects s
-            JOIN subject_levels sl ON sl.subject_id = s.id
-            WHERE s.subject_name = ?
-            AND sl.class_level = ?
-            LIMIT 1
-        ");
-        $stmt->bind_param("ss", $test_subject, $test_class_level);
-        $stmt->execute() or die($stmt->error);
-
-        if (!$stmt->fetch()) {
-            die("❌ Subject '{$test_subject}' is not allowed for {$test_class_level}");
+        if (!in_array($test_subject, $assigned_subjects, true)) {
+            die("❌ You are not assigned to subject '{$test_subject}'.");
         }
-        $stmt->close();
 
-        // Check if test exists
-        $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ? AND year = ? LIMIT 1");
-        $stmt->bind_param("siss", $test_title, $academic_level_id, $test_subject, $test_year);
+        $test_id = null;   // stays null for bank uploads
+        $bank_class = '';  // level_code used when saving bank questions
 
-        $stmt->execute() or die($stmt->error);
-        $stmt->bind_result($existing_test_id);
-        if ($stmt->fetch()) {
-            $test_id = $existing_test_id;
-            $stmt->close();
-        } else {
-            $stmt->close();
-            $stmt = $conn->prepare("INSERT INTO tests (title, academic_level_id, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->bind_param("sisis", $test_title, $academic_level_id, $test_subject, $test_duration, $test_year);
+        if ($isBankMode) {
+
+            // ---- QUESTION BANK UPLOAD ----
+            // No test is created; questions are saved with
+            // test_id = NULL and teacher_id = the uploading teacher,
+            // exactly like a manually-added bank question.
+
+            $stmt = $conn->prepare("
+                SELECT id, class_group
+                FROM academic_levels
+                WHERE level_code = ?
+                LIMIT 1
+            ");
+            $stmt->bind_param("s", $test_class);
             $stmt->execute() or die($stmt->error);
-            $test_id = $stmt->insert_id;
+            $level = $stmt->get_result()->fetch_assoc();
             $stmt->close();
+
+            if (!$level) {
+                die("❌ Invalid class: {$test_class}");
+            }
+
+            $bank_class = $test_class;
+
+            // Validate subject against subject_levels for this class group
+            $stmt = $conn->prepare("
+                SELECT 1
+                FROM subjects s
+                JOIN subject_levels sl ON sl.subject_id = s.id
+                WHERE s.subject_name = ?
+                AND sl.class_level = ?
+                LIMIT 1
+            ");
+            $stmt->bind_param("ss", $test_subject, $level['class_group']);
+            $stmt->execute() or die($stmt->error);
+
+            if (!$stmt->fetch()) {
+                die("❌ Subject '{$test_subject}' is not allowed for {$level['class_group']}");
+            }
+            $stmt->close();
+
+        } else {
+
+            // ---- TEST UPLOAD (existing behaviour) ----
+
+            // --- Get academic year from form ---
+            if (empty($_POST['year'])) {
+                die("Academic year is required.");
+            }
+            $test_year = $_POST['year'];
+
+            // Get academic_level_id for the class name
+            $stmt = $conn->prepare("SELECT academic_level_id
+            FROM classes
+            WHERE class_name = ?
+            LIMIT 1");
+            $stmt->bind_param("s", $test_class);
+            $stmt->execute() or die($stmt->error);
+            $stmt->bind_result($academic_level_id);
+            if (!$stmt->fetch()) {
+                die("❌ Invalid class: {$test_class}");
+            }
+            $stmt->close();
+
+            // Derive class level (JSS / SS)
+            $test_class_level = str_starts_with($test_class, 'SS') ? 'SS' : 'JSS';
+
+            // Validate subject against subject_levels
+            $stmt = $conn->prepare("
+                SELECT 1
+                FROM subjects s
+                JOIN subject_levels sl ON sl.subject_id = s.id
+                WHERE s.subject_name = ?
+                AND sl.class_level = ?
+                LIMIT 1
+            ");
+            $stmt->bind_param("ss", $test_subject, $test_class_level);
+            $stmt->execute() or die($stmt->error);
+
+            if (!$stmt->fetch()) {
+                die("❌ Subject '{$test_subject}' is not allowed for {$test_class_level}");
+            }
+            $stmt->close();
+
+            // Check if test exists
+            $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ? AND year = ? LIMIT 1");
+            $stmt->bind_param("siss", $test_title, $academic_level_id, $test_subject, $test_year);
+
+            $stmt->execute() or die($stmt->error);
+            $stmt->bind_result($existing_test_id);
+            if ($stmt->fetch()) {
+                $test_id = $existing_test_id;
+                $stmt->close();
+            } else {
+                $stmt->close();
+                $stmt = $conn->prepare("INSERT INTO tests (title, academic_level_id, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("sisis", $test_title, $academic_level_id, $test_subject, $test_duration, $test_year);
+                $stmt->execute() or die($stmt->error);
+                $test_id = $stmt->insert_id;
+                $stmt->close();
+            }
         }
 
         // --- Parse questions ---
@@ -345,9 +422,16 @@ try {
             if (empty($q['question']) || empty($q['correct_answer'])) continue;
 
             // Save the main question
-            $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, class, subject, question_type) VALUES (?, ?, ?, ?, ?)");
             $type = 'multiple_choice_single';
-            $stmt->bind_param("sisss", $q['question'], $test_id, $test_class, $test_subject, $type);
+
+            if ($isBankMode) {
+                $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, teacher_id, class, subject, question_type, created_at) VALUES (?, NULL, ?, ?, ?, ?, NOW())");
+                $stmt->bind_param("sisss", $q['question'], $teacher_id, $bank_class, $test_subject, $type);
+            } else {
+                $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, class, subject, question_type) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param("sisss", $q['question'], $test_id, $test_class, $test_subject, $type);
+            }
+
             $stmt->execute() or die($stmt->error);
             $question_id = $stmt->insert_id;
             $stmt->close();
@@ -380,8 +464,13 @@ try {
             $stmt->close();
         }
 
-        echo "✅ Test and questions uploaded successfully.";
-        echo '<br><br><a href="add_question.php" style="text-decoration:none;font-size:18px;">⬅ Back</a>';
+        if ($isBankMode) {
+            echo "✅ Questions uploaded to your Question Bank successfully.";
+            echo '<br><br><a href="bank.php" style="text-decoration:none;font-size:18px;">⬅ Back to Question Bank</a>';
+        } else {
+            echo "✅ Test and questions uploaded successfully.";
+            echo '<br><br><a href="add_question.php" style="text-decoration:none;font-size:18px;">⬅ Back</a>';
+        }
 
     } else {
         echo "❌ No file uploaded.";

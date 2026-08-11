@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS new_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     question_text TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     test_id INT,
+    teacher_id INT NULL,
     class VARCHAR(20),
     subject VARCHAR(100),
     question_type VARCHAR(50),

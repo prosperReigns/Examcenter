@@ -4,8 +4,10 @@ session_start();
 require_once "../db.php";
 require_once "../includes/system_guard.php";
 
-if (!isset($_SESSION['current_test_id'])) {
-    $_SESSION['error'] = "Please create or select a test first.";
+$teacher_id = (int)($_SESSION['user_id'] ?? 0);
+
+if ($teacher_id <= 0) {
+    $_SESSION['error'] = "Invalid user session.";
     Header("Location: bank.php");
     Exit();
 }
@@ -16,26 +18,69 @@ if (empty($_POST['questions'])) {
     Exit();
 }
 
+/*
+ * Determine which test we're adding to.
+ *
+ * A teacher can either:
+ *   - explicitly pick a test from the dropdown on bank.php
+ *     (target_test_id), or
+ *   - rely on the "current test" stored in their session.
+ *
+ * target_test_id, when present, always wins.
+ */
+
+$target_test_id = isset($_POST['target_test_id']) ? (int)$_POST['target_test_id'] : 0;
+
+if ($target_test_id > 0) {
+    $test_id = $target_test_id;
+} elseif (isset($_SESSION['current_test_id'])) {
+    $test_id = (int)$_SESSION['current_test_id'];
+} else {
+    $_SESSION['error'] = "Please create or select a test first.";
+    Header("Location: bank.php");
+    Exit();
+}
+
 $database = Database::getInstance();
 $conn = $database->getConnection();
 
-$test_id = (int)$_SESSION['current_test_id'];
+/*
+ * Fetch the subjects this teacher is assigned to, so we can
+ * confirm they're actually allowed to touch the chosen test
+ * and the bank questions being copied.
+ */
+
+$stmt = $conn->prepare("SELECT subject FROM teacher_subjects WHERE teacher_id = ?");
+$stmt->bind_param("i", $teacher_id);
+$stmt->execute();
+$assigned_subjects = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'subject');
+$stmt->close();
 
 $conn->begin_transaction();
 
 try {
 
     /*
-     * Get current test details
+     * Get target test details, scoped to a subject this
+     * teacher is actually assigned to.
      */
 
+    if (empty($assigned_subjects)) {
+        throw new Exception("You are not assigned to any subjects.");
+    }
+
+    $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
+
     $stmt = $conn->prepare("
-        SELECT class_group, subject
+        SELECT academic_level_id, subject
         FROM tests
         WHERE id = ?
+        AND subject IN ($placeholders)
     ");
 
-    $stmt->bind_param("i", $test_id);
+    $types = 'i' . str_repeat('s', count($assigned_subjects));
+    $params = array_merge([$test_id], $assigned_subjects);
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
 
     $test = $stmt->get_result()->fetch_assoc();
@@ -43,24 +88,36 @@ try {
     $stmt->close();
 
     if (!$test) {
-        throw new Exception("Invalid test.");
+        throw new Exception("Invalid test, or you don't have access to it.");
     }
+
+    // Remember this as the active test for subsequent visits.
+    $_SESSION['current_test_id'] = $test_id;
 
     foreach ($_POST['questions'] as $bank_id) {
 
         $bank_id = (int)$bank_id;
 
         /*
-         * Read question from bank
+         * Read question from bank, scoped to the requesting
+         * teacher so nobody can copy another teacher's
+         * private bank questions into their own test.
          */
 
         $stmt = $conn->prepare("
-            SELECT *
-            FROM question_bank
-            WHERE id=?
+            SELECT
+                id,
+                question_text,
+                class,
+                subject,
+                question_type
+            FROM new_questions
+            WHERE id = ?
+            AND test_id IS NULL
+            AND teacher_id = ?
         ");
 
-        $stmt->bind_param("i", $bank_id);
+        $stmt->bind_param("ii", $bank_id, $teacher_id);
         $stmt->execute();
 
         $question = $stmt->get_result()->fetch_assoc();
@@ -95,7 +152,7 @@ try {
             "sisss",
             $question['question_text'],
             $test_id,
-            $test['class_group'],
+            $test['academic_level_id'],
             $test['subject'],
             $question['question_type']
         );
@@ -283,6 +340,9 @@ try {
     $conn->commit();
 
     $_SESSION['success'] = "Selected questions added successfully.";
+
+    header("Location: bank.php?success=questions_added");
+    exit();
 
 } catch (Exception $e) {
     $conn->rollback();

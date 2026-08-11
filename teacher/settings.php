@@ -178,6 +178,10 @@ $conn->close();
         <div class="sidebar-menu mt-4">
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
             <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="bank.php">
+                <i class="fas fa-database"></i>
+                Question Bank
+            </a>
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
             <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>

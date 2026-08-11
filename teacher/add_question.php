@@ -223,7 +223,7 @@ ORDER BY t.created_at DESC
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-brand">
-            <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+            <h3><i class="fas fa-graduation-cap me-2"></i>Examcenter</h3>
             <div class="admin-info">
                 <small>Welcome back,</small>
                 <h6><?php echo htmlspecialchars($teacher['last_name']); ?></h6>
@@ -232,10 +232,15 @@ ORDER BY t.created_at DESC
         <div class="sidebar-menu mt-4">
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
             <a href="add_question.php" class="active"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="bank.php">
+                <i class="fas fa-database"></i>
+                Question Bank
+            </a>
+            <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
             <a href="manage_test.php"><i class="fas fa-list"></i>Manage Test</a>
-            <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
             <a href="manage_students.php"><i class="fas fa-users"></i>Manage Students</a>
+            
             <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
             <a href="my-profile.php"><i class="fas fa-user"></i>My Profile</a>
             <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
@@ -306,10 +311,10 @@ ORDER BY t.created_at DESC
                                     <select class="form-select" name="academic_level_id" required id="classSelect">
                                         <option value="">Select Class</option>
                                         <?php foreach ($levels as $level): ?>
-    <option value="<?= (int)$level['id'] ?>">
-        <?= htmlspecialchars($level['level_code']) ?>
-    </option>
-<?php endforeach; ?>
+                                        <option value="<?= (int)$level['id'] ?>">
+                                            <?= htmlspecialchars($level['level_code']) ?>
+                                        </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-2 form-group-spacing">
@@ -381,7 +386,7 @@ ORDER BY t.created_at DESC
                             <div class="form-group-spacing">
                                 <?php if($isBankMode): ?>
                                 <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                 <label class="form-label fw-bold">
                                 Class
                                 </label>
@@ -390,13 +395,28 @@ ORDER BY t.created_at DESC
                                 name="academic_level_id"
                                 required>
                                 <?php foreach($levels as $level): ?>
-                                <option value="<?= $level['id']; ?>">
+                                <option value="<?= $level['id']; ?>" <?= (isset($edit_question['class']) && $edit_question['class'] === $level['level_code']) ? 'selected' : ''; ?>>
                                 <?= htmlspecialchars($level['level_code']); ?>
                                 </option>
                                 <?php endforeach; ?>
                                 </select>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
+                                <label class="form-label fw-bold">
+                                Subject
+                                </label>
+                                <select
+                                class="form-select"
+                                name="subject"
+                                required>
+                                <?php foreach($assigned_subjects as $subj): ?>
+                                <option value="<?= htmlspecialchars($subj); ?>" <?= (isset($edit_question['subject']) && $edit_question['subject'] === $subj) ? 'selected' : ''; ?>>
+                                <?= htmlspecialchars($subj); ?>
+                                </option>
+                                <?php endforeach; ?>
+                                </select>
+                                </div>
+                                <div class="col-md-4">
                                 <label class="form-label fw-bold">
                                 Topic (Optional)
                                 </label>
@@ -427,6 +447,26 @@ ORDER BY t.created_at DESC
                                 <button type="submit" class="btn btn-primary"><i class="fas fa-<?php echo $edit_question ? 'save' : 'plus'; ?> me-2"></i><?php echo $edit_question ? 'Update Question' : 'Add Question'; ?></button>
                             </div>
                         </form>
+
+                        <?php if ($isBankMode && !$edit_question): ?>
+                        <hr>
+                        <h6>Bulk Upload to Question Bank</h6>
+                        <p class="text-muted small">
+                            Upload a <code>.docx</code> file using the same format as a test upload
+                            (Title / Class / Subject / Duration header, then numbered questions).
+                            Questions are saved to your bank and are not attached to any test.
+                            Use the class's short code for the Class line (e.g. <code>Class: JSS1</code>),
+                            not a stream name.
+                        </p>
+                        <form method="POST" id="bankUploadForm" enctype="multipart/form-data" action="upload.php">
+                            <input type="hidden" name="bank_mode" value="1">
+                            <label class="form-label fw-bold">Select File (.docx):</label>
+                            <input type="file" class="form-control" name="test_file" accept=".docx" required>
+                            <button type="submit" class="btn btn-primary mt-3">
+                                <i class="fas fa-upload me-2"></i>Upload to Bank
+                            </button>
+                        </form>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -764,6 +804,18 @@ ORDER BY t.created_at DESC
                     error.appendTo(element.closest('.mb-4'));
                 }
             });
+
+            // Form validation for Bank Upload Form
+            if ($('#bankUploadForm').length) {
+                $('#bankUploadForm').validate({
+                    rules: {
+                        test_file: { required: true, accept: "docx" }
+                    },
+                    messages: {
+                        test_file: { required: "Please select a file.", accept: "Please upload a valid .docx file." }
+                    }
+                });
+            }
 
             // Form validation for Select Test Form
             $('#selectTestForm').validate({
