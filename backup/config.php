@@ -23,7 +23,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $dbHost = "localhost";
 $dbUser = "root";
 $dbPass = "";
-$dbName = "cbt_exam";     // Change to your database name
+$dbName = "cbt_app_db";
 
 
 /*

@@ -92,8 +92,9 @@ try {
             $conn,
             $_SESSION['user_id'],
             "Backups",
-            "Restored backup '{$backup['filename']}'",
-            "RESTORE"
+            "RESTORE",
+            "Restored backup '{$backup['filename']}'"
+            
         );
     }
 

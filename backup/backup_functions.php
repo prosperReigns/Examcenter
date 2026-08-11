@@ -99,17 +99,17 @@ function verifyBackup(string $file, string $checksum): bool
 
 
 /**
- * Save backup record
+ * Save backup record.
  */
 function saveBackupRecord(
     mysqli $conn,
-    $filename,
-    $backupType,
-    $filesize,
-    $checksum,
-    $createdBy
-): bool
-{
+    string $filename,
+    string $backupType,
+    int $filesize,
+    string $checksum,
+    int $createdBy
+): bool {
+
     $stmt = $conn->prepare("
         INSERT INTO backups
         (
@@ -120,8 +120,18 @@ function saveBackupRecord(
             created_by
         )
         VALUES
-        (?,?,?,?,?)
+        (?, ?, ?, ?, ?)
     ");
+
+    if ($stmt === false) {
+
+        error_log(
+            "Backup DB error: "
+            . $conn->error
+        );
+
+        return false;
+    }
 
     $stmt->bind_param(
         "ssisi",
@@ -133,6 +143,15 @@ function saveBackupRecord(
     );
 
     $result = $stmt->execute();
+
+    if (!$result) {
+
+        error_log(
+            "Backup INSERT failed: "
+            . $stmt->error
+        );
+    }
+
     $stmt->close();
 
     return $result;
@@ -145,15 +164,24 @@ function saveBackupRecord(
 function getBackup(mysqli $conn, int $id): ?array
 {
     $stmt = $conn->prepare("
-        SELECT *
+        SELECT
+            backups.*,
+            admins.username
         FROM backups
-        WHERE id = ?
+
+        LEFT JOIN admins
+            ON admins.id = backups.created_by
+
+        WHERE backups.id = ?
+        LIMIT 1
     ");
 
     $stmt->bind_param("i", $id);
+
     $stmt->execute();
 
     $result = $stmt->get_result();
+
     $backup = $result->fetch_assoc();
 
     $stmt->close();
@@ -206,121 +234,290 @@ function getAllBackups(mysqli $conn): mysqli_result|false
 /**
  * Execute mysqldump
  */
-function createDatabaseBackup():string|false{
-        try{
-            $config = getBackupConfig();
+function createDatabaseBackup(): string|false
+{
+    try {
 
-            extract($config);
+        $config = getBackupConfig();
 
-            if (!file_exists($mysqldump)) {
-                return false;
-            }
+        $dbHost    = $config['dbHost'];
+        $dbUser    = $config['dbUser'];
+        $dbPass    = $config['dbPass'];
+        $dbName    = $config['dbName'];
+        $mysqldump = $config['mysqldump'];
 
-            $filename = generateBackupFilename();
+        /*
+        |--------------------------------------------------------------------------
+        | Verify mysqldump exists
+        |--------------------------------------------------------------------------
+        */
 
-            $filepath = BACKUP_DIRECTORY . DIRECTORY_SEPARATOR . $filename;
-
-            $command  = escapeshellarg($mysqldump) . " ";
-            $command .= "--host=" . escapeshellarg($dbHost) . " ";
-            $command .= "--user=" . escapeshellarg($dbUser) . " ";
-
-            if (!empty($dbPass)) {
-                $command .= "--password=" . escapeshellarg($dbPass) . " ";
-            }
-
-            $command .= "--routines --triggers --events ";
-            $command .= "--single-transaction ";
-            $command .= "--databases " . escapeshellarg($dbName) . " ";
-            $command .= "> " . escapeshellarg($filepath);
-
-            $lock = fopen(
-            BACKUP_DIRECTORY . "/backup.lock",
-                "c"
+        if (!is_file($mysqldump)) {
+            error_log(
+                "Backup error: mysqldump not found at: " . $mysqldump
             );
 
-            if ($lock === false) {
-                return false;
-            }
+            return false;
+        }
 
-            if (!flock($lock, LOCK_EX | LOCK_NB)) {
-                fclose($lock);
-                return false;
-            }
+        /*
+        |--------------------------------------------------------------------------
+        | Generate filename
+        |--------------------------------------------------------------------------
+        */
 
-            exec($command, $output, $returnCode);
+        $filename = generateBackupFilename();
 
-            if ($returnCode !== 0) {
-                error_log(
-                    implode(PHP_EOL, $output)
-                );
-            }
+        $filepath = BACKUP_DIRECTORY
+            . DIRECTORY_SEPARATOR
+            . $filename;
 
-            flock($lock, LOCK_UN);
+        /*
+        |--------------------------------------------------------------------------
+        | Build mysqldump command
+        |--------------------------------------------------------------------------
+        */
+
+        $command =
+            escapeshellarg($mysqldump) . " ";
+
+        $command .=
+            "--host=" . escapeshellarg($dbHost) . " ";
+
+        $command .=
+            "--user=" . escapeshellarg($dbUser) . " ";
+
+        if ($dbPass !== '') {
+            $command .=
+                "--password=" . escapeshellarg($dbPass) . " ";
+        }
+
+        $command .= "--routines ";
+        $command .= "--triggers ";
+        $command .= "--events ";
+        $command .= "--single-transaction ";
+        $command .= "--databases " . escapeshellarg($dbName) . " ";
+
+        /*
+        |--------------------------------------------------------------------------
+        | Redirect SQL output and errors
+        |--------------------------------------------------------------------------
+        */
+
+        $command .=
+            "> " . escapeshellarg($filepath) . " ";
+
+        $command .=
+            "2> " .
+            escapeshellarg(
+                BACKUP_DIRECTORY . DIRECTORY_SEPARATOR . "backup_error.log"
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent simultaneous backups/restores
+        |--------------------------------------------------------------------------
+        */
+
+        $lockPath =
+            BACKUP_DIRECTORY
+            . DIRECTORY_SEPARATOR
+            . "backup.lock";
+
+        $lock = fopen($lockPath, "c");
+
+        if ($lock === false) {
+
+            error_log(
+                "Backup error: Unable to open backup lock."
+            );
+
+            return false;
+        }
+
+        if (!flock($lock, LOCK_EX | LOCK_NB)) {
 
             fclose($lock);
 
-            if ($returnCode !== 0) {
-                return false;
-            }
+            error_log(
+                "Backup error: Another backup/restore operation is running."
+            );
 
-            if (!file_exists($filepath) || filesize($filepath) === 0) {
-                return false;
-            }
-
-            return $filepath;
-        }catch(Throwable $e) {
-            error_log($e->getMessage());
             return false;
         }
-        
+
+        /*
+        |--------------------------------------------------------------------------
+        | Execute mysqldump
+        |--------------------------------------------------------------------------
+        */
+
+        $output = [];
+
+        $returnCode = 0;
+
+        exec(
+            $command,
+            $output,
+            $returnCode
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Release lock
+        |--------------------------------------------------------------------------
+        */
+
+        flock($lock, LOCK_UN);
+        fclose($lock);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check command result
+        |--------------------------------------------------------------------------
+        */
+
+        if ($returnCode !== 0) {
+
+            $errorLog =
+                BACKUP_DIRECTORY
+                . DIRECTORY_SEPARATOR
+                . "backup_error.log";
+
+            $errorMessage = '';
+
+            if (file_exists($errorLog)) {
+                $errorMessage = trim(
+                    file_get_contents($errorLog)
+                );
+            }
+
+            error_log(
+                "mysqldump failed. Exit code: "
+                . $returnCode
+                . ". Error: "
+                . $errorMessage
+            );
+
+            /*
+            |------------------------------------------------------------------
+            | Remove incomplete backup
+            |------------------------------------------------------------------
+            */
+
+            if (file_exists($filepath)) {
+                @unlink($filepath);
+            }
+
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Verify backup file
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            !file_exists($filepath) ||
+            filesize($filepath) <= 0
+        ) {
+
+            error_log(
+                "Backup error: mysqldump completed but backup file is empty."
+            );
+
+            if (file_exists($filepath)) {
+                @unlink($filepath);
+            }
+
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Success
+        |--------------------------------------------------------------------------
+        */
+
+        return $filepath;
+
+    } catch (Throwable $e) {
+
+        error_log(
+            "Backup exception: " . $e->getMessage()
+        );
+
+        if (isset($filepath) && file_exists($filepath)) {
+            @unlink($filepath);
+        }
+
+        return false;
     }
+}
 
 
 
 /**
  * Restore a backup using the mysql client.
  */
-function restoreDatabaseBackup(string $backupFile):bool
-    {
-        try{
-            $config = getBackupConfig();
+function restoreDatabaseBackup(string $backupFile): bool
+{
+    try {
 
-        extract($config);
+        $config = getBackupConfig();
 
-        if (!file_exists($mysql)) {
+        $dbHost = $config['dbHost'];
+        $dbUser = $config['dbUser'];
+        $dbPass = $config['dbPass'];
+        $dbName = $config['dbName'];
+        $mysql  = $config['mysql'];
+
+        if (!is_file($mysql)) {
             return false;
         }
 
-        if (!file_exists($backupFile)) {
+        if (!is_file($backupFile)) {
             return false;
         }
 
-        if (filesize($backupFile) === 0) {
+        if (filesize($backupFile) <= 0) {
             return false;
         }
 
         if (
-            strtolower(pathinfo(
-                $backupFile,
-                PATHINFO_EXTENSION
-            )) !== "sql"
+            strtolower(
+                pathinfo($backupFile, PATHINFO_EXTENSION)
+            ) !== 'sql'
         ) {
             return false;
         }
-        $command = escapeshellarg($mysql) . " ";
-        $command .= "--host=" . escapeshellarg($dbHost) . " ";
-        $command .= "--user=" . escapeshellarg($dbUser) . " ";
 
-        if (!empty($dbPass)) {
-            $command .= "--password=" . escapeshellarg($dbPass) . " ";
+        $command =
+            escapeshellarg($mysql) . " ";
+
+        $command .=
+            "--host=" . escapeshellarg($dbHost) . " ";
+
+        $command .=
+            "--user=" . escapeshellarg($dbUser) . " ";
+
+        if ($dbPass !== '') {
+            $command .=
+                "--password=" . escapeshellarg($dbPass) . " ";
         }
 
-        $command .= escapeshellarg($dbName) . " < " . escapeshellarg($backupFile);
+        $command .=
+            escapeshellarg($dbName)
+            . " < "
+            . escapeshellarg($backupFile);
 
-        $lock = fopen(
-        BACKUP_DIRECTORY . "/backup.lock",
-            "c"
-        );
+        $lockPath =
+            BACKUP_DIRECTORY
+            . DIRECTORY_SEPARATOR
+            . "backup.lock";
+
+        $lock = fopen($lockPath, "c");
 
         if ($lock === false) {
             return false;
@@ -331,16 +528,29 @@ function restoreDatabaseBackup(string $backupFile):bool
             return false;
         }
 
-        exec($command, $output, $returnCode);
+        $output = [];
+
+        $returnCode = 0;
+
+        exec(
+            $command,
+            $output,
+            $returnCode
+        );
 
         flock($lock, LOCK_UN);
-
         fclose($lock);
 
-        return ($returnCode === 0);
-        }catch (Throwable $e){
-            error_log($e->getMessage());
-            return false;
-        }
-        
+        return $returnCode === 0;
+
+    } catch (Throwable $e) {
+
+        error_log(
+            "Restore exception: "
+            . $e->getMessage()
+        );
+
+        return false;
     }
+}
+

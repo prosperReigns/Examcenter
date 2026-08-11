@@ -64,8 +64,9 @@ if (function_exists('logAudit')) {
         $conn,
         $_SESSION['user_id'],
         "Backups",
-        "Downloaded backup '{$backup['filename']}'",
-        "DOWNLOAD"
+        "DOWNLOAD",
+        "Downloaded backup '{$backup['filename']}'"
+        
     );
 }
 

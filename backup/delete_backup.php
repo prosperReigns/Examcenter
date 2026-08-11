@@ -80,8 +80,9 @@ try {
             $conn,
             $_SESSION['user_id'],
             "Backups",
-            "Deleted backup '{$backup['filename']}'",
-            "DELETE"
+            "DELETE",
+            "Deleted backup '{$backup['filename']}'"
+            
         );
 
     }
