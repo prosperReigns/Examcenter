@@ -1,6 +1,6 @@
 import json
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 
 import jwt
 
@@ -62,7 +62,7 @@ def verify_expiry(
         payload["expiry_at"]
     )
 
-    if expiry < datetime.utcnow():
+    if expiry < datetime.now(timezone.utc):
 
         raise HTTPException(
             403,

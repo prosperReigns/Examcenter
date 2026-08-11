@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -18,6 +19,7 @@ from app.repositories.license_device_repository import (
 )
 from app.services.audit_service import record_audit_event
 from app.repositories.activation_repository import reset_device_activation
+from app.repositories.license_repository import get_license_by_id
 
 def get_devices(
     db: Session,
@@ -325,21 +327,18 @@ def heartbeat_device(
     db: Session,
     payload,
 ):
-
     device = get_device_by_machine_id(
         db,
         payload.machine_id,
     )
 
     if device is None:
-
         raise HTTPException(
             status_code=404,
             detail="Device not found",
         )
 
     if payload.last_user:
-
         device.last_user = payload.last_user
 
     updated = record_heartbeat(
@@ -348,14 +347,84 @@ def heartbeat_device(
         ip_address=payload.ip_address,
     )
 
+    # ------------------------------------------------------------------
+    # Find the license attached to this device
+    # ------------------------------------------------------------------
+
+    license_obj = get_license_by_id(
+        db,
+        device.license_id,
+    )
+
+    if license_obj is None or license_obj.deleted_at is not None:
+        db.commit()
+
+        return {
+            "status": "invalid",
+            "last_seen": updated.last_seen,
+            "expiry_date": None,
+            "grace_until": None,
+            "message": "License not found.",
+        }
+
+    # ------------------------------------------------------------------
+    # Check license status
+    # ------------------------------------------------------------------
+
+    now = datetime.now(timezone.utc)
+
+    if license_obj.status in {"revoked", "suspended"}:
+        db.commit()
+
+        return {
+            "status": license_obj.status,
+            "last_seen": updated.last_seen,
+            "expiry_date": (
+                license_obj.expiry_at.isoformat()
+                if license_obj.expiry_at
+                else None
+            ),
+            "grace_until": None,
+            "message": f"License is {license_obj.status}.",
+        }
+
+    # ------------------------------------------------------------------
+    # Check expiry
+    # ------------------------------------------------------------------
+
+    if (
+        license_obj.expiry_at is not None
+        and license_obj.expiry_at < now
+    ):
+        license_obj.status = "expired"
+
+        db.add(license_obj)
+        db.commit()
+
+        return {
+            "status": "expired",
+            "last_seen": updated.last_seen,
+            "expiry_date": license_obj.expiry_at.isoformat(),
+            "grace_until": None,
+            "message": "License has expired.",
+        }
+
+    # ------------------------------------------------------------------
+    # Active license
+    # ------------------------------------------------------------------
+
     db.commit()
 
     return {
-
         "status": "alive",
-
         "last_seen": updated.last_seen,
-
+        "expiry_date": (
+            license_obj.expiry_at.isoformat()
+            if license_obj.expiry_at
+            else None
+        ),
+        "grace_until": None,
+        "message": "License is active.",
     }
 
 def register_device(
