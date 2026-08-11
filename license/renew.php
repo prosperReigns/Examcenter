@@ -3,6 +3,7 @@
 session_start();
 
 require_once "verify.php";
+require_once "redirect_helper.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     header("Location: index.php");
@@ -56,7 +57,7 @@ try {
     $_SESSION["license_success"] =
         "License renewed successfully.";
 
-    header("Location: index.php");
+    header("Location: " . getPostActivationRedirect());
 
     exit();
 

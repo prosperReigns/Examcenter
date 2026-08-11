@@ -8,10 +8,10 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    "server" => "https://license.seedofabraham.com",
+    "server" => "https://5138-197-211-53-98.ngrok-free.app",
 
     "portal_url" =>
-        "https://license.seedofabraham.com",
+        "https://5138-197-211-53-98.ngrok-free.app",
 
     /*
     |--------------------------------------------------------------------------
@@ -56,15 +56,8 @@ return [
             "/trial",
 
 
-        "purchase_url" =>
-            "/purchase/start",
-
-        /*
-        Create purchase session
-        */
-
-        "purchase_create" =>
-            "/api/v1/purchase-sessions",
+        "purchase_start" =>
+            "/api/public/start-purchase",
 
 
         /*
@@ -72,15 +65,15 @@ return [
         */
 
         "purchase_status" =>
-            "/api/v1/public/purchase",
+            "/api/public/purchase",
 
 
         /*
-        Download signed license
+        Verify signed license
         */
 
-        "license_download" =>
-            "/api/v1/public/license/download",
+        "verify" =>
+            "/api/public/validate-license",
 
 
         /*
@@ -88,7 +81,16 @@ return [
         */
 
         "heartbeat" =>
-            "/api/v1/license/heartbeat",
+            "/api/public/devices/heartbeat",
+
+        "checkout" =>
+            "/activation",
+
+        "license_delivery" =>
+            "/api/public/license",
+
+        "plans" =>
+            "/public/plans",
 
     ],
 

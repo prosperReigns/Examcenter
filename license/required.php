@@ -4,7 +4,7 @@ session_start();
 require_once "fingerprint.php";
 require_once "helpers.php";
 require_once "plan_helper.php";
-
+require_once "redirect_helper.php";
 
 $licenseConfig = config("license");
 
@@ -223,24 +223,11 @@ $plan["price"]
 
 
 
-<a
-
-target="_blank"
-
-href="<?= 
-$licenseServer
-?>/purchase/start?
-fingerprint=<?=urlencode($fingerprint)?>
-&plan=<?=urlencode($plan["id"])?>
-"
-
-class="btn btn-primary w-100"
-
->
-
-Choose
-
-</a>
+<button
+    class="btn btn-primary w-100"
+    onclick="startPurchase('<?= htmlspecialchars($plan['id']) ?>')">
+    Choose
+</button>
 
 
 </div>
@@ -258,69 +245,25 @@ Choose
 </div>
                             </li>
                             <li>Complete registration and payment (if applicable).</li>
-                            <li>Download the generated license (.lic).</li>
-                            <li>Return here and upload the license file.</li>
+                            <li>The license will automatically activate this computer after payment.</li>
+                            <li>Keep the application open until activation completes.</li>
                         </ol>
-                        <hr>
-                        <div class="card border-success mb-4">
-                            <div class="card-header bg-success text-white">
-                                <strong>Choose a License</strong>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <div class="card h-100">
-                                        <div class="card-body text-center">
-                                            <h5>Free Trial</h5>
-                                            <p>7 Days</p>
-                                            <a 
-                                                target="_blank"
-                                                href="<?= 
-                                                $licenseServer .
-                                                $licenseConfig["trial_url"]
-                                                ?>?fingerprint=<?= urlencode($fingerprint) ?>&product=<?= urlencode($app["name"]) ?>&version=<?= urlencode($version) ?>"
-                                                >
-                                                Start Trial
-                                                </a>
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <div class="col-md-3 mb-3">
-                                    <div class="card h-100">
-                                        <div class="card-body text-center">
-                                            <h5>6 Months</h5>
-                                            <a target="_blank" class="btn btn-primary btn-sm w-100 my-3" href="<?= $licenseServer ?>/purchase/start?fingerprint=<?= urlencode($fingerprint) ?>&product=<?= urlencode($app["name"]) ?>&version=<?= urlencode($version) ?>&plan=6">Buy License</a>
-                                        </div>
-                                    </div>
-                                </div>
+                        <div class="alert alert-info">
 
-                                <div class="col-md-3 mb-3">
-                                    <div class="card h-100">
-                                        <div class="card-body text-center">
-                                            <h5>12 Months</h5>
-                                            <a target="_blank" class="btn btn-primary btn-sm w-100 my-3" href="<?= $licenseServer ?>/purchase/start?fingerprint=<?= urlencode($fingerprint) ?>&product=<?= urlencode($app["name"]) ?>&version=<?= urlencode($version) ?>&plan=12">Buy License</a>
-                                        </div>
-                                    </div>
-                                </div>
+                        <h5>
+                        Automatic Activation
+                        </h5>
 
-                                <div class="col-md-3 mb-3">
-                                    <div class="card h-100">
-                                        <div class="card-body text-center">
-                                            <h5>24 Months</h5>
-                                            <a target="_blank" class="btn btn-warning btn-sm w- my-3" href="<?= $licenseServer ?>/purchase/start?fingerprint=<?= urlencode($fingerprint) ?>&product=<?= urlencode($app["name"]) ?>&version=<?= urlencode($version) ?>&plan=24">Buy License</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <p>
+                        After successful payment, your license will be delivered automatically to this computer.
+                        </p>
+
+                        <p>
+                        Keep this window open while activation completes.
+                        </p>
 
                         </div>
-                        <form method="POST" action="activate.php" enctype="multipart/form-data">
-                            <h5>Already have a License?</h5>
-                            <p class="text-muted">Upload the <strong>.lic</strong> file you received from the License Portal.</p>
-                            <label class="form-label">License File</label>
-                            <input class="form-control mb-3" type="file" name="license_file" accept=".lic" required>
-                            <button class="btn btn-primary"><i class="fas fa-lock-open"></i> Activate Software</button>
-                        </form>
                     </div>
 
                     <div class="card-footer text-center text-muted">
@@ -352,6 +295,191 @@ Choose
 </script>
 
 <script src="../js/bootstrap.bundle.min.js"></script>
+<script>
+    async function startPurchase(plan) {
 
+    try {
+
+        const response = await fetch(
+            "<?= $licenseServer ?>/api/public/start-purchase",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+
+                    fingerprint: document.getElementById("fingerprint").value,
+
+                    product_code: "cbt_exam",
+
+                    version: "<?= $version ?>",
+
+                    plan_code: plan,
+
+                    customer_name: null,
+
+                    customer_email: null,
+
+                    customer_phone: null,
+
+                    school_name: null
+
+                })
+            }
+        );
+
+        if (!response.ok) {
+
+            const error = await response.text();
+
+            alert(error);
+
+            return;
+
+        }
+
+        const purchase = await response.json();
+
+        window.location.href = purchase.checkout_url;
+
+    }
+
+    catch (e) {
+
+        alert("Unable to contact the License Server.");
+
+        console.error(e);
+
+    }
+
+}
+</script>
+<script>
+
+let pollTimer = null;
+let activationInProgress = false;
+
+async function pollPurchase() {
+
+    // Prevent overlapping activation requests
+    if (activationInProgress) {
+        return;
+    }
+
+    activationInProgress = true;
+
+    try {
+
+        const response = await fetch(
+            "activate.php",
+            {
+                cache: "no-store"
+            }
+        );
+
+        const result = await response.json();
+
+        console.log("Automatic activation:", result);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Activation successful
+        |--------------------------------------------------------------------------
+        */
+
+        if (result.success) {
+
+            if (pollTimer !== null) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+
+            alert(
+                result.message ||
+                "License activated successfully!"
+            );
+
+            window.location.href = <?= json_encode(getPostActivationRedirect()) ?>;
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Still waiting for payment
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            result.status === "pending" ||
+            result.status === "processing"
+        ) {
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Permanent failure
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            result.status === "failed" ||
+            result.status === "error" ||
+            result.status === "no_purchase"
+        ) {
+
+            if (pollTimer !== null) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+
+            alert(
+                result.message ||
+                "Activation failed."
+            );
+
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "Automatic activation polling failed:",
+            error
+        );
+
+    }
+    finally {
+
+        activationInProgress = false;
+
+    }
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Start polling
+|--------------------------------------------------------------------------
+|
+| Do NOT call pollPurchase() immediately and start the interval
+| at the same time.
+|
+*/
+
+pollPurchase();
+
+pollTimer = setInterval(
+    pollPurchase,
+    3000
+);
+
+</script>
 </body>
 </html>

@@ -45,33 +45,14 @@ class Heartbeat
 
         $payload = [
 
-            "license_key" =>
-                $license["license_key"],
-
-
-            "machine_fingerprint" =>
+            "machine_id" =>
                 MachineFingerprint::generate(),
 
+            "ip_address" =>
+                null,
 
-            "hardware" =>
-                MachineFingerprint::details(),
-
-
-            "product" =>
-                $app["name"],
-
-            "installation_id" =>
-                InstallationIdentity::id(),
-
-            "installation_signature" =>
-                CloneDetector::generate(),
-
-            "version" =>
-                $app["version"],
-
-
-            "last_verified" =>
-                $license["last_verified"]
+            "last_user" =>
+                null
 
         ];
 

@@ -23,9 +23,9 @@ return [
     "timezone" => "Africa/Lagos",
 
     "license_secret" =>
-        "CHANGE_THIS_TO_A_RANDOM_64_CHARACTER_SECRET",
+        "315c19cb96ec49f6f2ebf648222b32f1bc905eb491670543beedd4b92eaa14ea",
 
-    "api_secret" => "CHANGE_THIS_TO_A_RANDOM_SECRET",
+    "api_secret" =>                 "4cfe382d9298299ae53887383c4162b934401654f627325848a3ff366d703f21",
 
      /*
     |--------------------------------------------------------------------------

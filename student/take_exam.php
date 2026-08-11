@@ -295,7 +295,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h4>D-Portal Examination</h4>
+                    <h4>Exancenter Examination Hall</h4>
                     <div class="d-flex gap-3">
                         <span><i class="bi bi-person-fill"></i> <?php echo htmlspecialchars($_SESSION['student_name']); ?></span>
                         <span><i class="bi bi-journal-text"></i> <?php echo htmlspecialchars($_SESSION['test_title']); ?></span>

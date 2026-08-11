@@ -1,14 +1,11 @@
 <?php
 
 require_once "license_api.php";
-require_once "LicenseDownloader.php";
 require_once "verify.php";
 
 
 class AutomaticActivation
 {
-
-
     /*
     |--------------------------------------------------------------------------
     | Activate from purchase polling
@@ -19,17 +16,12 @@ class AutomaticActivation
         string $pollToken
     ): array {
 
-
-        if (
-            empty($pollToken)
-        ) {
+        if (empty($pollToken)) {
 
             throw new Exception(
                 "Missing purchase token."
             );
-
         }
-
 
 
         /*
@@ -44,109 +36,151 @@ class AutomaticActivation
             );
 
 
-
         if (
-            empty(
-                $status["status"]
-            )
+            empty($status["status"])
         ) {
 
             throw new Exception(
                 "Invalid purchase response."
             );
-
         }
-
-
-
-        switch (
-            $status["status"]
-        ) {
-
-
-            case "pending":
-
-            case "processing":
-
-                return [
-
-                    "success" => false,
-
-                    "status" =>
-                        $status["status"],
-
-                    "message" =>
-                        "Payment is still processing."
-
-                ];
-
-
-
-            case "failed":
-
-                throw new Exception(
-                    "Payment failed."
-                );
-
-
-
-            case "completed":
-
-                break;
-
-
-
-            default:
-
-                throw new Exception(
-                    "Unknown purchase status."
-                );
-
-        }
-
-
 
 
         /*
         |--------------------------------------------------------------------------
-        | Get download token
+        | Failed purchase
         |--------------------------------------------------------------------------
         */
 
         if (
-            empty(
-                $status["download_token"]
-            )
+            $status["status"] === "failed"
         ) {
 
             throw new Exception(
-                "License download token missing."
+                "Payment failed."
             );
-
         }
-
-
-
-        $downloadToken =
-            $status["download_token"];
-
-
 
 
         /*
         |--------------------------------------------------------------------------
-        | Download signed license
+        | Cancelled purchase
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $status["status"] === "cancelled"
+        ) {
+
+            throw new Exception(
+                "Purchase was cancelled."
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Expired purchase
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $status["status"] === "expired"
+        ) {
+
+            throw new Exception(
+                "Purchase has expired."
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Purchase still processing
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $status["status"] !== "completed"
+        ) {
+
+            return [
+
+                "success" =>
+                    false,
+
+                "status" =>
+                    $status["status"],
+
+                "progress" =>
+                    $status["progress"] ?? null,
+
+                "message" =>
+                    $status["message"]
+                    ??
+                    "Purchase is still being processed.",
+
+                "poll_after" =>
+                    $status["poll_after"] ?? 3
+
+            ];
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Completed purchase must contain license
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            empty($status["license"])
+        ) {
+
+            throw new Exception(
+                "Purchase completed but license was not returned."
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | The License Server returns the COMPLETE SIGNED LICENSE
+        |
+        | It is already JSON.
+        |
+        | DO NOT:
+        |
+        | - base64_decode()
+        | - fetch another activation token
+        | - call a license download endpoint
+        |
         |--------------------------------------------------------------------------
         */
 
         $licenseText =
-            LicenseDownloader::downloadWithRetry(
-
-                $downloadToken
-
-            );
+            $status["license"];
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | Debug
+        |--------------------------------------------------------------------------
+        */
+
+        error_log(
+            "AUTO ACTIVATION: license received. Length="
+            . strlen($licenseText)
+        );
+
+        error_log(
+            "AUTO ACTIVATION: license prefix="
+            . substr(
+                $licenseText,
+                0,
+                150
+            )
+        );
 
 
         /*
@@ -155,21 +189,36 @@ class AutomaticActivation
         |--------------------------------------------------------------------------
         */
 
-        $verifier =
-            new LicenseVerifier();
+        try {
+
+            $verifier =
+                new LicenseVerifier();
+
+            $verifier->activate(
+                $licenseText
+            );
+
+        } catch (Exception $e) {
+
+            error_log(
+                "AUTO ACTIVATION VERIFICATION ERROR: "
+                . $e->getMessage()
+            );
+
+            throw $e;
+        }
 
 
-
-        $verifier->activate(
-            $licenseText
-        );
-
-
-
+        /*
+        |--------------------------------------------------------------------------
+        | Success
+        |--------------------------------------------------------------------------
+        */
 
         return [
 
-            "success" => true,
+            "success" =>
+                true,
 
             "status" =>
                 "completed",
@@ -178,9 +227,6 @@ class AutomaticActivation
                 "License activated successfully."
 
         ];
-
     }
-
-
 }
 ?>

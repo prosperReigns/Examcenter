@@ -7,17 +7,21 @@ require_once __DIR__ . "/Heartbeat.php";
 |--------------------------------------------------------------------------
 | License Runtime Synchronizer
 |--------------------------------------------------------------------------
+|
+| Handles automatic communication between ExamCenter and the
+| license server. This class can be called by the application
+| without requiring any manual CLI operation.
+|
 */
+
 
 class LicenseSynchronizer
 {
-
 
     public static function run(): array
     {
 
         try {
-
 
             /*
             |--------------------------------------------------------------------------
@@ -25,13 +29,14 @@ class LicenseSynchronizer
             |--------------------------------------------------------------------------
             */
 
-            if (
-                !Heartbeat::due()
-            ) {
+            if (!Heartbeat::due()) {
 
                 return [
 
                     "success" => true,
+
+                    "status" =>
+                        Heartbeat::serverStatus(),
 
                     "message" =>
                         "Synchronization not required."
@@ -39,7 +44,6 @@ class LicenseSynchronizer
                 ];
 
             }
-
 
 
             /*
@@ -52,7 +56,6 @@ class LicenseSynchronizer
                 Heartbeat::send();
 
 
-
             return [
 
                 "success" => true,
@@ -60,55 +63,42 @@ class LicenseSynchronizer
                 "status" =>
                     $response["status"]
                     ??
-                    "unknown"
+                    "unknown",
+
+                "expiry_date" =>
+                    $response["expiry_date"]
+                    ??
+                    null,
+
+                "grace_until" =>
+                    $response["grace_until"]
+                    ??
+                    null,
+
+                "message" =>
+                    $response["message"]
+                    ??
+                    null
 
             ];
 
-
-
         }
-        catch(Exception $e) {
-
+        catch (Throwable $e) {
 
             return [
 
                 "success" => false,
+
                 "status" => "offline",
+
                 "error" =>
-                    $e->getMessage()    
+                    $e->getMessage()
+
             ];
 
         }
 
-
     }
 
-
 }
-
-
-/*
-|--------------------------------------------------------------------------
-| CLI execution
-|--------------------------------------------------------------------------
-*/
-
-if (
-    php_sapi_name()
-    ===
-    "cli"
-) {
-
-
-    $result =
-        LicenseSynchronizer::run();
-
-
-
-    echo json_encode(
-        $result,
-        JSON_PRETTY_PRINT
-    );
-
-
-}
+?>

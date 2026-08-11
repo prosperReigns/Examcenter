@@ -6,6 +6,8 @@ require_once __DIR__ . "/fingerprint.php";
 require_once __DIR__ . "/Heartbeat.php";
 require_once __DIR__ . "/CloneDetector.php";
 require_once __DIR__ . "/SecurityLogger.php";
+require_once __DIR__ . "/license_sync.php";
+
 
 $db = Database::getInstance()->getConnection();
 
@@ -64,6 +66,36 @@ if (!$license) {
 
 }
 
+/*                                                                         |
+| -------------------------------------------------------------------------- |
+| Automatic License Synchronization                                          |
+| -------------------------------------------------------------------------- |
+|                                                                            |
+| Synchronization is performed automatically when required.                  |
+| No manual CLI command or administrator intervention is required.           |
+|                                                                            |
+| A failed heartbeat does NOT immediately block ExamCenter.                  |
+| The existing local cache and grace-period rules below determine            |
+| whether the application may continue operating.                            |
+|                                                                            |
+| */
+
+$syncResult =
+LicenseSynchronizer::run();
+
+if (
+!$syncResult["success"]
+) {
+
+SecurityLogger::write(
+    "HEARTBEAT_FAILED",
+    $syncResult["error"]
+    ?? "License server synchronization failed."
+);
+
+}
+
+
 /*
 |--------------------------------------------------------------------------
 | Verify installation binding
@@ -111,8 +143,18 @@ if (
 */
 
 
+/*
+|--------------------------------------------------------------------------
+| Remote license status
+|--------------------------------------------------------------------------
+*/
+
+$cache =
+    Heartbeat::cache();
+
 $status =
-    Heartbeat::serverStatus();
+    $cache["server_status"]
+    ?? "unknown";
 
 /*
 |--------------------------------------------------------------------------
@@ -120,12 +162,24 @@ $status =
 |--------------------------------------------------------------------------
 */
 
-if (
-    $status === "revoked"
-) {
+if ($status === "revoked") {
 
     redirectLicenseError(
         "License has been revoked."
+    );
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Server suspended license
+|--------------------------------------------------------------------------
+*/
+
+if ($status === "suspended") {
+
+    redirectLicenseError(
+        "License has been suspended."
     );
 
 }
@@ -136,9 +190,7 @@ if (
 |--------------------------------------------------------------------------
 */
 
-if (
-    $status === "expired"
-) {
+if ($status === "expired") {
 
     redirectLicenseError(
         "License has expired."
@@ -148,12 +200,45 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| Server unavailable
+| Check cached expiry date
+|--------------------------------------------------------------------------
+|
+| Even if the last heartbeat returned "alive", the license must not
+| remain usable after its cached expiry date.
+|
+*/
+
+if (!empty($cache["expiry_date"])) {
+
+    $expiryTimestamp =
+        strtotime(
+            $cache["expiry_date"]
+        );
+
+    if (
+        $expiryTimestamp !== false
+        &&
+        time() > $expiryTimestamp
+    ) {
+
+        redirectLicenseError(
+            "License has expired."
+        );
+
+    }
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Server unavailable / unknown
 |--------------------------------------------------------------------------
 */
 
 if (
     $status === "unknown"
+    ||
+    $status === "offline"
 ) {
 
     if (
@@ -161,9 +246,7 @@ if (
     ) {
 
         redirectLicenseError(
-
             "License verification unavailable. Please connect to the internet."
-
         );
 
     }
@@ -176,7 +259,7 @@ if (
 |--------------------------------------------------------------------------
 */
 
-$currentFingerprint = currentFingerprint();
+$currentFingerprint = MachineFingerprint::generate();
 
 if (
     !hash_equals(

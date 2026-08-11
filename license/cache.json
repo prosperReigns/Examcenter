@@ -1,9 +1,9 @@
 {
     "version": 1,
-    "last_sync": null,
-    "server_status": "unknown",
-    "expiry_date": null,
+    "last_sync": "2026-08-11 04:32:26",
+    "server_status": "alive",
+    "expiry_date": "2027-08-07T01:06:32.699832+01:00",
     "grace_until": null,
-    "server_message": null,
-    "checksum": ""
+    "server_message": "License is active.",
+    "checksum": "4373194ba7d171852c9fe9069be5eda3dd2b976ca9e3afd98239e3fc5130c65d"
 }

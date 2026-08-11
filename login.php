@@ -23,7 +23,8 @@ $error = '';
 
 // Initialize database connection
 try {
-    $conn = Database::getInstance()->getConnection();
+    $conn = Database::connection();
+
     if (!$conn || $conn->connect_error) {
         error_log("Database connection failed: " . ($conn ? $conn->connect_error : 'No connection'));
         $error = "Database connection failed. Please try again later.";

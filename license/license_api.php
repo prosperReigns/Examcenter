@@ -185,6 +185,15 @@ class LicenseAPI
 
         }
 
+        if (
+            strtoupper($method) === "GET"
+            && !empty($payload)
+        ) {
+
+            $url .= "?" . http_build_query($payload);
+
+        }
+
 
 
         curl_setopt_array(
@@ -194,10 +203,7 @@ class LicenseAPI
 
 
 
-        $response =
-            curl_exec($ch);
-
-
+        $response = curl_exec($ch);
 
         if ($response === false) {
 
@@ -215,6 +221,23 @@ class LicenseAPI
                 CURLINFO_HTTP_CODE
             );
 
+        error_log(
+            "LICENSE API REQUEST: "
+            . strtoupper($method)
+            . " "
+            . $url
+        );
+
+        error_log(
+            "LICENSE API RESPONSE HTTP: "
+            . $status
+        );
+
+        error_log(
+            "LICENSE API RESPONSE BODY: "
+            . $response
+        );
+
 
         curl_close($ch);
 
@@ -222,8 +245,20 @@ class LicenseAPI
 
         if ($status >= 400) {
 
+            error_log(
+                "LICENSE SERVER HTTP ERROR: "
+                . $status
+                . " URL="
+                . $url
+                . " RESPONSE="
+                . $response
+            );
+
             throw new Exception(
-                "License server request failed."
+                "License server request failed. HTTP "
+                . $status
+                . ": "
+                . $response
             );
 
         }
@@ -252,35 +287,6 @@ class LicenseAPI
         return $json;
 
     }
-
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Create Purchase Session
-    |--------------------------------------------------------------------------
-    */
-
-    public static function initializePurchase(
-        array $payload
-    ): array {
-
-
-        return self::request(
-
-            "POST",
-
-            self::endpoint(
-                "purchase_create"
-            ),
-
-            $payload
-
-        );
-
-    }
-
 
 
 
@@ -314,39 +320,26 @@ class LicenseAPI
     }
 
 
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Download License
-    |--------------------------------------------------------------------------
-    */
-
-    public static function downloadLicense(
-        string $downloadToken
-    ): array {
+    public static function fetchLicense(
+        string $token
+    ): array
+    {
 
 
         return self::request(
 
             "GET",
 
-            self::endpoint(
-                "license_download"
-            )
-            .
-            "/"
+            "/api/public/license/"
             .
             urlencode(
-                $downloadToken
+                $token
             )
 
         );
 
+
     }
-
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -373,48 +366,63 @@ class LicenseAPI
 
     }
 
-    public static function getDownloadToken(
-        string $pollToken
-    )
-    {
-
-        return self::request(
-
-            "/api/public/license/token/"
-            .
-            $pollToken,
-
-            []
-
-        );
-
-    }
-
     public static function plans()
     {
 
         return self::request(
-
-            "/api/public/plans",
-
-            []
+            "GET",
+            self::endpoint("plans")
 
         );
 
     }
 
-    public static function startPurchase(
-        array $payload
+    public static function startPurchase(array $payload): array
+    {
+        $response = self::request(
+            "POST",
+            self::endpoint("purchase_start"),
+            $payload
+        );
+
+        if (isset($response["checkout_token"])) {
+
+            $response["checkout_url"] =
+                self::checkoutUrl(
+                    $response["checkout_token"]
+                );
+
+        }
+
+        return $response;
+    }
+
+    public static function deliverLicense(
+        string $token
     ): array {
 
 
         return self::request(
-
-            "/api/public/purchase/start",
-
-            $payload
-
+            "GET",
+            self::endpoint("license_delivery")
+            .
+            urlencode($token)
         );
+
+    }
+
+    public static function checkoutUrl(
+        string $checkoutToken
+    ): string {
+
+        return
+            self::server()
+            .
+            self::endpoint("checkout")
+            .
+            "/"
+            .
+            urlencode($checkoutToken);
 
     }
 }

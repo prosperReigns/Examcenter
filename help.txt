@@ -347,6 +347,7 @@ CREATE TABLE IF NOT EXISTS licenses (
     machine_fingerprint VARCHAR(255),
     installation_id VARCHAR(255),
     installation_signature VARCHAR(255),
+    license_signature VARCHAR(1024) NULL,
     license_type VARCHAR(100),
     activation_date DATETIME,
     expiry_date DATETIME,

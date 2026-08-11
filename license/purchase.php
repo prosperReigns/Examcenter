@@ -51,24 +51,18 @@ MachineFingerprint::generate()
 
 );
 
+if (isset($response["checkout_url"])) {
 
+    $_SESSION["purchase"] = [
 
-if(
-isset(
-$response["checkout_url"]
-)
-){
+        "poll_token"      => $response["poll_token"],
+        "checkout_token"  => $response["checkout_token"],
+        "started_at"      => time()
 
+    ];
 
-header(
-"Location: "
-.$response["checkout_url"]
-);
-
-
-exit();
-
-
+    header("Location: " . $response["checkout_url"]);
+    exit();
 }
 
 
