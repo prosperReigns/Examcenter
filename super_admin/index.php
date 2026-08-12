@@ -1127,27 +1127,15 @@ $daysText = $daysRemaining < 0
 
 <nav class="sidebar-menu">
 
-    <a href="../admin/dashboard.php">
+    <a href="dashboard.php">
         <i class="fas fa-home"></i>
         <span>Dashboard</span>
     </a>
 
 
-    <a href="../admin/add_teacher.php">
+    <a href="manage_admins.php">
         <i class="fas fa-user-plus"></i>
-        <span>Add Teachers</span>
-    </a>
-
-
-    <a href="../admin/view_questions.php">
-        <i class="fas fa-question-circle"></i>
-        <span>View Questions</span>
-    </a>
-
-
-    <a href="../admin/view_results.php">
-        <i class="fas fa-chart-bar"></i>
-        <span>Exam Results</span>
+        <span>Manage Admins</span>
     </a>
 
 
@@ -1168,28 +1156,6 @@ $daysText = $daysRemaining < 0
     </a>
 
 
-    <a href="../admin/manage_subject.php">
-        <i class="fas fa-book"></i>
-        <span>Manage Subject</span>
-    </a>
-
-
-    <a href="../admin/manage_teachers.php">
-        <i class="fas fa-users"></i>
-        <span>Manage Teachers</span>
-    </a>
-
-
-    <a href="../admin/manage_test.php">
-        <i class="fas fa-file-alt"></i>
-        <span>Manage Tests</span>
-    </a>
-
-    <a href="../admin/exam_schedule.php">
-        <i class="fas fa-calendar-check"></i>
-        Timetable
-    </a>
-    
     <div class="sidebar-section">
         System
     </div>
@@ -1200,19 +1166,19 @@ $daysText = $daysRemaining < 0
         <span>License</span>
     </a>
 
-    <a href="../admin/audit_logs.php">
+    <a href="audit_logs.php">
         <i class="fas fa-shield-alt"></i>
         Audit Logs
     </a>
 
 
-    <a href="../backup/backup_list.php">
+    <a href="backup_list.php">
         <i class="fas fa-database"></i>
         Backup
     </a>
 
 
-    <a href="../admin/settings.php">
+    <a href="settings.php">
         <i class="fas fa-cog"></i>
         <span>Settings</span>
     </a>

@@ -57,7 +57,7 @@ try {
 $admin_id = (int) $_SESSION['user_id'];
 
 $stmt = $conn->prepare(
-    "SELECT username FROM admins WHERE id = ?"
+    "SELECT username FROM super_admins WHERE id = ?"
 );
 
 if (!$stmt) {
@@ -1441,7 +1441,7 @@ body {
 
     <div class="sidebar-menu mt-4">
 
-        <a href="../admin/dashboard.php">
+        <a href="dashboard.php">
 
             <i class="fas fa-tachometer-alt"></i>
 
@@ -1450,34 +1450,16 @@ body {
         </a>
 
 
-        <a href="../admin/add_teacher.php">
+        <a href="manage_admins.php">
 
             <i class="fas fa-user-plus"></i>
 
-            Add Teachers
+            Manage Admins
 
         </a>
 
 
-        <a href="../admin/view_questions.php">
-
-            <i class="fas fa-list"></i>
-
-            View Questions
-
-        </a>
-
-
-        <a href="../admin/view_results.php">
-
-            <i class="fas fa-chart-bar"></i>
-
-            Exam Results
-
-        </a>
-
-
-        <a href="../admin/manage_classes.php">
+        <a href="manage_classes.php">
 
             <i class="fas fa-users"></i>
 
@@ -1486,7 +1468,7 @@ body {
         </a>
 
 
-        <a href="../admin/manage_session.php">
+        <a href="manage_session.php">
 
             <i class="fas fa-calendar"></i>
 
@@ -1495,53 +1477,23 @@ body {
         </a>
 
 
-        <a href="../admin/manage_subject.php">
 
-            <i class="fas fa-book"></i>
-
-            Manage Subject
-
-        </a>
-
-
-        <a href="../admin/manage_teachers.php">
-
-            <i class="fas fa-users"></i>
-
-            Manage Teachers
-
-        </a>
-
-
-        <a href="../admin/manage_test.php">
-
-            <i class="fas fa-file-alt"></i>
-
-            Manage Tests
-
-        </a>
-
-        <a href="../admin/exam_schedule.php">
-            <i class="fas fa-calendar-check"></i>
-            Timetable
-        </a>
-
-        <a href="backup_list.php" class="active">
+        <a href="../backup/backup_list.php" class="active">
             <i class="fas fa-database"></i>
             backup
         </a>
 
-        <a href="../license/index.php">
+        <a href="index.php">
             <i class="fas fa-key"></i>
             <span>License</span>
         </a>
 
-        <a href="../admin/audit_logs.php">
+        <a href="audit_logs.php">
             <i class="fas fa-shield-alt"></i>
             Audit Logs
         </a>
 
-        <a href="../admin/settings.php">
+        <a href="settings.php">
 
             <i class="fas fa-cog"></i>
 

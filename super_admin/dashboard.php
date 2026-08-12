@@ -407,7 +407,6 @@ $username = $user_data['username'] ?? 'Super Admin';
 
 <head>
 
-```
 <meta charset="UTF-8">
 
 <meta
@@ -1850,7 +1849,6 @@ $username = $user_data['username'] ?? 'Super Admin';
     }
 
 </style>
-```
 
 </head>
 
@@ -1862,7 +1860,6 @@ $username = $user_data['username'] ?? 'Super Admin';
 
 <aside class="sidebar" id="sidebar">
 
-```
 <div class="sidebar-header">
 
     <a
@@ -1954,15 +1951,6 @@ $username = $user_data['username'] ?? 'Super Admin';
     </a>
 
 
-    <a href="manage_students.php">
-
-        <i class="fas fa-user-graduate"></i>
-
-        <span>Manage Students</span>
-
-    </a>
-
-
     <a href="manage_subject.php">
 
         <i class="fas fa-book"></i>
@@ -1971,6 +1959,21 @@ $username = $user_data['username'] ?? 'Super Admin';
 
     </a>
 
+    <a href="backup_list.php">
+        <i class="fas fa-database"></i>
+        <span>Backups</span>
+    </a>
+
+    <a
+        href="audit_logs.php"
+    >
+        <i class="fas fa-history"></i>
+        <span>Audit Logs</span>
+    </a>
+    <a href="index.php">
+        <i class="fas fa-key"></i>
+        <span>License</span>
+    </a>
 
     <div class="sidebar-section">
         System
@@ -2013,7 +2016,6 @@ $username = $user_data['username'] ?? 'Super Admin';
     <i class="fas fa-chevron-left"></i>
 
 </button>
-```
 
 </aside>
 
@@ -2030,7 +2032,6 @@ $username = $user_data['username'] ?? 'Super Admin';
 
 <main class="main-content">
 
-```
 <!-- TOP BAR -->
 
 <header class="topbar">
@@ -2791,7 +2792,6 @@ $username = $user_data['username'] ?? 'Super Admin';
     </div>
 
 </section>
-```
 
 </main>
 

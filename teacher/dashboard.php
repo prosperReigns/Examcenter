@@ -491,7 +491,6 @@ $current_page =
 $navigation = [
 
     [
-        'section' => 'Overview',
         'items' => [
             [
                 'label' => 'Dashboard',
@@ -502,7 +501,6 @@ $navigation = [
     ],
 
     [
-        'section' => 'Questions',
         'items' => [
             [
                 'label' => 'Add Questions',
@@ -523,7 +521,6 @@ $navigation = [
     ],
 
     [
-        'section' => 'Examinations',
         'items' => [
             [
                 'label' => 'Manage Test',
@@ -539,7 +536,6 @@ $navigation = [
     ],
 
     [
-        'section' => 'Students',
         'items' => [
             [
                 'label' => 'Manage Classroom',
@@ -555,7 +551,6 @@ $navigation = [
     ],
 
     [
-        'section' => 'Account',
         'items' => [
             [
                 'label' => 'Settings',
@@ -578,8 +573,6 @@ $navigation = [
 <html lang="en">
 
 <head>
-
-```
 <meta charset="UTF-8">
 
 <meta
@@ -588,7 +581,7 @@ $navigation = [
 >
 
 <title>
-    Teacher Dashboard | D-Portal CBT
+    Teacher Dashboard | Examcenter
 </title>
 
 <link
@@ -660,8 +653,8 @@ $navigation = [
         left: 0;
         width: var(--sidebar-width);
         height: 100vh;
-        background: var(--sidebar-bg);
-        color: #fff;
+        background: #f5f7fb;
+        color: #333;
         z-index: 1050;
         overflow-y: auto;
         overflow-x: hidden;
@@ -694,6 +687,7 @@ $navigation = [
     .brand-main {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 12px;
     }
 
@@ -703,21 +697,23 @@ $navigation = [
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--primary);
+        background: #4361ee;
         border-radius: 12px;
         font-size: 18px;
         flex-shrink: 0;
+        color: #fff;
     }
 
     .brand-text h4 {
         margin: 0;
         font-size: 18px;
         font-weight: 700;
+        color: #4361ee;
     }
 
     .brand-text span {
         display: block;
-        color: #9ca3af;
+        color: #4486f7;
         font-size: 11px;
         margin-top: 2px;
     }
@@ -734,32 +730,22 @@ $navigation = [
         background: rgba(255,255,255,.055);
         display: flex;
         align-items: center;
-        gap: 11px;
+        justify-content: center;
     }
 
-    .teacher-avatar {
-        width: 38px;
-        height: 38px;
-        border-radius: 50%;
-        background: #e0e7ff;
-        color: var(--primary);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        flex-shrink: 0;
-    }
 
     .teacher-profile small {
         color: #9ca3af;
-        font-size: 10px;
-        display: block;
-    }
-
-    .teacher-profile strong {
         font-size: 13px;
         display: block;
+        
+    }
+
+    .teacher-profile h6 {
+        font-size: 16px;
+        display: block;
         margin-top: 2px;
+        text-align: center;
     }
 
 
@@ -776,7 +762,7 @@ $navigation = [
     }
 
     .nav-section-title {
-        color: #6b7280;
+        color: #333;
         font-size: 10px;
         text-transform: uppercase;
         letter-spacing: .9px;
@@ -791,7 +777,7 @@ $navigation = [
         padding: 11px 12px;
         margin: 2px 0;
         border-radius: 9px;
-        color: #cbd5e1;
+        color: #333;
         text-decoration: none;
         font-size: 13px;
         font-weight: 500;
@@ -806,8 +792,8 @@ $navigation = [
     }
 
     .sidebar-link:hover {
-        color: #fff;
-        background: var(--sidebar-hover);
+        color: #0d6efd;
+        background: rgba(45, 120, 240, 0.1);
     }
 
     .sidebar-link.active {
@@ -818,12 +804,12 @@ $navigation = [
     }
 
     .sidebar-link.logout {
-        color: #fca5a5;
+        color: #f90404;
     }
 
     .sidebar-link.logout:hover {
-        background: rgba(220,38,38,.12);
-        color: #fecaca;
+        background: rgba(45, 120, 240, 0.1);;
+        color: #fd0505;
     }
 
 
@@ -1543,7 +1529,6 @@ $navigation = [
     }
 
 </style>
-```
 
 </head>
 
@@ -1555,7 +1540,6 @@ $navigation = [
 
 <aside class="sidebar" id="sidebar">
 
-```
 <div class="sidebar-brand">
 
     <div class="brand-main">
@@ -1566,9 +1550,7 @@ $navigation = [
 
         <div class="brand-text">
 
-            <h4>D-Portal</h4>
-
-            <span>CBT MANAGEMENT SYSTEM</span>
+            <h4>Examcenter</h4>
 
         </div>
 
@@ -1576,26 +1558,13 @@ $navigation = [
 
 
     <div class="teacher-profile">
-
-        <div class="teacher-avatar">
-
-            <?= strtoupper(
-                substr(
-                    htmlspecialchars($teacher_last_name),
-                    0,
-                    1
-                )
-            ) ?>
-
-        </div>
-
         <div>
 
-            <small>Signed in as</small>
+            <small>Welcome back</small>
 
-            <strong>
+            <h6>
                 <?= htmlspecialchars($teacher_last_name) ?>
-            </strong>
+            </h6>
 
         </div>
 
@@ -1609,10 +1578,6 @@ $navigation = [
     <?php foreach ($navigation as $section): ?>
 
         <div class="nav-section">
-
-            <div class="nav-section-title">
-                <?= htmlspecialchars($section['section']) ?>
-            </div>
 
             <?php foreach ($section['items'] as $item): ?>
 
@@ -1658,7 +1623,6 @@ $navigation = [
     </div>
 
 </div>
-```
 
 </aside>
 
@@ -1673,7 +1637,6 @@ $navigation = [
 
 <main class="main-content">
 
-```
 <!-- =====================================================
      HEADER
 ====================================================== -->
@@ -2432,7 +2395,6 @@ $navigation = [
     </div>
 
 </div>
-```
 
 </main>
 

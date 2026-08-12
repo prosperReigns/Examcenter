@@ -8,33 +8,77 @@ $class = $_GET['class'];
 $subject = $_GET['subject'];
 $title = $_GET['title'];
 
-// Fetch test
+/* =========================================================
+   FETCH TEST
+   ========================================================= */
+
 $stmt = $conn->prepare("
-    SELECT 
-        t.*, 
-        c.class_name, 
+    SELECT
+        t.*,
         al.level_code,
+        al.class_group,
         s.subject_name
     FROM tests t
-    JOIN classes c ON t.academic_level_id = c.academic_level_id
-    JOIN academic_levels al ON t.academic_level_id = al.id
-    JOIN subjects s ON LOWER(TRIM(t.subject)) LIKE CONCAT(LOWER(TRIM(s.subject_name)), '%')
-    WHERE 
-        c.class_name = ?
-        AND s.subject_name = ?
+
+    INNER JOIN academic_levels al
+        ON t.academic_level_id = al.id
+
+    LEFT JOIN subjects s
+        ON LOWER(TRIM(t.subject)) LIKE CONCAT(
+            LOWER(TRIM(s.subject_name)),
+            '%'
+        )
+
+    WHERE
+        al.level_code = ?
+        AND (
+            LOWER(TRIM(t.subject)) = LOWER(TRIM(?))
+            OR LOWER(TRIM(t.subject)) LIKE CONCAT(
+                LOWER(TRIM(?)),
+                ' (%)'
+            )
+        )
         AND t.title = ?
+
     ORDER BY t.created_at DESC
+
     LIMIT 1
 ");
 
-$stmt->bind_param("sss", $class, $subject, $title);
-$stmt->execute();
-$test = $stmt->get_result()->fetch_assoc();
+if (!$stmt) {
+    die("Unable to prepare test query: " . $conn->error);
+}
+
+$stmt->bind_param(
+    "ssss",
+    $class,
+    $subject,
+    $subject,
+    $title
+);
+
+if (!$stmt->execute()) {
+    die("Unable to load test: " . $stmt->error);
+}
+
+$test = $stmt
+    ->get_result()
+    ->fetch_assoc();
+
 $stmt->close();
 
-if (!$test) die("Test not found");
 
-$test_id = $test['id'];
+if (!$test) {
+    die(
+        "Test not found.<br><br>" .
+        "Requested class: " . htmlspecialchars($class) . "<br>" .
+        "Requested subject: " . htmlspecialchars($subject) . "<br>" .
+        "Requested title: " . htmlspecialchars($title)
+    );
+}
+
+$test_id = (int) $test['id'];
+
 
 // Fetch questions helper function
 function fetchQuestions($conn, $table, $columns, $test_id) {

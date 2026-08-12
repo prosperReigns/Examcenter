@@ -225,7 +225,7 @@ class LicenseAPI
             "LICENSE API REQUEST: "
             . strtoupper($method)
             . " "
-            . $url
+            . $url  
         );
 
         error_log(

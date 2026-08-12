@@ -2,6 +2,7 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 
 // Enable error reporting
 ini_set('display_errors', 1);
@@ -128,7 +129,7 @@ if ($result) {
 <!-- Sidebar -->
 <div class="sidebar">
     <div class="sidebar-brand">
-        <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+        <h3><i class="fas fa-graduation-cap me-2"></i>Examcenter</h3>
         <div class="admin-info">
             <small>Welcome back,</small>
             <h6><b><?php echo htmlspecialchars($admin['username']); ?></b></h6>
@@ -136,17 +137,29 @@ if ($result) {
     </div>
     <div class="sidebar-menu mt-4">
         <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-        <a href="add_question.php" style="text-decoration: line-through"><i class="fas fa-plus-circle"></i>Add Questions</a>
+        <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
         <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
         <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
-        <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
         <a href="manage_classes.php"><i class="fas fa-school"></i>Manage Classes</a>
         <a href="manage_session.php"><i class="fas fa-calendar-alt"></i>Manage Session</a>
         <a href="manage_subject.php" class="active"><i class="fas fa-book"></i>Manage Subject</a>
         <a href="manage_students.php"><i class="fas fa-user-graduate"></i>Manage Student</a>
         <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
         <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
+        <a href="exam_schedule.php"><i class="fas fa-calendar-check"></i>Timestable</a>
         <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
+        <a href="../license/index.php">
+            <i class="fas fa-key"></i>
+            License
+        </a>
+        <a href="audit_logs.php">
+            <i class="fas fa-shield-alt"></i>
+            Audit Logs
+        </a>
+        <a href="../backup/backup_list.php">
+            <i class="fas fa-database"></i>
+            Backup
+        </a>
         <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
     </div>
 </div>

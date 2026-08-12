@@ -6,8 +6,6 @@ require_once "../db.php";
 require_once "../includes/audit.php";
 require_once __DIR__ . '/../license/license_guard.php';
 
-$conn = Database::connection();
-
 /*
 |--------------------------------------------------------------------------
 | Authentication
@@ -16,6 +14,28 @@ $conn = Database::connection();
 
 if (!isset($_SESSION['user_id'])) {
     exit("Unauthorized");
+}
+
+try {
+    $database = Database::getInstance();
+    $conn = $database->getConnection();
+
+    $user_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username, role FROM super_admins WHERE id = ?");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $super_admin = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$super_admin || strtolower($super_admin['role']) !== 'super_admin') {
+        session_destroy();
+        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        exit();
+    }
+} catch (Exception $e) {
+    error_log("Page error: " . $e->getMessage());
+    die("System error");
 }
 
 /*
@@ -1453,7 +1473,6 @@ body {
 
 <aside id="sidebar">
 
-```
 <!--
 
     The existing sidebar content should remain consistent
@@ -1472,6 +1491,30 @@ body {
             <span>Dashboard</span>
         </a>
     </li>
+    <li>
+        <a href="manage_admins.php">
+            <i class="fas fa-user-shield"></i>
+            <span>Manage Admins</span>
+        </a>
+    </li>
+    <li>
+        <a href="manage_classes.php">
+            <i class="fas fa-users"></i>
+            <span>Manage Classes</span>
+        </a>
+    </li>
+    <li>
+        <a href="manage_session.php">
+            <i class="fas fa-calendar-alt"></i>
+            <span>Manage Session</span>
+        </a>
+    </li>
+    <li>
+        <a href="manage_subject.php">
+            <i class="fas fa-book"></i>
+            <span>Manage Subjects</span>
+        </a>
+    </li>
 
     <li>
         <a href="audit_logs.php" class="active">
@@ -1479,9 +1522,32 @@ body {
             <span>Audit Logs</span>
         </a>
     </li>
+    <li>
+        <a href="backup_list.php" class="active">
+            <i class="fas fa-database"></i>
+            <span>Backups</span>
+        </a>
+    </li>
+    <li>
+        <a href="index.php" class="active">
+            <i class="fas fa-history"></i>
+            <span>License</span>
+        </a>
+    </li>
+    <li>
+        <a href="settings.php" class="active">
+            <i class="fas fa-history"></i>
+            <span>settings</span>
+        </a>
+    </li>
+    <li>
+        <a href="../admin/logout.php" class="active">
+            <i class="fas fa-history"></i>
+            <span>Logout</span>
+        </a>
+    </li>
 
 </ul>
-```
 
 </aside>
 
@@ -1497,7 +1563,6 @@ body {
 
 <main class="main-content">
 
-```
 <!-- =====================================================
      HEADER
 ====================================================== -->

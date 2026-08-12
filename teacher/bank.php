@@ -696,8 +696,8 @@ try {
             left: 0;
             width: 250px;
             height: 100vh;
-            background: #212529;
-            color: #fff;
+            background: #fff;
+            color: #1f2937;
             z-index: 1050;
             overflow-y: auto;
         }
@@ -718,13 +718,13 @@ try {
         }
 
         .admin-info small {
-            color: rgba(255,255,255,0.65);
+            color: rgba(15, 14, 14, 0.65);
         }
 
         .admin-info h6 {
             margin: 5px 0 0;
             font-size: 15px;
-            color: #fff;
+            color: #000000;
         }
 
         .sidebar-menu {
@@ -735,7 +735,7 @@ try {
             display: flex;
             align-items: center;
             gap: 12px;
-            color: rgba(255,255,255,0.78);
+            color: rgba(10, 10, 10, 0.78);
             text-decoration: none;
             padding: 12px 14px;
             margin-bottom: 4px;
@@ -751,12 +751,13 @@ try {
 
         .sidebar-menu a:hover,
         .sidebar-menu a.active {
-            background: rgba(255,255,255,0.10);
-            color: #fff;
+            background: rgba(45, 120, 240, 0.1);
+            color: #0d6efd;
         }
 
         .sidebar-menu a.active {
             background: #0d6efd;
+            color: #fff
         }
 
         .sidebar-menu .logout-btn {
@@ -766,7 +767,7 @@ try {
 
         .sidebar-menu .logout-btn:hover {
             background: rgba(220,53,69,0.15);
-            color: #fff;
+            color: #fa0f0f;
         }
 
 
@@ -2452,46 +2453,6 @@ document.addEventListener(
 
 
         updateSelectedCount();
-
-
-    /*
-        |--------------------------------------------------------------------------
-        | TEST SELECTION / PREVIEW
-        |--------------------------------------------------------------------------
-        */
-
-        const targetTestSelect = document.getElementById("targetTestSelect");
-
-        if (targetTestSelect) {
-
-            targetTestSelect.addEventListener("change", function () {
-
-                const testId = this.value;
-
-                if (!testId) {
-                    return;
-                }
-
-                /*
-                * Reload bank.php with the selected test.
-                *
-                * PHP will:
-                * - validate the test
-                * - store it in the session
-                * - fetch its questions
-                * - render the Review/Preview modal
-                */
-
-                const url = new URL(window.location.href);
-
-                url.searchParams.set("test_id", testId);
-                url.searchParams.delete("success");
-
-                window.location.href = url.toString();
-            });
-        }
-
-
         /*
         |--------------------------------------------------------------------------
         | REVIEW / PREVIEW MODAL
@@ -2582,13 +2543,3 @@ document.addEventListener(
 </body>
 
 </html>
-
-<?php
-
-if (isset($stmt) && $stmt) {
-    $stmt->close();
-}
-
-$conn->close();
-
-?>

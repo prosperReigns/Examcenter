@@ -2,6 +2,7 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 
 // Enable error reporting
 ini_set('display_errors', 1);
@@ -200,7 +201,7 @@ while ($row = $result->fetch_assoc()) {
 <!-- Sidebar -->
 <div class="sidebar">
     <div class="sidebar-brand">
-        <h3><i class="fas fa-graduation-cap me-2"></i>D-Portal</h3>
+        <h3><i class="fas fa-graduation-cap me-2"></i>Examcenter</h3>
         <div class="admin-info">
             <small>Welcome back,</small>
             <h6><b><?php echo htmlspecialchars($admin['username']); ?></b></h6>
@@ -208,17 +209,29 @@ while ($row = $result->fetch_assoc()) {
     </div>
     <div class="sidebar-menu mt-4">
         <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-        <a href="add_question.php" style="text-decoration: line-through"><i class="fas fa-plus-circle"></i>Add Questions</a>
+        <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
         <a href="view_questions.php"><i class="fas fa-list"></i>View Questions</a>
         <a href="view_results.php"><i class="fas fa-chart-bar"></i>Exam Results</a>
-        <a href="add_teacher.php"><i class="fas fa-user-plus"></i>Add Teachers</a>
         <a href="manage_classes.php" class="active"><i class="fas fa-users"></i>Manage Classes</a>
         <a href="manage_session.php"><i class="fas fa-users"></i>Manage Session</a>
         <a href="manage_subject.php"><i class="fas fa-users"></i>Manage Subject</a>
         <a href="manage_students.php"><i class="fas fa-users"></i>Manage Student</a>
         <a href="manage_teachers.php"><i class="fas fa-users"></i>Manage Teachers</a>
         <a href="manage_test.php"><i class="fas fa-users"></i>Manage Tests</a>
+        <a href="exam_schedule.php"><i class="fas fa-calendar-check"></i>Timestable</a>
         <a href="settings.php"><i class="fas fa-cog"></i>Settings</a>
+        <a href="../license/index.php">
+            <i class="fas fa-key"></i>
+            License
+        </a>
+        <a href="audit_logs.php">
+            <i class="fas fa-shield-alt"></i>
+            Audit Logs
+        </a>
+        <a href="../backup/backup_list.php">
+            <i class="fas fa-database"></i>
+            Backup
+        </a>
         <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i>Logout</a>
     </div>
 </div>
@@ -272,7 +285,7 @@ while ($row = $result->fetch_assoc()) {
         <div class="card-body">
             <form method="post">
             <div class="mb-3">
-                    <label>Class Group</label>
+                    <label class="mb-3">Class Group</label>
                     <div class="input-group">
                         <span class="input-group-text">
                             <i class="fas fa-layer-group"></i>
@@ -286,26 +299,26 @@ while ($row = $result->fetch_assoc()) {
                     </div>
                 </div>
 
-                <div class="input-group">
-                     <span class="input-group-text">
+                <div class="input-group mb-3">
+                     <span class="input-group-text me-3">
                         <i class="fas fa-code"></i>
                     </span>
 
-                    <label>Level Code</label>
+                    <label class="me-3">Level Code</label>
                     <input type="text" id="level_code" name="level_code" class="form-control" placeholder="-- JSS1 --" required>
                 </div>
 
                 <div class="input-group">
-                    <span class="input-group-text">
+                    <span class="input-group-text me-3">
                         <i class="fas fa-users"></i>
                     </span>
-                    <label>Stream Name</label>
+                    <label class="me-3">Stream Name</label>
                     <input type="text" id="stream_name" name="stream_name" class="form-control" placeholder="-- Gold --" required>
                 </div>
 
 
-                <button class="btn btn-success px-4"><i class="fas fa-save me-2"></i>Save Class</button>
-                <button type="reset" class="btn btn-outline-secondary px-4" onclick="resetForm()"><i class="fas fa-times me-2"></i>Cancel</button>
+                <button class="btn btn-success px-4 mt-3"><i class="fas fa-save me-2"></i>Save Class</button>
+                <button type="reset" class="btn btn-outline-secondary px-4 mt-3" onclick="resetForm()"><i class="fas fa-times me-2"></i>Cancel</button>
             </form>
         </div>
     </div>

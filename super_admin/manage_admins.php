@@ -338,7 +338,6 @@ $adminCount = count($admins);
 
 <head>
 
-```
 <meta charset="UTF-8">
 
 <meta
@@ -1100,7 +1099,6 @@ $adminCount = count($admins);
     }
 
 </style>
-```
 
 </head>
 
@@ -1128,7 +1126,6 @@ $adminCount = count($admins);
     id="sidebar"
 >
 
-```
 <div class="sidebar-header">
 
     <div class="brand">
@@ -1190,14 +1187,6 @@ $adminCount = count($admins);
     </a>
 
     <a
-        href="manage_students.php"
-        class="sidebar-link"
-    >
-        <i class="fas fa-user-graduate"></i>
-        <span>Manage Students</span>
-    </a>
-
-    <a
         href="manage_subject.php"
         class="sidebar-link"
     >
@@ -1212,8 +1201,22 @@ $adminCount = count($admins);
         <i class="fas fa-calendar-alt"></i>
         <span>Manage Sessions</span>
     </a>
+    <a href="backup_list.php" class="sidebar-link">
+        <i class="fas fa-database"></i>
+        <span>Backups</span>
+    </a>
 
-
+    <a
+        href="audit_logs.php"
+        class="sidebar-link"
+    >
+        <i class="fas fa-history"></i>
+        <span>Audit Logs</span>
+    </a>
+    <a href="index.php" class="sidebar-link">
+        <i class="fas fa-key"></i>
+        <span>License</span>
+    </a>
     <div class="nav-section-title">
         System
     </div>
@@ -1235,7 +1238,6 @@ $adminCount = count($admins);
     </a>
 
 </nav>
-```
 
 </aside>
 
@@ -1247,7 +1249,6 @@ $adminCount = count($admins);
 
 <main class="main-content">
 
-```
 <!--
 |--------------------------------------------------------------------------
 | Topbar
@@ -1864,7 +1865,6 @@ $adminCount = count($admins);
 
 
 </div>
-```
 
 </main>
 
@@ -1881,7 +1881,6 @@ $adminCount = count($admins);
     aria-hidden="true"
 >
 
-```
 <div class="modal-dialog modal-dialog-centered">
 
     <div class="modal-content border-0 shadow">
@@ -1943,7 +1942,6 @@ $adminCount = count($admins);
     </div>
 
 </div>
-```
 
 </div>
 

@@ -529,15 +529,15 @@ try {
         | possible expiry_at naming.
         */
 
-        if (!empty($license['expires_at'])) {
+        if (!empty($license['expires_date'])) {
 
             $licenseExpiry =
-                $license['expires_at'];
+                $license['expires_date'];
 
-        } elseif (!empty($license['expiry_at'])) {
+        } elseif (!empty($license['expiry_date'])) {
 
             $licenseExpiry =
-                $license['expiry_at'];
+                $license['expiry_date'];
         }
 
 
@@ -1446,9 +1446,9 @@ try {
         </a>
 
 
-        <a href="bank.php">
+        <a href="add_teacher.php">
             <i class="fas fa-database"></i>
-            Question Bank
+            Add Teacher
         </a>
 
 
@@ -1490,7 +1490,7 @@ try {
 
         <a href="manage_teachers.php">
             <i class="fas fa-user-tie"></i>
-            Manage Agents
+            Manage teachers
         </a>
 
 
@@ -1498,7 +1498,7 @@ try {
             <i class="fas fa-file-alt"></i>
             Manage Tests
         </a>
-
+        <a href="exam_schedule.php"><i class="fas fa-calendar-check"></i>Timestable</a>
 
         <a href="settings.php">
             <i class="fas fa-cog"></i>
@@ -1506,7 +1506,7 @@ try {
         </a>
 
 
-        <a href="license.php">
+        <a href="../license/index.php">
             <i class="fas fa-key"></i>
             License
         </a>
@@ -1876,7 +1876,7 @@ try {
                         <div class="col-sm-6">
 
                             <a
-                                href="../teacher/add_question.php"
+                                href="add_teacher.php"
                                 class="quick-action"
                             >
 
@@ -1887,11 +1887,11 @@ try {
                                 <div>
 
                                     <div class="quick-action-title">
-                                        Create Test
+                                        Add Teacher
                                     </div>
 
                                     <span class="quick-action-description">
-                                        Create examination content
+                                        Add new teachers
                                     </span>
 
                                 </div>
@@ -1904,7 +1904,7 @@ try {
                         <div class="col-sm-6">
 
                             <a
-                                href="bank.php"
+                                href="manage_session.php"
                                 class="quick-action"
                             >
 
@@ -1915,11 +1915,11 @@ try {
                                 <div>
 
                                     <div class="quick-action-title">
-                                        Question Bank
+                                        Academic Session
                                     </div>
 
                                     <span class="quick-action-description">
-                                        Manage examination questions
+                                        Manage academic session
                                     </span>
 
                                 </div>
@@ -1932,7 +1932,7 @@ try {
                         <div class="col-sm-6">
 
                             <a
-                                href="import_questions.php"
+                                href="exam_schedule.php"
                                 class="quick-action"
                             >
 
@@ -1943,11 +1943,11 @@ try {
                                 <div>
 
                                     <div class="quick-action-title">
-                                        Import Questions
+                                        Times Table
                                     </div>
 
                                     <span class="quick-action-description">
-                                        Import questions into the bank
+                                        Schedule Examination
                                     </span>
 
                                 </div>

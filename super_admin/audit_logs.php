@@ -4,9 +4,6 @@ session_start();
 
 require_once "../db.php";
 require_once "../includes/audit.php";
-require_once __DIR__ . '/../license/license_guard.php';
-
-$conn = Database::connection();
 
 /*
 |--------------------------------------------------------------------------
@@ -17,6 +14,28 @@ $conn = Database::connection();
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../login.php");
     exit;
+}
+
+try {
+    $database = Database::getInstance();
+    $conn = $database->getConnection();
+
+    $user_id = (int)$_SESSION['user_id'];
+    $stmt = $conn->prepare("SELECT username, role FROM super_admins WHERE id = ?");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $super_admin = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$super_admin || strtolower($super_admin['role']) !== 'super_admin') {
+        session_destroy();
+        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        exit();
+    }
+} catch (Exception $e) {
+    error_log("Page error: " . $e->getMessage());
+    die("System error");
 }
 
 /*
@@ -1572,23 +1591,9 @@ $endPage = min($totalPages, $page + 2);
     </li>
 
     <li>
-        <a href="add_teacher.php">
-            <i class="fas fa-user-plus"></i>
-            <span>Add Teachers</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="view_questions.php">
-            <i class="fas fa-list"></i>
-            <span>View Questions</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="view_results.php">
-            <i class="fas fa-chart-bar"></i>
-            <span>Exam Results</span>
+        <a href="manage_admins.php">
+            <i class="fas fa-user-shield"></i>
+            <span>Manage Admins</span>
         </a>
     </li>
 
@@ -1614,35 +1619,7 @@ $endPage = min($totalPages, $page + 2);
     </li>
 
     <li>
-        <a href="manage_students.php">
-            <i class="fas fa-user-graduate"></i>
-            <span>Manage Students</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="manage_teachers.php">
-            <i class="fas fa-chalkboard-teacher"></i>
-            <span>Manage Teachers</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="manage_test.php">
-            <i class="fas fa-file-alt"></i>
-            <span>Manage Tests</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="exam_schedule.php">
-            <i class="fas fa-calendar-check"></i>
-            <span>Timetable</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="../backup/backup_list.php">
+        <a href="backup_list.php">
             <i class="fas fa-database"></i>
             <span>Backups</span>
         </a>
@@ -1659,7 +1636,7 @@ $endPage = min($totalPages, $page + 2);
     </li>
 
     <li>
-        <a href="../license/index.php">
+        <a href="index.php">
             <i class="fas fa-key"></i>
             <span>License</span>
         </a>
