@@ -43,7 +43,7 @@ function redirectLicenseError(
 ): void
 {
     header(
-        "Location: /EXAMCENTER/license/required.php?error="
+        "Location: required.php?error="
         . urlencode($message)
     );
 

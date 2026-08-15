@@ -3,6 +3,7 @@ session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
 require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/bootstrap.php';
 
 header('Content-Type: text/html; charset=UTF-8');
 
@@ -21,7 +22,7 @@ if (
     !isset($_SESSION['user_role']) ||
     strtolower($_SESSION['user_role']) !== 'teacher'
 ) {
-    header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+    header("Location: ../login.php?error=Unauthorized");
     exit();
 }
 
@@ -59,7 +60,7 @@ try {
 
     if (!$teacher) {
         session_destroy();
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 
@@ -441,7 +442,7 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
                 <div class="row align-items-center">
                     <div class="col-lg-3 text-center">
                         <img
-                            src="/EXAMCENTER/uploads/students/default.png"
+                            src="uploads/students/default.png"
                             class="profile-photo mb-3"
                             alt="Student">
 
@@ -779,11 +780,11 @@ if (!in_array((int)$student['class_id'], $assigned_class_ids)) {
         document.addEventListener('DOMContentLoaded', () => {
             // ======== DOWNLOAD / EMAIL BUTTONS ========
             document.getElementById('downloadReportBtn').addEventListener('click', () => {
-                window.location.href = `/EXAMCENTER/teacher/download_student_report.php?student_id=${studentId}&academic_year_id=${termSwitcher.value}`;
+                window.location.href = `download_student_report.php?student_id=${studentId}&academic_year_id=${termSwitcher.value}`;
             });
 
             document.getElementById('emailReportBtn').addEventListener('click', () => {
-                fetch(`/EXAMCENTER/teacher/email_student_report.php`, {
+                fetch(`email_student_report.php`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ student_id: studentId, academic_year_id: termSwitcher.value })

@@ -10,7 +10,7 @@ require '../vendor/autoload.php'; // PhpWord autoload
 use PhpOffice\PhpWord\IOFactory;
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'teacher') {
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 

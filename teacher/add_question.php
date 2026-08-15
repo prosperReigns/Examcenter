@@ -33,7 +33,7 @@ if (
     !isset($_SESSION['user_role']) ||
     strtolower($_SESSION['user_role']) !== 'teacher'
 ) {
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -120,7 +120,7 @@ try {
 
     if (!$teacher) {
         session_destroy();
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 

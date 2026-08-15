@@ -4,12 +4,19 @@ class Database {
     private $conn;
     
     private function __construct() {
-        $host = "localhost"; // or 127.0.0.1
+        $host = "127.0.0.1"; // or 127.0.0.1
         $username = "root";
         $password = "";
         $database = "cbt_app_db";
+        $port = 3307;
 
-        $this->conn = mysqli_connect($host, $username, $password, $database);
+        $this->conn = mysqli_connect(
+            $host,
+            $username,
+            $password,
+            $database,
+            $port
+        );
         
         if (!$this->conn) {
             die("Connection failed: " . mysqli_connect_error());

@@ -11,7 +11,7 @@ use PhpOffice\PhpWord\IOFactory;
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'admin') {
     error_log("Redirecting to login: No user_id or invalid role in session");
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -40,7 +40,7 @@ try {
     if (!$admin) {
         error_log("No admin found for user_id=$admin_id");
         session_destroy();
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 

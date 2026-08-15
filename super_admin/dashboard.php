@@ -2,6 +2,8 @@
 session_start();
 
 require_once '../db.php';
+require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -14,7 +16,7 @@ if (
     strtolower($_SESSION['user_role']) !== 'super_admin'
 ) {
     error_log("Redirecting to login: No user_id or invalid role in session");
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -64,7 +66,7 @@ try {
 
         session_destroy();
 
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 

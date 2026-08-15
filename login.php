@@ -112,30 +112,30 @@ function redirectByRole($role, $setupCompleted) {
     switch($role) {
         case 'super_admin':
             if (!$setupCompleted) {
-                header("Location: $base_url/EXAMCENTER/super_admin/system_setup.php");
+                header("Location: super_admin/system_setup.php");
                 exit();
             }
-            $target = $base_url . '/EXAMCENTER/super_admin/dashboard.php';
+            $target = 'super_admin/dashboard.php';
             break;
         case 'admin':
             if (!$setupCompleted) {
                 error_log("system setup incomplete, kindly contact super admin");
-                header("Location: $base_url/EXAMCENTER/login.php");
+                header("Location: login.php");
                 exit();
             }
-            $target = $base_url . '/EXAMCENTER/admin/dashboard.php';
+            $target = 'admin/dashboard.php';
             break;
         case 'teacher':
             if (!$setupCompleted) {
                 error_log("system setup incomplete, kindly contact super admin");
-                header("Location: $base_url/EXAMCENTER/login.php");
+                header("Location: login.php");
                 exit();
             }
-            $target = $base_url . '/EXAMCENTER/teacher/dashboard.php';
+            $target = $base_url . 'teacher/dashboard.php';
             break;
         default:
             session_destroy();
-            header("Location: " . $base_url . "/EXAMCENTER/login.php");
+            header("Location: login.php");
             exit();
     }
     
@@ -249,8 +249,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
             }
         }
     } catch (Exception $e) {
-        error_log("Login error: " . $e->getMessage());
-        $error = "System error during login";
+        error_log("LOGIN ERROR: " . $e->getMessage());
+    error_log("LOGIN FILE: " . $e->getFile());
+    error_log("LOGIN LINE: " . $e->getLine());
+    error_log("LOGIN TRACE: " . $e->getTraceAsString());
+
+    $error = "Login error: " . $e->getMessage();
     }
 }
 
@@ -262,7 +266,7 @@ ob_end_flush();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D-Portal | Staff Login</title>
+    <title>Examcenter | Staff Login</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/all.css">

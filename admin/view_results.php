@@ -18,7 +18,7 @@ if (
     !isset($_SESSION['user_role']) ||
     strtolower($_SESSION['user_role']) !== 'admin'
 ) {
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -89,7 +89,7 @@ try {
     if (!$admin) {
         session_destroy();
 
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 

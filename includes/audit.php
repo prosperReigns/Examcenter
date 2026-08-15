@@ -74,33 +74,41 @@ if (!function_exists('getAuditUsername')) {
 
 if (!function_exists('logAudit')) {
     function logAudit(
-        mysqli $conn,
-        ?int $adminId,
-        string $module,
-        string $description,
-        string $action = "SYSTEM"
-    ) {
+    mysqli $conn,
+    ?int $adminId,
+    string $module,
+    string $description,
+    string $action = "SYSTEM"
+) {
+    try {
         $username = getAuditUsername();
         $ip = getClientIP();
         $computer = getComputerName();
         $agent = getUserAgent();
+
         $stmt = $conn->prepare("
             INSERT INTO audit_logs
             (
-            admin_id,
-            username,
-            module,
-            action,
-            description,
-            ip_address,
-            computer_name,
-            user_agent
+                admin_id,
+                username,
+                module,
+                action,
+                description,
+                ip_address,
+                computer_name,
+                user_agent
             )
             VALUES
-            (?,?,?,?,?,?,?,?)
-            ");
+            (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
 
-        $stmt->bind_param(
+        if (!$stmt) {
+            throw new Exception(
+                "Audit prepare failed: " . $conn->error
+            );
+        }
+
+        if (!$stmt->bind_param(
             "isssssss",
             $adminId,
             $username,
@@ -110,9 +118,35 @@ if (!function_exists('logAudit')) {
             $ip,
             $computer,
             $agent
+        )) {
+            throw new Exception(
+                "Audit bind failed: " . $stmt->error
+            );
+        }
+
+        if (!$stmt->execute()) {
+            throw new Exception(
+                "Audit execute failed: " . $stmt->error
+            );
+        }
+
+        $stmt->close();
+
+        return true;
+
+    } catch (Throwable $e) {
+        error_log(
+            "AUDIT ERROR: " .
+            $e->getMessage() .
+            " in " .
+            $e->getFile() .
+            ":" .
+            $e->getLine()
         );
-        return $stmt->execute();
+
+        return false;
     }
+}
 
 }
 

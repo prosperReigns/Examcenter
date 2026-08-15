@@ -46,7 +46,7 @@ if (
     );
 
     header(
-        "Location: /EXAMCENTER/login.php?error=Not logged in"
+        "Location: ../login.php?error=Not logged in"
     );
 
     exit();
@@ -150,7 +150,7 @@ try {
         session_destroy();
 
         header(
-            "Location: /EXAMCENTER/login.php?error=Unauthorized"
+            "Location: ../login.php?error=Unauthorized"
         );
 
         exit();

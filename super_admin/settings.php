@@ -4,6 +4,7 @@ session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
 
+
 // =========================================================
 // ERROR REPORTING
 // =========================================================
@@ -23,7 +24,7 @@ if (
 ) {
     error_log("Redirecting to login: No user_id or invalid role in session");
 
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -69,7 +70,7 @@ try {
 
         session_destroy();
 
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 

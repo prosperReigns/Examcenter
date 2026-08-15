@@ -3,6 +3,7 @@ session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
 require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/bootstrap.php';
 
 // 
 header('Content-Type: text/html; charset=UTF-8');
@@ -17,7 +18,7 @@ ini_set('error_log', '../logs/errors.log');
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_role']) || strtolower($_SESSION['user_role']) !== 'teacher') {
     error_log("Redirecting to login: No user_id or invalid role in session");
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -47,7 +48,7 @@ try {
     if (!$teacher) {
         error_log("No teacher found for user_id=$teacher_id");
         session_destroy();
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 
@@ -293,7 +294,7 @@ try {
                 <input type="hidden" name="student_id" id="student_id" value="">
                 <div class="text-center mb-4">
                     <div class="profile-image-wrapper position-relative mx-auto">
-                        <img src="/EXAMCENTER/uploads/students/default.png" class="profile-image" alt="Profile">
+                        <img src="uploads/students/default.png" class="profile-image" alt="Profile">
 
                         <!-- Edit button -->
                         <label for="profileImageInput" class="edit-btn">
@@ -416,7 +417,7 @@ try {
                                 <td>
                                     <a href="student_profile.php?id=<?php echo $student['id']; ?>" class="btn btn-sm btn-primary">View Profile</a>
                                     <button data-id="<?php echo $student['id']; ?>" class="btn btn-sm btn-warning btn-edit-student">Edit</button>
-                                    <button data-id="<?php echo $student['id']; ?>" data-url="/EXAMCENTER/teacher/delete_student.php?id=<?php echo $student['id']; ?>" class="btn btn-sm btn-danger btn-delete-student">Delete</button>
+                                    <button data-id="<?php echo $student['id']; ?>" data-url="delete_student.php?id=<?php echo $student['id']; ?>" class="btn btn-sm btn-danger btn-delete-student">Delete</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -514,7 +515,7 @@ try {
                 const formData = $(this).serialize();
 
                 $.ajax({
-                    url: '/EXAMCENTER/teacher/edit_student.php',
+                    url: 'edit_student.php',
                     type: 'POST',
                     data: formData,
                     dataType: 'json',

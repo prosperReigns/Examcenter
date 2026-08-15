@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt2->close();
         
         // Send email with reset link
-        $resetLink = "http://{$_SERVER['HTTP_HOST']}/EXAMCENTER/reset_password.php?token=$token";
+        $resetLink = "http://{$_SERVER['HTTP_HOST']}/reset_password.php?token=$token";
         Mailer::send($email, "Password Reset Request", "Click this link to reset your password: $resetLink");
         
         $_SESSION['fp_success'] = "A password reset link has been sent to your email.";

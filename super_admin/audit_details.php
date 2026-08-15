@@ -4,6 +4,7 @@ session_start();
 
 require_once "../db.php";
 require_once "../includes/audit.php";
+require_once '../includes/system_guard.php';
 require_once __DIR__ . '/../license/license_guard.php';
 
 /*
@@ -30,7 +31,7 @@ try {
 
     if (!$super_admin || strtolower($super_admin['role']) !== 'super_admin') {
         session_destroy();
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 } catch (Exception $e) {

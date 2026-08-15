@@ -153,7 +153,8 @@ $stmt->execute();
 $questions_result = $stmt->get_result();
 
 $questions = [];
-$base_url = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/Examcenter';
+$base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
+    . '://' . $_SERVER['HTTP_HOST'];
 
 while ($row = $questions_result->fetch_assoc()) {
     $question_id = $row['id'];
@@ -193,8 +194,8 @@ while ($row = $questions_result->fetch_assoc()) {
         if ($type === 'multiple_choice_single' && !empty($detail['image_path'])) {
             $relative_path = str_replace('\\', '/', $detail['image_path']);
         
-            // Fix path by including project folder
-            $file_path = $_SERVER['DOCUMENT_ROOT'] . '/Examcenter/' . $relative_path;
+            $file_path = $_SERVER['DOCUMENT_ROOT'] . '/' . $relative_path;
+
             $image_url = $base_url . '/' . $relative_path;
         
             error_log("DOCUMENT_ROOT = " . $_SERVER['DOCUMENT_ROOT']);

@@ -29,7 +29,7 @@ try {
     if (!$user || strtolower($user['role']) !== 'teacher') {
         error_log("Unauthorized access attempt by user_id=$user_id, role=" . ($user['role'] ?? 'none'));
         session_destroy();
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 } catch (Exception $e) {

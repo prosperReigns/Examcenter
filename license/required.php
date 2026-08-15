@@ -112,6 +112,11 @@ $message = "";
 if (isset($_GET['error'])) {
     $message = $_GET['error'];
 }
+    $returnUrl =
+        "http://" .
+        $_SERVER["HTTP_HOST"] .
+        rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/\\") .
+        "/waiting.php";
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -295,7 +300,10 @@ $plan["price"]
 </script>
 
 <script src="../js/bootstrap.bundle.min.js"></script>
+
 <script>
+    const examcenterReturnUrl = <?= json_encode($returnUrl) ?>;
+
     async function startPurchase(plan) {
 
     try {
@@ -341,7 +349,22 @@ $plan["price"]
 
         const purchase = await response.json();
 
-        window.location.href = purchase.checkout_url;
+        const returnUrl =
+            examcenterReturnUrl +
+            "?poll_token=" +
+            encodeURIComponent(
+                purchase.poll_token
+            );
+
+        const checkoutUrl =
+            purchase.checkout_url +
+            "?return_url=" +
+            encodeURIComponent(
+                returnUrl
+            );
+
+        window.location.href =
+            checkoutUrl;
 
     }
 

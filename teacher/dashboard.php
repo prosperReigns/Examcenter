@@ -12,7 +12,7 @@ require_once __DIR__ . '/../license/license_guard.php';
 
 if (!isset($_SESSION['user_id'])) {
     error_log("Redirecting to login: No user_id in session");
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -66,7 +66,7 @@ try {
         session_destroy();
 
         header(
-            "Location: /EXAMCENTER/login.php?error=Unauthorized"
+            "Location: ../login.php?error=Unauthorized"
         );
 
         exit();

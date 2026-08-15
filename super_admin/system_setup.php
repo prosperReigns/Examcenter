@@ -22,7 +22,7 @@ ini_set('error_log', '../logs/errors.log');
 ========================================================= */
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -60,7 +60,7 @@ if (
     session_destroy();
 
     header(
-        "Location: /EXAMCENTER/login.php?error=Unauthorized"
+        "Location: ../login.php?error=Unauthorized"
     );
 
     exit();
@@ -684,7 +684,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
             header(
-                "Location: /EXAMCENTER/super_admin/dashboard.php"
+                "Location: dashboard.php"
             );
 
             exit();
@@ -1892,7 +1892,6 @@ class="brand"
 
 >
 
-```
 <span class="brand-icon">
 
     <i class="fas fa-graduation-cap"></i>
@@ -1902,13 +1901,11 @@ class="brand"
 <span>
     Examcenter
 </span>
-```
 
 </a>
 
 <div class="setup-intro">
 
-```
 <h1>
     System Setup
 </h1>
@@ -1918,7 +1915,6 @@ class="brand"
     system. Complete each step to
     prepare Examcenter for use.
 </p>
-```
 
 </div>
 
@@ -1929,7 +1925,6 @@ class="brand"
     data-step-item="1"
 >
 
-```
 <div class="step-number">
     1
 </div>
@@ -1945,7 +1940,6 @@ class="brand"
     </span>
 
 </div>
-```
 
 </div>
 
@@ -1954,7 +1948,6 @@ class="brand"
     data-step-item="2"
 >
 
-```
 <div class="step-number">
     2
 </div>
@@ -1970,7 +1963,6 @@ class="brand"
     </span>
 
 </div>
-```
 
 </div>
 
@@ -1979,7 +1971,6 @@ class="brand"
     data-step-item="3"
 >
 
-```
 <div class="step-number">
     3
 </div>
@@ -1995,7 +1986,6 @@ class="brand"
     </span>
 
 </div>
-```
 
 </div>
 
@@ -2004,7 +1994,6 @@ class="brand"
     data-step-item="4"
 >
 
-```
 <div class="step-number">
     4
 </div>
@@ -2020,7 +2009,6 @@ class="brand"
     </span>
 
 </div>
-```
 
 </div>
 
@@ -2029,7 +2017,6 @@ class="brand"
     data-step-item="5"
 >
 
-```
 <div class="step-number">
     5
 </div>
@@ -2045,7 +2032,6 @@ class="brand"
     </span>
 
 </div>
-```
 
 </div>
 
@@ -2061,7 +2047,6 @@ class="brand"
 
 <div class="content-header">
 
-```
 <div>
 
     <div class="content-label">
@@ -2090,7 +2075,6 @@ class="brand"
     <?= $totalSteps ?>
 
 </div>
-```
 
 </div>
 
@@ -2098,7 +2082,6 @@ class="brand"
 
 <div class="progress-container">
 
-```
 <div class="progress">
 
     <div
@@ -2112,7 +2095,6 @@ class="brand"
     ></div>
 
 </div>
-```
 
 </div>
 
@@ -2120,13 +2102,11 @@ class="brand"
 
 <div class="setup-alert alert alert-danger">
 
-```
 <i class="fas fa-exclamation-circle"></i>
 
 <div>
     <?= htmlspecialchars($error) ?>
 </div>
-```
 
 </div>
 
@@ -2143,7 +2123,6 @@ class="brand"
 
 <div class="step-card">
 
-```
 <div class="step-icon">
     <i class="fas fa-school"></i>
 </div>
@@ -2206,7 +2185,6 @@ class="brand"
     </div>
 
 </form>
-```
 
 </div>
 
@@ -2223,7 +2201,6 @@ class="brand"
 
 <div class="step-card">
 
-```
 <div class="step-icon">
     <i class="fas fa-calendar-alt"></i>
 </div>
@@ -2286,7 +2263,6 @@ class="brand"
     </div>
 
 </form>
-```
 
 </div>
 
@@ -2303,7 +2279,6 @@ class="brand"
 
 <div class="step-card">
 
-```
 <div class="step-icon">
     <i class="fas fa-users"></i>
 </div>
@@ -2448,7 +2423,6 @@ class="brand"
 
 
 </form>
-```
 
 </div>
 
@@ -2465,7 +2439,6 @@ class="brand"
 
 <div class="step-card">
 
-```
 <div class="step-icon">
     <i class="fas fa-book"></i>
 </div>
@@ -2562,7 +2535,6 @@ class="brand"
 
 
 </form>
-```
 
 </div>
 
@@ -2579,7 +2551,6 @@ class="brand"
 
 <div class="step-card">
 
-```
 <div class="step-icon">
     <i class="fas fa-user-shield"></i>
 </div>
@@ -2693,7 +2664,6 @@ class="brand"
 
 
 </form>
-```
 
 </div>
 
@@ -2701,13 +2671,11 @@ class="brand"
 
 <div class="setup-footer">
 
-```
 Examcenter System Setup
 
 &bull;
 
 Secure Initial Configuration
-```
 
 </div>
 

@@ -19,7 +19,7 @@ if (!$result || (int)$result['setup_completed'] !== 1) {
     if (isset($_SESSION['setup_step'])) {
         unset($_SESSION['setup_step']);
     }
-    header("Location: /EXAMCENTER/super_admin/system_setup.php");
+    header("Location: ../super_admin/system_setup.php");
     exit();
 }
 ?>

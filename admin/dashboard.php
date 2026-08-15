@@ -4,6 +4,7 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
 require_once "../backup/backup_scheduler.php";
 
 /*
@@ -18,7 +19,11 @@ if (
     strtolower($_SESSION['user_role']) !== 'admin'
 ) {
     error_log("Redirecting to login: No user_id or invalid role in session");
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+
+    header(
+        "Location: ../login.php?error=Not logged in"
+    );
+
     exit();
 }
 
@@ -35,7 +40,10 @@ try {
     $conn = $database->getConnection();
 
     if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
+        throw new Exception(
+            "Database connection failed: " .
+            $conn->connect_error
+        );
     }
 
     $admin_id = (int) $_SESSION['user_id'];
@@ -47,8 +55,11 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    function tableExists(mysqli $conn, string $table): bool
-    {
+    function tableExists(
+        mysqli $conn,
+        string $table
+    ): bool {
+
         $table = $conn->real_escape_string($table);
 
         $result = $conn->query(
@@ -59,8 +70,12 @@ try {
     }
 
 
-    function columnExists(mysqli $conn, string $table, string $column): bool
-    {
+    function columnExists(
+        mysqli $conn,
+        string $table,
+        string $column
+    ): bool {
+
         if (!tableExists($conn, $table)) {
             return false;
         }
@@ -76,13 +91,20 @@ try {
     }
 
 
-    function getCount(mysqli $conn, string $table): int
-    {
+    function getCount(
+        mysqli $conn,
+        string $table
+    ): int {
+
         if (!tableExists($conn, $table)) {
             return 0;
         }
 
-        $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+        $table = preg_replace(
+            '/[^a-zA-Z0-9_]/',
+            '',
+            $table
+        );
 
         $result = $conn->query(
             "SELECT COUNT(*) AS total FROM `{$table}`"
@@ -98,8 +120,12 @@ try {
     }
 
 
-    function getScalar(mysqli $conn, string $sql, $default = 0)
-    {
+    function getScalar(
+        mysqli $conn,
+        string $sql,
+        $default = 0
+    ) {
+
         $result = $conn->query($sql);
 
         if (!$result) {
@@ -116,8 +142,11 @@ try {
     }
 
 
-    function safeDate($value, string $format = 'd M Y'): string
-    {
+    function safeDate(
+        $value,
+        string $format = 'd M Y'
+    ): string {
+
         if (empty($value)) {
             return 'N/A';
         }
@@ -132,21 +161,30 @@ try {
     }
 
 
-    function formatBytesSafe($bytes): string
-    {
+    function formatBytesSafe($bytes): string {
+
         if (!is_numeric($bytes) || $bytes <= 0) {
             return '0 B';
         }
 
         $bytes = (float) $bytes;
 
-        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $units = [
+            'B',
+            'KB',
+            'MB',
+            'GB',
+            'TB'
+        ];
 
         $power = floor(
             log($bytes, 1024)
         );
 
-        $power = min($power, count($units) - 1);
+        $power = min(
+            $power,
+            count($units) - 1
+        );
 
         return number_format(
             $bytes / pow(1024, $power),
@@ -175,7 +213,11 @@ try {
             );
         }
 
-        $stmt->bind_param("i", $admin_id);
+        $stmt->bind_param(
+            "i",
+            $admin_id
+        );
+
         $stmt->execute();
 
         $admin = $stmt
@@ -195,7 +237,7 @@ try {
         session_destroy();
 
         header(
-            "Location: /EXAMCENTER/login.php?error=Unauthorized"
+            "Location: ../login.php?error=Unauthorized"
         );
 
         exit();
@@ -246,6 +288,7 @@ try {
             );
 
             $stmt->execute();
+
             $stmt->close();
         }
     }
@@ -253,7 +296,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | AUTOMATIC BACKUP SCHEDULER
+    | AUTOMATIC BACKUP
     |--------------------------------------------------------------------------
     */
 
@@ -294,29 +337,20 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | AGENTS
+    | teachers
     |--------------------------------------------------------------------------
-    |
-    | The current Examcenter architecture uses agents rather than
-    | the older teacher-management concept.
-    |
     */
 
-    $totalAgents = 0;
+    $totalteachers = 0;
 
-    if (tableExists($conn, 'agents')) {
+    if (tableExists($conn, 'teachers')) {
 
-        $totalAgents =
-            getCount($conn, 'agents');
+        $totalteachers =
+            getCount($conn, 'teachers');
 
     } elseif (tableExists($conn, 'teachers')) {
 
-        /*
-        | Backward compatibility for installations that still have
-        | the old teachers table.
-        */
-
-        $totalAgents =
+        $totalteachers =
             getCount($conn, 'teachers');
     }
 
@@ -354,7 +388,8 @@ try {
 
     $pendingResults = 0;
 
-    if (tableExists($conn, 'results') &&
+    if (
+        tableExists($conn, 'results') &&
         columnExists($conn, 'results', 'status')
     ) {
 
@@ -386,7 +421,13 @@ try {
 
     if (tableExists($conn, 'backups')) {
 
-        if (columnExists($conn, 'backups', 'file_size')) {
+        if (
+            columnExists(
+                $conn,
+                'backups',
+                'file_size'
+            )
+        ) {
 
             $backupStorage = (int) getScalar(
                 $conn,
@@ -400,7 +441,13 @@ try {
             );
         }
 
-        if (columnExists($conn, 'backups', 'created_at')) {
+        if (
+            columnExists(
+                $conn,
+                'backups',
+                'created_at'
+            )
+        ) {
 
             $result = $conn->query(
                 "
@@ -444,7 +491,13 @@ try {
 
     if (tableExists($conn, 'audit_logs')) {
 
-        if (columnExists($conn, 'audit_logs', 'created_at')) {
+        if (
+            columnExists(
+                $conn,
+                'audit_logs',
+                'created_at'
+            )
+        ) {
 
             $todayAuditLogs = (int) getScalar(
                 $conn,
@@ -456,7 +509,13 @@ try {
             );
         }
 
-        if (columnExists($conn, 'audit_logs', 'action')) {
+        if (
+            columnExists(
+                $conn,
+                'audit_logs',
+                'action'
+            )
+        ) {
 
             $failedLogins = (int) getScalar(
                 $conn,
@@ -474,13 +533,6 @@ try {
     |--------------------------------------------------------------------------
     | LICENSE
     |--------------------------------------------------------------------------
-    |
-    | Examcenter is now connected to the external license system.
-    |
-    | The dashboard therefore treats the local license record as
-    | local activation state rather than attempting to reproduce
-    | the complete license-server logic here.
-    |
     */
 
     $license = null;
@@ -524,11 +576,6 @@ try {
                 (string) $license['status'];
         }
 
-        /*
-        | Support both the older expires_at naming and
-        | possible expiry_at naming.
-        */
-
         if (!empty($license['expires_date'])) {
 
             $licenseExpiry =
@@ -539,7 +586,6 @@ try {
             $licenseExpiry =
                 $license['expiry_date'];
         }
-
 
         if (!empty($license['plan_name'])) {
 
@@ -552,13 +598,11 @@ try {
                 $license['license_type'];
         }
 
-
         if (!empty($license['version'])) {
 
             $licenseVersion =
                 $license['version'];
         }
-
 
         if (!empty($licenseExpiry)) {
 
@@ -588,7 +632,6 @@ try {
             }
         }
 
-
         $normalizedLicenseStatus =
             strtolower(trim($licenseStatus));
 
@@ -607,7 +650,7 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | LICENSE ALERT
+    | ALERTS
     |--------------------------------------------------------------------------
     */
 
@@ -619,7 +662,8 @@ try {
         $alerts[] = [
             'type' => 'danger',
             'icon' => 'fa-key',
-            'message' => 'No license has been activated on this installation.'
+            'message' =>
+                'No license has been activated on this installation.'
         ];
 
     } elseif (!$licenseIsActive) {
@@ -679,7 +723,7 @@ try {
                 }
 
             } catch (Throwable $e) {
-                // Ignore malformed backup dates.
+                // Ignore malformed dates.
             }
         }
 
@@ -965,34 +1009,399 @@ try {
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>
-        Admin Dashboard | Examcenter
-    </title>
-    <link href="../css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../css/all.css">
-    <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
-    <link rel="stylesheet" href="../assets/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="../css/admin-dashboard.css">
-    <link rel="stylesheet" href="../css/dashboard.css">
-    <link rel="stylesheet" href="../css/view_results.css">
-    <link rel="stylesheet" href="../css/sidebar.css">
+    <title>Admin Dashboard | Examcenter</title>
+
+    <link
+        href="../css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/all.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/dataTables.bootstrap5.min.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../assets/fontawesome/css/all.min.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/admin-dashboard.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/dashboard.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/view_results.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="../css/sidebar.css"
+    >
 
 
     <style>
 
         /*
         |--------------------------------------------------------------------------
-        | DASHBOARD
+        | GLOBAL
         |--------------------------------------------------------------------------
         */
 
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+        }
+
         body {
             background: #f5f7fb;
+            overflow-x: hidden;
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | LEFT SIDEBAR
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | These rules intentionally override sidebar.css.
+        |
+        */
+
+        .sidebar {
+            position: fixed !important;
+
+            top: 0 !important;
+            left: 0 !important;
+            right: auto !important;
+            bottom: 0 !important;
+
+            width: 260px !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+
+            max-height: none !important;
+
+            display: flex !important;
+            flex-direction: column !important;
+
+            overflow: hidden !important;
+
+            z-index: 1050 !important;
+
+            background: #ffffff;
+
+            box-shadow:
+                2px 0 12px
+                rgba(0, 0, 0, .08);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR BRAND
+        |--------------------------------------------------------------------------
+        */
+
+        .sidebar-brand {
+            flex: 0 0 auto !important;
+
+            padding: 22px 18px 18px !important;
+
+            background: #ffffff;
+
+            position: relative;
+
+            z-index: 2;
+        }
+
+        .sidebar-brand h3 {
+            margin: 0 !important;
+            font-weight: 700;
+        }
+
+        .admin-info {
+            margin-top: 15px !important;
+        }
+
+        .admin-info small {
+            display: block;
+            color: #6c757d;
+            margin-bottom: 3px;
+        }
+
+        .admin-info h6 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR MENU
+        |--------------------------------------------------------------------------
+        |
+        | This is the critical fix.
+        |
+        | The menu itself scrolls instead of the sidebar being
+        | clipped by a fixed height.
+        |
+        */
+
+        .sidebar-menu {
+            flex: 1 1 auto !important;
+
+            min-height: 0 !important;
+
+            height: auto !important;
+
+            max-height: none !important;
+
+            overflow-y: auto !important;
+
+            overflow-x: hidden !important;
+
+            padding:
+                0 10px 20px !important;
+
+            margin-top: 10px !important;
+
+            scrollbar-width: thin;
+
+            scrollbar-color:
+                #c7cdd4
+                transparent;
+        }
+
+
+        .sidebar-menu::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-menu::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-menu::-webkit-scrollbar-thumb {
+            background: #c7cdd4;
+            border-radius: 10px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR LINKS
+        |--------------------------------------------------------------------------
+        */
+
+        .sidebar-menu > a {
+            display: flex !important;
+
+            align-items: center !important;
+
+            width: 100% !important;
+
+            min-height: 46px !important;
+
+            padding:
+                11px 14px !important;
+
+            margin-bottom: 4px !important;
+
+            border-radius: 8px !important;
+
+            text-decoration: none !important;
+
+            white-space: nowrap !important;
+
+            overflow: hidden !important;
+
+            color: #495057 !important;
+
+            transition:
+                background .2s ease,
+                color .2s ease,
+                transform .2s ease;
+        }
+
+        .sidebar-menu > a i {
+            width: 25px !important;
+
+            min-width: 25px !important;
+
+            margin-right: 10px !important;
+
+            text-align: center !important;
+
+            font-size: 16px !important;
+        }
+
+        .sidebar-menu > a:hover {
+            background: #eef4ff !important;
+            color: #0d6efd !important;
+        }
+
+        .sidebar-menu > a.active {
+            background: #0d6efd !important;
+            color: #ffffff !important;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | LOGOUT
+        |--------------------------------------------------------------------------
+        |
+        | Keep logout visually separated but inside the
+        | scrollable menu.
+        |
+        */
+
+        .sidebar-menu > a.logout-btn {
+            margin-top: 12px !important;
+
+            margin-bottom: 5px !important;
+
+            color: #dc3545 !important;
+
+            background: transparent !important;
+        }
+
+        .sidebar-menu > a.logout-btn:hover {
+            background: #fdebed !important;
+            color: #dc3545 !important;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN CONTENT
+        |--------------------------------------------------------------------------
+        */
 
         .main-content {
             min-height: 100vh;
-            padding-bottom: 40px;
+
+            margin-left: 260px;
+
+            padding:
+                30px;
+
+            padding-bottom: 50px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MOBILE TOGGLE
+        |--------------------------------------------------------------------------
+        |
+        | The button is fixed on the RIGHT side.
+        |
+        */
+
+        #sidebarToggle {
+            position: fixed !important;
+
+            top: 18px !important;
+
+            right: 18px !important;
+
+            left: auto !important;
+
+            width: 46px !important;
+            height: 42px !important;
+
+            border: none !important;
+
+            border-radius: 8px !important;
+
+            background: #0d6efd !important;
+
+            color: #ffffff !important;
+
+            display: none;
+
+            align-items: center !important;
+            justify-content: center !important;
+
+            cursor: pointer !important;
+
+            z-index: 1100 !important;
+
+            box-shadow:
+                0 3px 12px
+                rgba(0, 0, 0, .18);
+
+            transition:
+                background .2s ease,
+                transform .2s ease;
+        }
+
+        #sidebarToggle:hover {
+            background: #0b5ed7 !important;
+            transform: translateY(-1px);
+        }
+
+        #sidebarToggle:focus {
+            outline:
+                3px solid
+                rgba(13, 110, 253, .25);
+        }
+
+        #sidebarToggle i {
+            font-size: 20px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR OVERLAY
+        |--------------------------------------------------------------------------
+        */
+
+        .sidebar-overlay {
+            position: fixed !important;
+
+            inset: 0 !important;
+
+            background:
+                rgba(0, 0, 0, .45) !important;
+
+            opacity: 0 !important;
+
+            visibility: hidden !important;
+
+            pointer-events: none !important;
+
+            z-index: 1040 !important;
+
+            transition:
+                opacity .25s ease,
+                visibility .25s ease;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1 !important;
+
+            visibility: visible !important;
+
+            pointer-events: auto !important;
         }
 
 
@@ -1004,9 +1413,13 @@ try {
 
         .dashboard-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
+
             gap: 20px;
+
             margin-bottom: 25px;
         }
 
@@ -1022,47 +1435,10 @@ try {
 
         .dashboard-header-right {
             display: flex;
+
             align-items: center;
+
             gap: 10px;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | SIDEBAR TOGGLE
-        |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        | The toggle is deliberately on the RIGHT-HAND side.
-        |
-        */
-
-        #sidebarToggle {
-            width: 46px;
-            height: 42px;
-            border: none;
-            border-radius: 7px;
-            background: #0d6efd;
-            color: #fff;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
-            transition: .2s ease;
-        }
-
-        #sidebarToggle:hover {
-            background: #0b5ed7;
-            transform: translateY(-1px);
-        }
-
-        #sidebarToggle:focus {
-            outline: 3px solid rgba(13, 110, 253, .25);
-        }
-
-        #sidebarToggle i {
-            font-size: 20px;
         }
 
 
@@ -1074,16 +1450,26 @@ try {
 
         .dashboard-stat-card {
             border: 0;
+
             border-radius: 12px;
+
             background: #fff;
-            box-shadow: 0 3px 12px rgba(0, 0, 0, .06);
-            transition: transform .2s ease,
-                        box-shadow .2s ease;
+
+            box-shadow:
+                0 3px 12px
+                rgba(0, 0, 0, .06);
+
+            transition:
+                transform .2s ease,
+                box-shadow .2s ease;
         }
 
         .dashboard-stat-card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 7px 20px rgba(0, 0, 0, .09);
+
+            box-shadow:
+                0 7px 20px
+                rgba(0, 0, 0, .09);
         }
 
         .dashboard-stat-card .card-body {
@@ -1092,24 +1478,35 @@ try {
 
         .stat-label {
             color: #6c757d;
+
             font-size: 13px;
+
             font-weight: 600;
+
             text-transform: uppercase;
         }
 
         .stat-value {
             font-size: 30px;
+
             font-weight: 700;
+
             margin-top: 5px;
         }
 
         .stat-icon {
             width: 52px;
+
             height: 52px;
+
             border-radius: 12px;
+
             display: flex;
+
             align-items: center;
+
             justify-content: center;
+
             font-size: 21px;
         }
 
@@ -1142,14 +1539,21 @@ try {
 
         .dashboard-card {
             border: 0;
+
             border-radius: 12px;
-            box-shadow: 0 3px 12px rgba(0, 0, 0, .06);
+
+            box-shadow:
+                0 3px 12px
+                rgba(0, 0, 0, .06);
+
             overflow: hidden;
         }
 
         .dashboard-card .card-header {
             border: 0;
+
             padding: 15px 18px;
+
             font-weight: 600;
         }
 
@@ -1166,62 +1570,92 @@ try {
 
         .quick-action {
             display: flex;
+
             align-items: center;
+
             gap: 12px;
+
             min-height: 82px;
+
             padding: 14px;
+
             border-radius: 10px;
+
             text-decoration: none;
+
             color: #212529;
+
             background: #f8f9fa;
+
             border: 1px solid #edf0f3;
+
             transition: .2s ease;
         }
 
         .quick-action:hover {
             color: #212529;
+
             background: #eef3f8;
+
             transform: translateY(-2px);
         }
 
         .quick-action-icon {
             width: 42px;
+
             height: 42px;
+
             flex: 0 0 42px;
+
             display: flex;
+
             align-items: center;
+
             justify-content: center;
+
             border-radius: 9px;
+
             background: #e9f1ff;
+
             color: #0d6efd;
         }
 
         .quick-action-title {
             font-weight: 600;
+
             font-size: 14px;
         }
 
         .quick-action-description {
             display: block;
+
             color: #6c757d;
+
             font-size: 12px;
+
             margin-top: 2px;
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | LICENSE CARD
+        | LICENSE
         |--------------------------------------------------------------------------
         */
 
         .license-status {
             display: inline-flex;
+
             align-items: center;
+
             gap: 7px;
+
             padding: 6px 10px;
+
             border-radius: 20px;
+
             font-size: 12px;
+
             font-weight: 600;
         }
 
@@ -1242,8 +1676,11 @@ try {
 
         .license-dot {
             width: 7px;
+
             height: 7px;
+
             border-radius: 50%;
+
             background: currentColor;
         }
 
@@ -1256,7 +1693,9 @@ try {
 
         .system-info {
             padding: 16px;
+
             text-align: center;
+
             border-right: 1px solid #eee;
         }
 
@@ -1266,7 +1705,9 @@ try {
 
         .system-info-label {
             color: #6c757d;
+
             font-size: 12px;
+
             margin-bottom: 5px;
         }
 
@@ -1283,9 +1724,13 @@ try {
 
         .dashboard-table th {
             font-size: 12px;
+
             text-transform: uppercase;
+
             color: #6c757d;
+
             font-weight: 600;
+
             white-space: nowrap;
         }
 
@@ -1302,13 +1747,17 @@ try {
 
         .empty-state {
             padding: 35px 15px;
+
             text-align: center;
+
             color: #6c757d;
         }
 
         .empty-state i {
             font-size: 30px;
+
             margin-bottom: 10px;
+
             opacity: .5;
         }
 
@@ -1321,6 +1770,7 @@ try {
 
         .system-alert {
             border-radius: 8px;
+
             margin-bottom: 10px;
         }
 
@@ -1337,37 +1787,93 @@ try {
 
         .chart-container {
             position: relative;
+
             height: 300px;
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | MOBILE
+        | TABLET / MOBILE
         |--------------------------------------------------------------------------
         */
 
         @media (max-width: 991.98px) {
 
-            #sidebarToggle {
-                display: flex;
+            /*
+            | Sidebar starts hidden off-screen.
+            */
+
+            .sidebar {
+                transform:
+                    translateX(-100%) !important;
+
+                transition:
+                    transform .25s ease !important;
             }
+
+
+            /*
+            | Sidebar opens from the LEFT.
+            */
+
+            .sidebar.active {
+                transform:
+                    translateX(0) !important;
+            }
+
+
+            /*
+            | Main content uses full width.
+            */
+
+            .main-content {
+                margin-left: 0;
+
+                padding:
+                    25px 20px 40px;
+            }
+
+
+            /*
+            | Toggle appears on RIGHT.
+            */
+
+            #sidebarToggle {
+                display: flex !important;
+            }
+
+
+            /*
+            | Header leaves room for right-side toggle.
+            */
 
             .dashboard-header {
-                align-items: flex-start;
-            }
-
-            .dashboard-header-right {
-                flex-shrink: 0;
+                padding-right: 65px;
             }
 
         }
 
 
+        /*
+        |--------------------------------------------------------------------------
+        | SMALL MOBILE
+        |--------------------------------------------------------------------------
+        */
+
         @media (max-width: 575.98px) {
+
+            .main-content {
+                padding:
+                    20px 15px 35px;
+            }
 
             .dashboard-header {
                 flex-direction: row;
+
+                align-items: flex-start;
+
+                padding-right: 60px;
             }
 
             .dashboard-header-left h2 {
@@ -1384,12 +1890,20 @@ try {
 
             .system-info {
                 border-right: 0;
+
                 border-bottom: 1px solid #eee;
             }
 
             .system-info:last-child {
                 border-bottom: 0;
             }
+
+            #sidebarToggle {
+                top: 12px !important;
+
+                right: 12px !important;
+            }
+
         }
 
     </style>
@@ -1401,33 +1915,66 @@ try {
 
 
 <!-- ============================================================
-     SIDEBAR
+     MOBILE SIDEBAR TOGGLE
+============================================================ -->
+
+<button
+    type="button"
+    id="sidebarToggle"
+    aria-label="Open navigation menu"
+    aria-expanded="false"
+    aria-controls="mainSidebar"
+>
+
+    <i class="fas fa-bars"></i>
+
+</button>
+
+
+<!-- ============================================================
+     SIDEBAR OVERLAY
 ============================================================ -->
 
 <div
+    class="sidebar-overlay"
+    id="sidebarOverlay"
+></div>
+
+
+<!-- ============================================================
+     LEFT SIDEBAR
+============================================================ -->
+
+<aside
     class="sidebar"
-    id="sidebar"
+    id="mainSidebar"
 >
+
+    <!-- BRAND -->
 
     <div class="sidebar-brand">
 
         <h3>
+
             <i class="fas fa-graduation-cap me-2"></i>
+
             Examcenter
+
         </h3>
+
 
         <div class="admin-info">
 
             <small>
-                <b>Welcome back,</b>
+                Welcome back,
             </small>
 
             <h6>
-                <b>
-                    <?= htmlspecialchars(
-                        $admin['username']
-                    ) ?>
-                </b>
+
+                <?= htmlspecialchars(
+                    $admin['username']
+                ) ?>
+
             </h6>
 
         </div>
@@ -1435,118 +1982,168 @@ try {
     </div>
 
 
-    <div class="sidebar-menu mt-4">
+    <!-- MENU -->
+
+    <nav
+        class="sidebar-menu"
+        aria-label="Admin navigation"
+    >
 
         <a
             href="dashboard.php"
             class="active"
         >
+
             <i class="fas fa-tachometer-alt"></i>
-            Dashboard
+
+            <span>Dashboard</span>
+
         </a>
 
 
         <a href="add_teacher.php">
-            <i class="fas fa-database"></i>
-            Add Teacher
+
+            <i class="fas fa-user-plus"></i>
+
+            <span>Add Teachers</span>
+
         </a>
 
 
         <a href="view_questions.php">
+
             <i class="fas fa-list"></i>
-            View Questions
+
+            <span>View Questions</span>
+
         </a>
 
 
         <a href="view_results.php">
+
             <i class="fas fa-chart-bar"></i>
-            Exam Results
-        </a>
 
+            <span>Exam Results</span>
 
-        <a href="manage_students.php">
-            <i class="fas fa-user-graduate"></i>
-            Manage Students
         </a>
 
 
         <a href="manage_classes.php">
+
             <i class="fas fa-users"></i>
-            Manage Classes
+
+            <span>Manage Classes</span>
+
         </a>
 
 
         <a href="manage_session.php">
+
             <i class="fas fa-calendar-alt"></i>
-            Academic Session
+
+            <span>Manage Session</span>
+
         </a>
 
 
         <a href="manage_subject.php">
+
             <i class="fas fa-book"></i>
-            Manage Subjects
+
+            <span>Manage Subject</span>
+
+        </a>
+
+
+        <a href="manage_students.php">
+
+            <i class="fas fa-user-graduate"></i>
+
+            <span>Manage Student</span>
+
         </a>
 
 
         <a href="manage_teachers.php">
-            <i class="fas fa-user-tie"></i>
-            Manage teachers
+
+            <i class="fas fa-chalkboard-teacher"></i>
+
+            <span>Manage Teachers</span>
+
         </a>
 
 
-        <a href="manage_test.php">
-            <i class="fas fa-file-alt"></i>
-            Manage Tests
-        </a>
-        <a href="exam_schedule.php"><i class="fas fa-calendar-check"></i>Timestable</a>
+        <a href="exam_schedule.php">
 
-        <a href="settings.php">
-            <i class="fas fa-cog"></i>
-            Settings
-        </a>
+            <i class="fas fa-calendar-check"></i>
 
+            <span>Timetable</span>
 
-        <a href="../license/index.php">
-            <i class="fas fa-key"></i>
-            License
-        </a>
-
-
-        <a href="audit_logs.php">
-            <i class="fas fa-shield-alt"></i>
-            Audit Logs
         </a>
 
 
         <a href="../backup/backup_list.php">
+
             <i class="fas fa-database"></i>
-            Backup
+
+            <span>Backups</span>
+
         </a>
 
+
+        <a href="audit_logs.php">
+
+            <i class="fas fa-history"></i>
+
+            <span>Audit Logs</span>
+
+        </a>
+
+
+        <a href="../license/index.php">
+
+            <i class="fas fa-key"></i>
+
+            <span>License</span>
+
+        </a>
+
+
+        <a href="settings.php">
+
+            <i class="fas fa-cog"></i>
+
+            <span>Settings</span>
+
+        </a>
+
+
+        <!-- LOGOUT -->
 
         <a
-            href="logout.php"
+            href="../teacher/logout.php"
             class="logout-btn"
         >
+
             <i class="fas fa-sign-out-alt"></i>
-            Logout
+
+            <span>Logout</span>
+
         </a>
 
-    </div>
+    </nav>
 
-</div>
+</aside>
 
 
 <!-- ============================================================
      MAIN CONTENT
 ============================================================ -->
 
-<div class="main-content">
+<main class="main-content">
 
 
-    <!-- ========================================================
-         HEADER
-    ========================================================= -->
+    <!-- HEADER -->
 
     <div class="dashboard-header">
 
@@ -1564,35 +2161,18 @@ try {
         </div>
 
 
-        <!-- RIGHT SIDE -->
-
         <div class="dashboard-header-right">
 
             <a
                 href="view_results.php"
                 class="btn btn-secondary btn-results"
             >
+
                 <i class="fas fa-chart-bar me-2"></i>
+
                 View Results
+
             </a>
-
-
-            <!--
-            =====================================================
-            SIDEBAR TOGGLE
-            RIGHT-HAND SIDE
-            =====================================================
-            -->
-
-            <button
-                type="button"
-                id="sidebarToggle"
-                aria-label="Toggle navigation"
-                aria-expanded="false"
-                title="Toggle navigation"
-            >
-                <i class="fas fa-bars"></i>
-            </button>
 
         </div>
 
@@ -1600,14 +2180,13 @@ try {
 
 
     <!-- ========================================================
-         MAIN STATISTICS
+         STATISTICS
     ========================================================= -->
 
     <div
         class="row g-3 mb-4"
         id="dashboardStats"
     >
-
 
         <!-- QUESTIONS -->
 
@@ -1626,9 +2205,11 @@ try {
                             </div>
 
                             <div class="stat-value">
+
                                 <?= number_format(
                                     $totalQuestions
                                 ) ?>
+
                             </div>
 
                         </div>
@@ -1642,10 +2223,13 @@ try {
                     </div>
 
                     <small class="text-muted">
+
                         <?= number_format(
                             $questionsWithImages
                         ) ?>
+
                         image question(s)
+
                     </small>
 
                 </div>
@@ -1672,9 +2256,11 @@ try {
                             </div>
 
                             <div class="stat-value">
+
                                 <?= number_format(
                                     $totalTests
                                 ) ?>
+
                             </div>
 
                         </div>
@@ -1715,9 +2301,11 @@ try {
                             </div>
 
                             <div class="stat-value">
+
                                 <?= number_format(
                                     $totalStudents
                                 ) ?>
+
                             </div>
 
                         </div>
@@ -1741,7 +2329,7 @@ try {
         </div>
 
 
-        <!-- AGENTS -->
+        <!-- teachers -->
 
         <div class="col-xl-3 col-md-6">
 
@@ -1754,13 +2342,15 @@ try {
                         <div>
 
                             <div class="stat-label">
-                                Agents
+                                teachers
                             </div>
 
                             <div class="stat-value">
+
                                 <?= number_format(
-                                    $totalAgents
+                                    $totalteachers
                                 ) ?>
+
                             </div>
 
                         </div>
@@ -1774,7 +2364,7 @@ try {
                     </div>
 
                     <small class="text-muted">
-                        Administrative exam agents
+                        Administrative exam teachers
                     </small>
 
                 </div>
@@ -1787,13 +2377,13 @@ try {
 
 
     <!-- ========================================================
-         SYSTEM OVERVIEW
+         ALERTS + QUICK ACTIONS
     ========================================================= -->
 
     <div class="row g-4">
 
 
-        <!-- SYSTEM ALERTS -->
+        <!-- ALERTS -->
 
         <div class="col-lg-6">
 
@@ -1806,7 +2396,6 @@ try {
                     System Alerts
 
                 </div>
-
 
                 <div class="card-body">
 
@@ -1867,7 +2456,6 @@ try {
 
                 </div>
 
-
                 <div class="card-body">
 
                     <div class="row g-3">
@@ -1881,7 +2469,9 @@ try {
                             >
 
                                 <div class="quick-action-icon">
+
                                     <i class="fas fa-plus-circle"></i>
+
                                 </div>
 
                                 <div>
@@ -1909,7 +2499,9 @@ try {
                             >
 
                                 <div class="quick-action-icon">
+
                                     <i class="fas fa-database"></i>
+
                                 </div>
 
                                 <div>
@@ -1937,7 +2529,9 @@ try {
                             >
 
                                 <div class="quick-action-icon">
+
                                     <i class="fas fa-file-import"></i>
+
                                 </div>
 
                                 <div>
@@ -1965,7 +2559,9 @@ try {
                             >
 
                                 <div class="quick-action-icon">
+
                                     <i class="fas fa-save"></i>
+
                                 </div>
 
                                 <div>
@@ -1993,7 +2589,9 @@ try {
                             >
 
                                 <div class="quick-action-icon">
+
                                     <i class="fas fa-history"></i>
+
                                 </div>
 
                                 <div>
@@ -2021,7 +2619,9 @@ try {
                             >
 
                                 <div class="quick-action-icon">
+
                                     <i class="fas fa-shield-alt"></i>
+
                                 </div>
 
                                 <div>
@@ -2040,7 +2640,6 @@ try {
 
                         </div>
 
-
                     </div>
 
                 </div>
@@ -2053,7 +2652,7 @@ try {
 
 
     <!-- ========================================================
-         TESTS + LICENSE
+         RECENT TESTS + LICENSE
     ========================================================= -->
 
     <div class="row g-4 mt-1">
@@ -2072,7 +2671,6 @@ try {
                     Recent Tests
 
                 </div>
-
 
                 <div class="table-responsive">
 
@@ -2094,7 +2692,6 @@ try {
 
                         </thead>
 
-
                         <tbody>
 
                         <?php if (
@@ -2110,12 +2707,13 @@ try {
                                 <tr>
 
                                     <td>
+
                                         <?= htmlspecialchars(
                                             $test['title']
                                             ?? 'Untitled Test'
                                         ) ?>
-                                    </td>
 
+                                    </td>
 
                                     <td>
 
@@ -2131,7 +2729,6 @@ try {
 
                                     </td>
 
-
                                     <td>
 
                                         <?= number_format(
@@ -2142,7 +2739,6 @@ try {
                                         ) ?>
 
                                     </td>
-
 
                                     <td>
 
@@ -2202,31 +2798,29 @@ try {
 
                 </div>
 
-
                 <div class="card-body">
 
+                    <?php
+
+                    if ($licenseIsActive) {
+
+                        $licenseClass =
+                            'license-active';
+
+                    } elseif ($license) {
+
+                        $licenseClass =
+                            'license-danger';
+
+                    } else {
+
+                        $licenseClass =
+                            'license-danger';
+                    }
+
+                    ?>
 
                     <div class="mb-3">
-
-                        <?php
-
-                        if ($licenseIsActive) {
-
-                            $licenseClass =
-                                'license-active';
-
-                        } elseif ($license) {
-
-                            $licenseClass =
-                                'license-danger';
-
-                        } else {
-
-                            $licenseClass =
-                                'license-danger';
-                        }
-
-                        ?>
 
                         <span
                             class="license-status <?= $licenseClass ?>"
@@ -2242,29 +2836,25 @@ try {
 
                     </div>
 
-
                     <table class="table table-borderless mb-0">
 
                         <tr>
 
-                            <th>
-                                Plan
-                            </th>
+                            <th>Plan</th>
 
                             <td class="text-end">
+
                                 <?= htmlspecialchars(
                                     $licensePlan
                                 ) ?>
+
                             </td>
 
                         </tr>
 
-
                         <tr>
 
-                            <th>
-                                Expires
-                            </th>
+                            <th>Expires</th>
 
                             <td class="text-end">
 
@@ -2276,31 +2866,27 @@ try {
 
                         </tr>
 
-
                         <tr>
 
-                            <th>
-                                Days Left
-                            </th>
+                            <th>Days Left</th>
 
                             <td class="text-end">
 
                                 <strong>
+
                                     <?= number_format(
                                         $daysRemaining
                                     ) ?>
+
                                 </strong>
 
                             </td>
 
                         </tr>
 
-
                         <tr>
 
-                            <th>
-                                Version
-                            </th>
+                            <th>Version</th>
 
                             <td class="text-end">
 
@@ -2313,7 +2899,6 @@ try {
                         </tr>
 
                     </table>
-
 
                     <div class="d-grid mt-3">
 
@@ -2340,7 +2925,7 @@ try {
 
 
     <!-- ========================================================
-         BACKUP + AUDIT
+         BACKUPS + AUDIT
     ========================================================= -->
 
     <div class="row g-4 mt-1">
@@ -2360,9 +2945,7 @@ try {
 
                 </div>
 
-
                 <div class="card-body">
-
 
                     <div class="row text-center mb-3">
 
@@ -2373,13 +2956,14 @@ try {
                             </div>
 
                             <div class="fs-4 fw-bold">
+
                                 <?= number_format(
                                     $totalBackups
                                 ) ?>
+
                             </div>
 
                         </div>
-
 
                         <div class="col-6">
 
@@ -2388,18 +2972,18 @@ try {
                             </div>
 
                             <div class="fs-4 fw-bold">
+
                                 <?= formatBytesSafe(
                                     $backupStorage
                                 ) ?>
+
                             </div>
 
                         </div>
 
                     </div>
 
-
                     <hr>
-
 
                     <?php if (
                         $recentBackups &&
@@ -2414,18 +2998,13 @@ try {
 
                                     <tr>
 
-                                        <th>
-                                            Date
-                                        </th>
+                                        <th>Date</th>
 
-                                        <th>
-                                            Size
-                                        </th>
+                                        <th>Size</th>
 
                                     </tr>
 
                                 </thead>
-
 
                                 <tbody>
 
@@ -2445,7 +3024,6 @@ try {
                                             ) ?>
 
                                         </td>
-
 
                                         <td>
 
@@ -2477,7 +3055,6 @@ try {
                         </div>
 
                     <?php endif; ?>
-
 
                     <div class="d-grid mt-3">
 
@@ -2515,7 +3092,6 @@ try {
 
                 </div>
 
-
                 <div class="table-responsive">
 
                     <table class="table table-striped mb-0 dashboard-table">
@@ -2524,26 +3100,17 @@ try {
 
                             <tr>
 
-                                <th>
-                                    Time
-                                </th>
+                                <th>Time</th>
 
-                                <th>
-                                    Admin
-                                </th>
+                                <th>Admin</th>
 
-                                <th>
-                                    Module
-                                </th>
+                                <th>Module</th>
 
-                                <th>
-                                    Action
-                                </th>
+                                <th>Action</th>
 
                             </tr>
 
                         </thead>
-
 
                         <tbody>
 
@@ -2569,7 +3136,6 @@ try {
 
                                     </td>
 
-
                                     <td>
 
                                         <?= htmlspecialchars(
@@ -2578,7 +3144,6 @@ try {
                                         ) ?>
 
                                     </td>
-
 
                                     <td>
 
@@ -2592,7 +3157,6 @@ try {
                                         </span>
 
                                     </td>
-
 
                                     <td>
 
@@ -2650,7 +3214,6 @@ try {
 
             <div class="row g-0">
 
-
                 <div class="col-md-3">
 
                     <div class="system-info">
@@ -2660,11 +3223,14 @@ try {
                         </div>
 
                         <div class="system-info-value">
+
                             <?= number_format(
                                 $dbSize,
                                 2
                             ) ?>
+
                             MB
+
                         </div>
 
                     </div>
@@ -2681,9 +3247,11 @@ try {
                         </div>
 
                         <div class="system-info-value">
+
                             <?= htmlspecialchars(
                                 PHP_VERSION
                             ) ?>
+
                         </div>
 
                     </div>
@@ -2732,7 +3300,6 @@ try {
 
                 </div>
 
-
             </div>
 
         </div>
@@ -2747,7 +3314,7 @@ try {
     <div class="row g-4 mt-1">
 
 
-        <!-- QUESTIONS PER SUBJECT -->
+        <!-- QUESTIONS -->
 
         <div class="col-lg-6">
 
@@ -2760,7 +3327,6 @@ try {
                     Questions Per Subject
 
                 </div>
-
 
                 <div class="card-body">
 
@@ -2777,7 +3343,7 @@ try {
         </div>
 
 
-        <!-- MONTHLY TESTS -->
+        <!-- TESTS -->
 
         <div class="col-lg-6">
 
@@ -2790,7 +3356,6 @@ try {
                     Tests Created This Year
 
                 </div>
-
 
                 <div class="card-body">
 
@@ -2821,7 +3386,6 @@ try {
 
                 </div>
 
-
                 <div class="card-body">
 
                     <div class="chart-container">
@@ -2851,7 +3415,6 @@ try {
 
                 </div>
 
-
                 <div class="card-body">
 
                     <div class="chart-container">
@@ -2868,12 +3431,11 @@ try {
 
     </div>
 
-
-</div>
+</main>
 
 
 <!-- ============================================================
-     SCRIPTS
+     JAVASCRIPT
 ============================================================ -->
 
 <script src="../js/jquery-3.7.0.min.js"></script>
@@ -2889,80 +3451,260 @@ document.addEventListener(
     'DOMContentLoaded',
     function () {
 
-
         /*
         |--------------------------------------------------------------------------
-        | SIDEBAR TOGGLE
+        | SIDEBAR
         |--------------------------------------------------------------------------
         |
-        | This is intentionally independent of jQuery.
-        | Therefore it will still work even if another JS file
-        | has a problem.
+        | IMPORTANT:
+        | HTML uses #mainSidebar.
+        | The old code searched for #sidebar.
         |
         */
 
         const sidebar =
-            document.getElementById('sidebar');
+            document.getElementById(
+                'mainSidebar'
+            );
 
         const sidebarToggle =
-            document.getElementById('sidebarToggle');
+            document.getElementById(
+                'sidebarToggle'
+            );
 
-
-        if (sidebar && sidebarToggle) {
-
-            sidebarToggle.addEventListener(
-                'click',
-                function () {
-
-                    sidebar.classList.toggle('active');
-
-                    const isOpen =
-                        sidebar.classList.contains(
-                            'active'
-                        );
-
-                    sidebarToggle.setAttribute(
-                        'aria-expanded',
-                        isOpen ? 'true' : 'false'
-                    );
-
-                }
+        const sidebarOverlay =
+            document.getElementById(
+                'sidebarOverlay'
             );
 
 
-            /*
-            | Close the sidebar when a menu item is
-            | selected on smaller screens.
-            */
+        function openSidebar() {
 
-            sidebar
-                .querySelectorAll('a')
-                .forEach(function (link) {
+            if (!sidebar) {
+                return;
+            }
 
-                    link.addEventListener(
-                        'click',
-                        function () {
+            sidebar.classList.add(
+                'active'
+            );
 
-                            if (
-                                window.innerWidth <= 991
-                            ) {
+            if (sidebarOverlay) {
 
-                                sidebar.classList.remove(
-                                    'active'
-                                );
+                sidebarOverlay.classList.add(
+                    'active'
+                );
+            }
 
-                                sidebarToggle.setAttribute(
-                                    'aria-expanded',
-                                    'false'
-                                );
-                            }
+            if (sidebarToggle) {
 
-                        }
+                sidebarToggle.setAttribute(
+                    'aria-expanded',
+                    'true'
+                );
+
+                sidebarToggle.setAttribute(
+                    'aria-label',
+                    'Close navigation menu'
+                );
+
+                const icon =
+                    sidebarToggle.querySelector(
+                        'i'
                     );
 
-                });
+                if (icon) {
 
+                    icon.classList.remove(
+                        'fa-bars'
+                    );
+
+                    icon.classList.add(
+                        'fa-times'
+                    );
+                }
+            }
+
+            document.body.classList.add(
+                'sidebar-open'
+            );
         }
+
+
+        function closeSidebar() {
+
+            if (!sidebar) {
+                return;
+            }
+
+            sidebar.classList.remove(
+                'active'
+            );
+
+            if (sidebarOverlay) {
+
+                sidebarOverlay.classList.remove(
+                    'active'
+                );
+            }
+
+            if (sidebarToggle) {
+
+                sidebarToggle.setAttribute(
+                    'aria-expanded',
+                    'false'
+                );
+
+                sidebarToggle.setAttribute(
+                    'aria-label',
+                    'Open navigation menu'
+                );
+
+                const icon =
+                    sidebarToggle.querySelector(
+                        'i'
+                    );
+
+                if (icon) {
+
+                    icon.classList.remove(
+                        'fa-times'
+                    );
+
+                    icon.classList.add(
+                        'fa-bars'
+                    );
+                }
+            }
+
+            document.body.classList.remove(
+                'sidebar-open'
+            );
+        }
+
+
+        function toggleSidebar() {
+
+            if (!sidebar) {
+                return;
+            }
+
+            if (
+                sidebar.classList.contains(
+                    'active'
+                )
+            ) {
+
+                closeSidebar();
+
+            } else {
+
+                openSidebar();
+            }
+        }
+
+
+        if (sidebarToggle) {
+
+            sidebarToggle.addEventListener(
+                'click',
+                function (event) {
+
+                    event.preventDefault();
+
+                    toggleSidebar();
+
+                }
+            );
+        }
+
+
+        if (sidebarOverlay) {
+
+            sidebarOverlay.addEventListener(
+                'click',
+                function () {
+
+                    closeSidebar();
+
+                }
+            );
+        }
+
+
+        /*
+        | Close with ESC.
+        */
+
+        document.addEventListener(
+            'keydown',
+            function (event) {
+
+                if (
+                    event.key === 'Escape' &&
+                    sidebar &&
+                    sidebar.classList.contains(
+                        'active'
+                    )
+                ) {
+
+                    closeSidebar();
+                }
+
+            }
+        );
+
+
+        /*
+        | Close sidebar after selecting a
+        | navigation item on mobile.
+        */
+
+        if (sidebar) {
+
+            sidebar
+                .querySelectorAll(
+                    '.sidebar-menu a'
+                )
+                .forEach(
+                    function (link) {
+
+                        link.addEventListener(
+                            'click',
+                            function () {
+
+                                if (
+                                    window.innerWidth <= 991
+                                ) {
+
+                                    closeSidebar();
+                                }
+
+                            }
+                        );
+
+                    }
+                );
+        }
+
+
+        /*
+        | If the browser is resized back to desktop,
+        | remove the mobile active state.
+        */
+
+        window.addEventListener(
+            'resize',
+            function () {
+
+                if (
+                    window.innerWidth > 991
+                ) {
+
+                    closeSidebar();
+                }
+
+            }
+        );
 
 
         /*
@@ -2995,6 +3737,7 @@ document.addEventListener(
             new Chart(
                 subjectCanvas,
                 {
+
                     type: 'bar',
 
                     data: {
@@ -3008,6 +3751,7 @@ document.addEventListener(
                         datasets: [
 
                             {
+
                                 label:
                                     'Questions',
 
@@ -3018,6 +3762,7 @@ document.addEventListener(
                                                 item.total
                                             )
                                     )
+
                             }
 
                         ]
@@ -3090,7 +3835,9 @@ document.addEventListener(
                         datasets: [
 
                             {
-                                label: 'Tests',
+
+                                label:
+                                    'Tests',
 
                                 data:
                                     monthlyTests.map(
@@ -3103,6 +3850,7 @@ document.addEventListener(
                                 fill: false,
 
                                 tension: .3
+
                             }
 
                         ]
@@ -3167,6 +3915,7 @@ document.addEventListener(
                         datasets: [
 
                             {
+
                                 data:
                                     auditData.map(
                                         item =>
@@ -3174,6 +3923,7 @@ document.addEventListener(
                                                 item.total
                                             )
                                     )
+
                             }
 
                         ]
@@ -3238,6 +3988,7 @@ document.addEventListener(
                         datasets: [
 
                             {
+
                                 data:
                                     resultData.map(
                                         item =>
@@ -3245,6 +3996,7 @@ document.addEventListener(
                                                 item.total
                                             )
                                     )
+
                             }
 
                         ]
@@ -3269,13 +4021,18 @@ document.addEventListener(
 
 </script>
 
+
 </body>
 
 </html>
 
 <?php
 
-if (isset($conn) && $conn instanceof mysqli) {
+if (
+    isset($conn) &&
+    $conn instanceof mysqli
+) {
+
     $conn->close();
 }
 

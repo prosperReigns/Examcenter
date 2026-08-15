@@ -11,7 +11,7 @@ error_reporting(E_ALL);
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+    header("Location: ../login.php?error=Unauthorized");
     exit();
 }
 
@@ -28,7 +28,7 @@ $stmt->close();
 
 if (!$admin || strtolower($admin['role']) !== 'admin') {
     session_destroy();
-    header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+    header("Location: ../login.php?error=Unauthorized");
     exit();
 }
 

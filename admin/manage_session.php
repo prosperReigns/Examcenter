@@ -23,7 +23,7 @@ ini_set('error_log', '../logs/errors.log');
 // Authentication
 // ---------------------------------------------------------------
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 

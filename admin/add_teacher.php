@@ -27,7 +27,7 @@ ini_set('error_log', '../logs/errors.log');
 if (!isset($_SESSION['user_id'])) {
     error_log("Redirecting to login: No user_id in session");
 
-    header("Location: /EXAMCENTER/login.php?error=Not logged in");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
@@ -77,7 +77,7 @@ try {
 
         session_destroy();
 
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 
@@ -1358,12 +1358,6 @@ aria-expanded="false"
     class="sidebar-overlay"
     id="sidebarOverlay"
 ></div>
-
-<!--
-|--------------------------------------------------------------------------
-| Sidebar
-|--------------------------------------------------------------------------
--->
 
 <div class="sidebar" id="mainSidebar">
 

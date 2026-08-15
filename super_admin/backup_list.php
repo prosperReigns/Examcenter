@@ -4,6 +4,7 @@ session_start();
 
 require_once "../db.php";
 require_once "backup_functions.php";
+require_once '../includes/system_guard.php';
 require_once "../includes/audit.php";
 require_once __DIR__ . '/../license/license_guard.php';
 
