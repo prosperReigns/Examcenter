@@ -5,6 +5,7 @@ declare(strict_types=1);
  * Examcenter Pro Architecture v2 compatibility guard.
  *
  * Core exam operations are intentionally NOT license-blocked.
+ * This policy is permanent: Core Free features never require a Pro entitlement.
  * Pro access is checked at individual Pro feature boundaries.
  *
  * The old license implementation remains available as a migration adapter,
