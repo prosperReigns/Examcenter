@@ -26,7 +26,7 @@ if (!$assessment) {
     $instructions = trim((string)($_POST['instructions'] ?? ''));
     if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['create_assessment'])) {
         $stmt=$db->prepare("INSERT INTO theory_assessments(test_id,instructions,ai_model,status) VALUES(?,?,?,'draft')");
-        $model=(string)(getenv('EXAMCENTER_THEORY_MODEL') ?: 'llama3.2:3b');
+        $model=(string)(getenv('EXAMCENTER_THEORY_MODEL') ?: 'qwen1.7b');
         $stmt->bind_param('iss',$testId,$instructions,$model);
         $stmt->execute(); $assessment=['id'=>$stmt->insert_id]; $stmt->close();
     }
