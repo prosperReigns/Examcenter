@@ -12,7 +12,7 @@ if($submissionId<=0)exit('Invalid submission.');
 $stmt=$db->prepare("SELECT s.id,s.status,s.grading_status,a.test_id FROM theory_submissions s JOIN theory_assessments a ON a.id=s.theory_assessment_id WHERE s.id=? AND s.student_id=? LIMIT 1");$studentId=(int)$_SESSION['student_id'];$stmt->bind_param('ii',$submissionId,$studentId);$stmt->execute();$sub=$stmt->get_result()->fetch_assoc();$stmt->close();
 if(!$sub||!in_array($sub['status'],['submitted','grading','graded'],true)){exit('Submission is not ready for grading.');}
 $stmt=$db->prepare("SELECT id FROM theory_answers WHERE submission_id=? ORDER BY id");$stmt->bind_param('i',$submissionId);$stmt->execute();$answers=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
-$model=(string)(getenv('EXAMCENTER_THEORY_MODEL')?:'llama3.2:3b');$grader=new OllamaTheoryGrader('http://127.0.0.1:11434',$model,300);$service=new TheoryGradingService($grader);
+$model=(string)(getenv('EXAMCENTER_THEORY_MODEL')?:'qwen1.7b');$grader=new OllamaTheoryGrader('http://127.0.0.1:11434',$model,300);$service=new TheoryGradingService($grader);
 $stmt=$db->prepare("UPDATE theory_submissions SET status='grading',grading_status='running' WHERE id=?");$stmt->bind_param('i',$submissionId);$stmt->execute();$stmt->close();
 $total=0.0;$max=0.0;$error='';
 foreach($answers as $a){try{$r=$service->gradeAnswer((int)$a['id']);$total+=(float)$r['awarded_marks'];$max+=(float)$r['maximum_marks'];}catch(Throwable $e){$error=$e->getMessage();break;}}
