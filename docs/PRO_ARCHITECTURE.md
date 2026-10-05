@@ -61,3 +61,8 @@ The migration is additive and idempotent:
 6. Keep legacy identifiers until the migration is complete.
 
 Do not delete or rename legacy tables as part of this migration.
+
+
+## Offline AI theory
+
+Theory assessments are implemented as a Pro feature boundary. Teachers provide questions and maximum marks; no answer dictionary is required. Students submit written answers locally. Ollama performs local grading and returns provisional marks, partial credit and explanations. Marks are bounded to the question maximum and can be manually reviewed with an audit trail. See `docs/THEORY_AI_ARCHITECTURE.md`.
