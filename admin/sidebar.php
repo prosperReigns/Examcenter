@@ -19,6 +19,7 @@ $adminNav = [
     ['../backup/backup_list.php', 'fa-database', 'Backups'],
     ['audit_logs.php', 'fa-history', 'Audit Logs'],
     ['../license/index.php', 'fa-key', 'License'],
+    ['pro_suite.php', 'fa-layer-group', 'Pro Suite'],
     ['settings.php', 'fa-cog', 'Settings'],
 ];
 ?>
