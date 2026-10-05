@@ -38,6 +38,7 @@ $required = [
     'coding/CodingRunner.php',
     'admin/pro_suite.php',
     'admin/pro_sessions.php',
+    'admin/pro_security.php',
     'admin/pro_analytics.php',
     'admin/pro_certificates.php',
     'admin/pro_campuses.php',
