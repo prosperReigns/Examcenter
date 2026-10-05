@@ -6,6 +6,7 @@ require_once __DIR__ . '/../db.php';
 const MIGRATION_KEYS = [
     '20261005_0001_universal_architecture',
     '20261005_0002_theory_assessment',
+    '20261005_0003_pro_assessment_suite',
 ];
 
 $db = Database::connection();
