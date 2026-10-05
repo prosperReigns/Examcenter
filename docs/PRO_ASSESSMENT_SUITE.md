@@ -39,3 +39,8 @@ Then execute the MariaDB migration on a development database:
 `php database/migrate.php`
 
 Live migration, browser verification, Ollama execution and coding-runner execution still require the user's local PC environment and are intentionally not claimed as completed here.
+
+
+## Product boundary
+
+Examcenter Core is free. Any capability required to conduct a normal examination end-to-end is never Pro-gated. Pro covers supporting/advanced capabilities only. New features must be classified using `ExamcenterProductPolicy` before implementation.
