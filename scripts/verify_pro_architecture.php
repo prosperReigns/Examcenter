@@ -30,6 +30,7 @@ $required = [
     'student/theory_register.php',
     'student/theory_exam.php',
     'student/grade_theory.php',
+    'student/theory_result.php',
 ];
 
 $failed = false;
@@ -61,6 +62,7 @@ $phpFiles = [
     'student/theory_register.php',
     'student/theory_exam.php',
     'student/grade_theory.php',
+    'student/theory_result.php',
 ];
 
 foreach ($phpFiles as $path) {
