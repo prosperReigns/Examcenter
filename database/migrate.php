@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../db.php';
 
-const MIGRATION_KEY = '20261005_0001_universal_architecture';
+const MIGRATION_KEYS = ['20261005_0001_universal_architecture','20261005_0002_theory_assessment'];
 
 $db = Database::connection();
 
@@ -19,10 +19,23 @@ $check->execute();
 $already = $check->get_result()->fetch_assoc();
 $check->close();
 
-if ($already) {
-    echo "Migration already applied: " . MIGRATION_KEY . PHP_EOL;
-    exit(0);
+foreach (MIGRATION_KEYS as $migrationKey) {
+    $check = $db->prepare("SELECT id FROM schema_migrations WHERE migration_key = ? LIMIT 1");
+    $check->bind_param('s', $migrationKey);
+    $check->execute();
+    $already = $check->get_result()->fetch_assoc();
+    $check->close();
+    if ($already) { echo "Migration already applied: {$migrationKey}" . PHP_EOL; continue; }
+    $sql = file_get_contents(__DIR__ . '/migrations/' . $migrationKey . '.sql');
+    if ($sql === false) throw new RuntimeException("Migration SQL file could not be read: {$migrationKey}");
+    if (!$db->multi_query($sql)) throw new RuntimeException("Migration failed: {$db->error}");
+    do { if ($result = $db->store_result()) $result->free(); } while ($db->more_results() && $db->next_result());
+    if ($db->errno) throw new RuntimeException("Migration failed: {$db->error}");
+    $stmt = $db->prepare("INSERT INTO schema_migrations (migration_key) VALUES (?)");
+    $stmt->bind_param('s', $migrationKey); $stmt->execute(); $stmt->close();
+    echo "Migration applied: {$migrationKey}" . PHP_EOL;
 }
+exit(0);
 
 $sql = file_get_contents(__DIR__ . '/migrations/' . MIGRATION_KEY . '.sql');
 if ($sql === false) {
