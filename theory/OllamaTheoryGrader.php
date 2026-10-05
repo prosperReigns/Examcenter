@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/GradingResult.php';
 final class OllamaTheoryGrader {
-    public function __construct(private string $endpoint='http://127.0.0.1:11434',private string $model='qwen1.7b',private int $timeout=300){}
+    public function __construct(private string $endpoint='http://127.0.0.1:11434',private string $model='qwen3:1.7b',private int $timeout=300){}
     public function grade(string $question,float $max,string $answer):array{
         $prompt=$this->prompt($question,$max,$answer);
         $ch=curl_init(rtrim($this->endpoint,'/').'/api/generate');
