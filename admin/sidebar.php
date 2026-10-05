@@ -22,7 +22,7 @@ $adminNav = [
     ['settings.php', 'fa-cog', 'Settings'],
 ];
 ?>
-<div class="sidebar" id="mainSidebar">
+<div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
         <h3><i class="fas fa-graduation-cap me-2"></i>Examcenter</h3>
         <div class="admin-info">
