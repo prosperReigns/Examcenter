@@ -50,7 +50,7 @@ try {
             if (!$exists) {
                 $stmt = $db->prepare("INSERT INTO organizational_units (institution_id,unit_type_id,legacy_class_id,name,code) VALUES (?,?,?,?,?)");
                 $classCode = 'LEGACY-CLASS-' . $legacyClassId;
-                $stmt->bind_param('iisis', $institutionId, $unitTypeId, $legacyClassId, $className, $classCode);
+                $stmt->bind_param('iiiss', $institutionId, $unitTypeId, $legacyClassId, $className, $classCode);
                 $stmt->execute();
                 $stmt->close();
             }
