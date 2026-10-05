@@ -1451,49 +1451,9 @@ body {
      SIDEBAR
 ========================================================== -->
 
-<aside id="sidebar">
+<?php require __DIR__ . '/sidebar.php'; ?>
 
-```
-<!--
 
-    The existing sidebar content should remain consistent
-    with the other Examcenter admin pages.
-
-    Keep the same navigation structure/classes used
-    throughout the admin dashboard.
-
--->
-
-<ul class="sidebar-menu">
-
-    <li>
-        <a href="dashboard.php">
-            <i class="fas fa-home"></i>
-            <span>Dashboard</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="audit_logs.php" class="active">
-            <i class="fas fa-history"></i>
-            <span>Audit Logs</span>
-        </a>
-    </li>
-
-</ul>
-```
-
-</aside>
-
-<!-- =========================================================
-     SIDEBAR OVERLAY
-========================================================== -->
-
-<div id="sidebarOverlay"></div>
-
-<!-- =========================================================
-     MAIN CONTENT
-========================================================== -->
 
 <main class="main-content">
 
