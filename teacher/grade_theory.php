@@ -14,7 +14,7 @@ $db=Database::connection();$testId=(int)($_GET['test_id']??0);
 $stmt=$db->prepare("SELECT ta.id,t.title FROM theory_assessments ta JOIN tests t ON t.id=ta.test_id WHERE ta.test_id=? LIMIT 1");$stmt->bind_param('i',$testId);$stmt->execute();$assessment=$stmt->get_result()->fetch_assoc();$stmt->close();if(!$assessment)exit('Assessment not found.');
 
 $stmt=$db->prepare("SELECT id FROM theory_submissions WHERE theory_assessment_id=? AND status='submitted' ORDER BY id");$stmt->bind_param('i',$assessment['id']);$stmt->execute();$subs=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
-$model=(string)(getenv('EXAMCENTER_THEORY_MODEL')?:'qwen1.7b');$grader=new OllamaTheoryGrader('http://127.0.0.1:11434',$model,300);$service=new TheoryGradingService($grader);
+$model=(string)(getenv('EXAMCENTER_THEORY_MODEL')?:'qwen3:1.7b');$grader=new OllamaTheoryGrader('http://127.0.0.1:11434',$model,300);$service=new TheoryGradingService($grader);
 $done=0;$failed=0;$messages=[];
 foreach($subs as $sub){
  $stmt=$db->prepare("SELECT id FROM theory_answers WHERE submission_id=? ORDER BY id");$stmt->bind_param('i',$sub['id']);$stmt->execute();$answers=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
