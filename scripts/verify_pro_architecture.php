@@ -20,6 +20,16 @@ $required = [
     'license/ProEntitlementAPI.php',
     'includes/ProEntitlementStorage.php',
     'includes/pro.php',
+    'database/migrations/20261005_0002_theory_assessment.sql',
+    'theory/GradingResult.php',
+    'theory/OllamaTheoryGrader.php',
+    'theory/TheoryGradingService.php',
+    'teacher/theory_assessment.php',
+    'teacher/theory_review.php',
+    'teacher/grade_theory.php',
+    'student/theory_register.php',
+    'student/theory_exam.php',
+    'student/grade_theory.php',
 ];
 
 $failed = false;
@@ -42,6 +52,15 @@ $phpFiles = [
     'license/license_guard.php',
     'includes/ProEntitlementStorage.php',
     'includes/pro.php',
+    'theory/GradingResult.php',
+    'theory/OllamaTheoryGrader.php',
+    'theory/TheoryGradingService.php',
+    'teacher/theory_assessment.php',
+    'teacher/theory_review.php',
+    'teacher/grade_theory.php',
+    'student/theory_register.php',
+    'student/theory_exam.php',
+    'student/grade_theory.php',
 ];
 
 foreach ($phpFiles as $path) {
