@@ -420,3 +420,39 @@ CREATE TABLE backup_settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ON UPDATE CURRENT_TIMESTAMP
 );
+
+-- ============================================================
+-- EXAMCENTER PRO ARCHITECTURE V2 / UNIVERSAL EXTENSION
+-- ============================================================
+-- The legacy schema above remains supported for backward compatibility.
+-- The additive migration in database/migrations/20261005_0001_universal_architecture.sql
+-- introduces:
+--   institution_types
+--   institutions
+--   organizational_unit_types
+--   organizational_units
+--   academic_periods
+--   programmes
+--   programme_levels
+--   people
+--   institution_memberships
+--   unit_memberships
+--   courses
+--   course_assignments
+--   assessment_groups
+--   assessment_group_assignments
+--   universal_assessment_context
+--   pro_entitlement_cache
+--   pro_entitlement_features
+--
+-- Pro licensing is now entitlement-based:
+--   product_code = examcenter
+--   edition = pro
+--   package_version = 2
+--   signed, checksum-protected and bound to installation_id + machine_id.
+--
+-- Core CBT must not be blocked when Pro entitlement verification or
+-- the licensing server is unavailable. Pro checks belong at Pro feature
+-- boundaries only.
+--
+-- See docs/PRO_ARCHITECTURE.md for the authoritative architecture contract.
