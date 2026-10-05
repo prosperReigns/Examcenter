@@ -11,7 +11,7 @@ final class TheoryGradingService {
         if(!$row)throw new RuntimeException('Theory answer not found.');
         $r=$this->grader->grade((string)$row['question_text'],(float)$row['maximum_marks'],(string)$row['answer_text']);
         $s=$db->prepare("INSERT INTO theory_marks (answer_id,awarded_marks,maximum_marks,percentage,confidence,relevance_score,correctness_score,completeness_score,understanding_score,explanation,strengths,weaknesses,missing_points,grading_model,grading_model_version,status,graded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ai_provisional',NOW()) ON DUPLICATE KEY UPDATE awarded_marks=VALUES(awarded_marks),maximum_marks=VALUES(maximum_marks),percentage=VALUES(percentage),confidence=VALUES(confidence),relevance_score=VALUES(relevance_score),correctness_score=VALUES(correctness_score),completeness_score=VALUES(completeness_score),understanding_score=VALUES(understanding_score),explanation=VALUES(explanation),strengths=VALUES(strengths),weaknesses=VALUES(weaknesses),missing_points=VALUES(missing_points),grading_model=VALUES(grading_model),status='ai_provisional',graded_at=NOW()");
-        $model=(string)(getenv('EXAMCENTER_THEORY_MODEL')?:'qwen1.7b');$ver='local';
+        $model=(string)(getenv('EXAMCENTER_THEORY_MODEL')?:'qwen3:1.7b');$ver='local';
         $s->bind_param('iddddddddssssss',$answerId,$r['awarded_marks'],$r['maximum_marks'],$r['percentage'],$r['confidence'],$r['relevance_score'],$r['correctness_score'],$r['completeness_score'],$r['understanding_score'],$r['explanation'],$r['strengths'],$r['weaknesses'],$r['missing_points'],$model,$ver);
         $s->execute();$s->close();return $r;
     }
