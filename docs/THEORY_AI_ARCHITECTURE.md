@@ -6,7 +6,7 @@ AI marks are provisional and can be reviewed by a teacher. Scores are always val
 
 Default local runtime:
 - Ollama
-- qwen3:1.7b
+- Qwen 1.7B (`qwen3:1.7b`)
 - nomic-embed-text (optional for future local RAG)
 - http://127.0.0.1:11434
 
