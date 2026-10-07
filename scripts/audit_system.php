@@ -117,6 +117,27 @@ $phpFiles = array_values(array_filter(
         && !str_contains($p, '/vendor/')
 ));
 
+// Canonical Universal SQL must not reference retired draft column names.
+$legacyUniversalPatterns = [
+    '/\\b(?:ou|p)\\.(?:unit_name|unit_code|parent_unit_id|status)\\b/i',
+    '/\\bco\\.(?:course_name|course_code|status)\\b/i',
+    '/\\bap\\.(?:period_name|period_code)\\b/i',
+    '/\\bi\\.(?:institution_name|institution_code|status)\\b/i',
+    '/\\bp\\.(?:programme_name|programme_code|status)\\b/i',
+    '/\\bpl\\.(?:level_name|level_code|level_order)\\b/i',
+    '/\\bag\\.(?:group_name|group_code)\\b/i',
+    '/\\but\\.(?:type_name|type_code)\\b/i',
+    '/\\bum\\.(?:institution_membership_id|organizational_unit_id)\\b/i',
+];
+foreach ($phpFiles as $path) {
+    $content = file_get_contents($root . '/' . $path) ?: '';
+    foreach ($legacyUniversalPatterns as $pattern) {
+        if (preg_match($pattern, $content, $match)) {
+            auditFail("Legacy Universal SQL identifier '{$match[0]}' remains in {$path}.");
+        }
+    }
+}
+
 // Every explicit require_pro('feature') code must be registered in ProFeatures.
 $featureFile = file_get_contents($root . '/includes/pro_features.php') ?: '';
 preg_match_all("/='([a-z0-9_]+)'/", $featureFile, $featureMatches);
