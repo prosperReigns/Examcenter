@@ -151,11 +151,11 @@ try {
         $stmt->close();
 
         $stmt = $conn->prepare(
-            "SELECT ou.id, ou.name, ou.code, ut.type_name
+            "SELECT ou.id, ou.name, ou.code, ut.name
              FROM organizational_units ou
              INNER JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id
              WHERE ou.institution_id = ? AND ou.is_active = 'active'
-             ORDER BY ut.type_name, ou.name"
+             ORDER BY ut.name, ou.name"
         );
         $stmt->bind_param('i', $institutionId);
         $stmt->execute();
