@@ -9,13 +9,13 @@ $subject = $_GET['subject'];
 $title = $_GET['title'];
 
 // Fetch test
-$stmt = $conn->prepare("SELECT t.*, COALESCE(ou.unit_name, CONCAT(al.level_code, ' ', s.stream_name)) AS test_class
+$stmt = $conn->prepare("SELECT t.*, COALESCE(ou.name, CONCAT(al.level_code, ' ', s.stream_name)) AS test_class
                                              FROM tests t
                                              LEFT JOIN academic_levels al ON al.id = t.academic_level_id
                                              LEFT JOIN classes c ON c.academic_level_id = al.id
                                              LEFT JOIN streams s ON s.id = c.stream_id
                                              LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
-                                             WHERE COALESCE(ou.unit_name, CONCAT(al.level_code, ' ', s.stream_name)) = ?
+                                             WHERE COALESCE(ou.name, CONCAT(al.level_code, ' ', s.stream_name)) = ?
                                                  AND t.subject = ? AND t.title = ?
                                              ORDER BY t.created_at DESC LIMIT 1");
 $stmt->bind_param("sss", $class, $subject, $title);
