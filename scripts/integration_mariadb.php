@@ -103,7 +103,7 @@ $stmt=$db->prepare("INSERT INTO assessment_group_assignments (assessment_group_i
 
 $testTitle='Universal E2E Test'; $duration=30; $subject='General Assessment'; $year='2026';
 $stmt=$db->prepare("INSERT INTO tests (title,duration,subject,year,institution_id,organizational_unit_id,programme_id,programme_level_id,academic_period_id,course_id,assessment_group_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-$stmt->bind_param('sisssiiiiii',$testTitle,$duration,$subject,$year,$institutionId,$unitId,$programmeId,$levelId,$periodId,$courseId,$groupId); $testId=insertId($stmt);
+$stmt->bind_param('sissiiiiiii',$testTitle,$duration,$subject,$year,$institutionId,$unitId,$programmeId,$levelId,$periodId,$courseId,$groupId); $testId=insertId($stmt);
 
 $stmt=$db->prepare("INSERT INTO universal_assessment_context (test_id,institution_id,unit_id,programme_id,academic_period_id,course_id,assessment_group_id) VALUES (?,?,?,?,?,?,?)"); $stmt->bind_param('iiiiiii',$testId,$institutionId,$unitId,$programmeId,$periodId,$courseId,$groupId); insertId($stmt);
 
