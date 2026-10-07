@@ -174,7 +174,7 @@ $universal_teacher_available = $active_institution_id !== null
 
 if ($universal_teacher_available) {
     $stmt = $conn->prepare(
-        "SELECT id, unit_name, unit_code
+        "SELECT id, name AS unit_name, code AS unit_code
          FROM organizational_units
          WHERE institution_id = ? AND is_active = 1
          ORDER BY unit_name"
@@ -299,10 +299,10 @@ if (isset($_GET['edit_id'])) {
 
             if ($universal_teacher_available) {
                 $stmt = $conn->prepare(
-                    "SELECT um.organizational_unit_id
+                    "SELECT um.unit_id AS organizational_unit_id
                      FROM unit_memberships um
                      INNER JOIN institution_memberships im
-                         ON im.id = um.institution_membership_id
+                         ON im.person_id = um.person_id
                      WHERE im.institution_id = ?
                        AND im.legacy_teacher_id = ?"
                 );
@@ -627,7 +627,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                              (person_code, first_name, last_name, full_name, email, phone)
                              VALUES (?, ?, ?, ?, ?, ?)"
                         );
-                        $stmt->bind_param('ssssss', $person_code, $first_name, $last_name, $display_name, $email, $phone);
+                        $stmt->bind_param('issssss', $active_institution_id, $person_code, $first_name, $last_name, $display_name, $email, $phone);
                         $stmt->execute();
                         $person_id = $stmt->insert_id;
                         $stmt->close();
@@ -646,8 +646,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $stmt->close();
                     }
 
-                    $stmt = $conn->prepare("DELETE FROM unit_memberships WHERE institution_membership_id = ?");
-                    $stmt->bind_param('i', $membership_id);
+                    $stmt = $conn->prepare("DELETE FROM unit_memberships WHERE person_id = ?");
+                    $stmt->bind_param('i', $person_id);
                     $stmt->execute();
                     $stmt->close();
 
@@ -674,7 +674,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                              (institution_membership_id, organizational_unit_id, membership_role)
                              VALUES (?, ?, ?)"
                         );
-                        $stmt->bind_param('iis', $membership_id, $unit_id, $membership_role);
+                        $stmt->bind_param('iis', $unit_id, $person_id, $membership_role);
                         $stmt->execute();
                         $stmt->close();
                     }
