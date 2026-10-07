@@ -187,7 +187,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
                     $course_id = $test_context['course_id'];
 
                     if ($universal_request && $requested_course_id > 0) {
-                        $stmt = $conn->prepare("SELECT id FROM courses WHERE id = ? AND institution_id = ? AND status = 'active' LIMIT 1");
+                        $stmt = $conn->prepare("SELECT id FROM courses WHERE id = ? AND institution_id = ? AND is_active = 'active' LIMIT 1");
                         $stmt->bind_param('ii', $requested_course_id, $institution_id);
                         $stmt->execute();
                         $course_id = $stmt->get_result()->fetch_assoc() ? $requested_course_id : null;
@@ -195,7 +195,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
                     }
 
                     if ($universal_request && $requested_unit_id > 0) {
-                        $stmt = $conn->prepare("SELECT id FROM organizational_units WHERE id = ? AND institution_id = ? AND status = 'active' LIMIT 1");
+                        $stmt = $conn->prepare("SELECT id FROM organizational_units WHERE id = ? AND institution_id = ? AND is_active = 'active' LIMIT 1");
                         $stmt->bind_param('ii', $requested_unit_id, $institution_id);
                         $stmt->execute();
                         $organizational_unit_id = $stmt->get_result()->fetch_assoc() ? $requested_unit_id : null;
@@ -203,7 +203,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
                     }
 
                     if ($universal_request && $requested_period_id > 0) {
-                        $stmt = $conn->prepare("SELECT id FROM academic_periods WHERE id = ? AND institution_id = ? AND status IN ('planned', 'active') LIMIT 1");
+                        $stmt = $conn->prepare("SELECT id FROM academic_periods WHERE id = ? AND institution_id = ? AND is_active IN ('planned', 'active') LIMIT 1");
                         $stmt->bind_param('ii', $requested_period_id, $institution_id);
                         $stmt->execute();
                         $academic_period_id = $stmt->get_result()->fetch_assoc() ? $requested_period_id : null;
