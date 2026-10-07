@@ -216,10 +216,10 @@ try {
     $class_condition = 'c.class_name = ?';
 
     if ($universal_reporting_available) {
-        $student_class_select = 'COALESCE(ou.unit_name, c.class_name, s.class) AS student_class';
-        $test_class_select = 'COALESCE(ou.unit_name, c.class_name, s.class) AS test_class';
-        $class_condition = 'COALESCE(ou.unit_name, c.class_name, s.class) = ?';
-        $universal_select = ", ccourse.course_name, ap.period_name, t.organizational_unit_id,
+        $student_class_select = 'COALESCE(ou.name, c.class_name, s.class) AS student_class';
+        $test_class_select = 'COALESCE(ou.name, c.class_name, s.class) AS test_class';
+        $class_condition = 'COALESCE(ou.name, c.class_name, s.class) = ?';
+        $universal_select = ", ccourse.name, ap.name, t.organizational_unit_id,
             t.course_id, t.academic_period_id";
         $universal_joins = "
             LEFT JOIN organizational_units ou
@@ -234,13 +234,13 @@ try {
     }
 
     if ($universal_reporting_available) {
-        $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+        $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+        $stmt = $conn->prepare("SELECT id, code AS course_code, name AS course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
