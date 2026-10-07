@@ -174,7 +174,7 @@ $attempt_result = $stmt->get_result();
 $exam_state = $attempt_result->fetch_assoc();
 $stmt->close();
 
-$time_left = $exam_state ? max($exam_state['time_left'], $exam_duration) : $exam_duration;
+$time_left = $exam_state ? max(0, min((int)$exam_state['time_left'], $exam_duration)) : $exam_duration;
 error_log("Initial time_left: $time_left seconds");
 $current_index = $exam_state ? (int)$exam_state['current_index'] : 0;
 
@@ -192,7 +192,7 @@ if (!$exam_state) {
 }
 
 // Get questions for the test (unchanged)
-$stmt = $conn->prepare("SELECT * FROM new_questions WHERE test_id = ? ORDER BY RAND()");
+$stmt = $conn->prepare("SELECT * FROM new_questions WHERE test_id = ? ORDER BY id");
 if ($stmt === false) {
     error_log("Prepare failed: SELECT * FROM new_questions - " . $conn->error);
     die("Error preparing questions query: " . $conn->error);
@@ -315,7 +315,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../css/all.min.css">
     <link rel="stylesheet" href="../css/take_exam.css">
-    <script src="https://cdn.jsdelivr.net/npm/mathjs@10.6.4/lib/browser/math.js"></script>
+    <script src="../js/math.min.js"></script>
 </head>
 
 <body>
