@@ -26,7 +26,7 @@ theory_manual_reviews, theory_marks, theory_answers, theory_submissions, theory_
 assessment_assignments, exam_attempt_events, exam_attempt_sessions, exam_attempts, results, new_questions, tests,
 admins, teachers, students, classes;
 SET FOREIGN_KEY_CHECKS=1;
-CREATE TABLE classes (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE classes (id INT AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE students (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE teachers (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE admins (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
