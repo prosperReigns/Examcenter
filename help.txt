@@ -1,5 +1,39 @@
 -- ============================================================
--- EXAMCENTER UNIVERSAL DATABASE SCHEMA — AUTHORITATIVE REFERENCE
+-- EXAMCENTER UNIVERSAL ARCHITECTURE — CANONICAL RUNTIME CONTRACT
+-- ============================================================
+-- The executable migrations are authoritative:
+--   20261005_0001_universal_architecture.sql
+--   20261005_0002_theory_assessment.sql
+--   20261005_0003_pro_assessment_suite.sql
+--   20261007_0004_system_audit_hardening.sql
+--   20261007_0005_legacy_universal_reconciliation.php
+--
+-- Canonical Universal names:
+-- institutions: name, code, is_active
+-- institution_types: code, name, is_active
+-- organizational_units: parent_id, code, name, is_active
+-- organizational_unit_types: code, name, is_active
+-- academic_periods: parent_id, code, name, starts_at, ends_at
+-- programmes: code, name, is_active
+-- programme_levels: organizational_unit_id, code, name, sort_order
+-- people: institution_id, display_name, external_ref, is_active
+-- institution_memberships: institution_id, person_id, role_code, status
+-- unit_memberships: unit_id, person_id, membership_role, status
+-- courses: programme_id, code, name, is_active
+-- course_assignments: course_id, unit_id, person_id, academic_period_id, role_code
+-- assessment_groups: code, name, group_type, weighting
+-- assessment_group_assignments: unit_id, programme_id, academic_period_id, course_id
+--
+-- Older names such as institution_name, unit_name, course_name,
+-- period_name, type_name, parent_unit_id and institution_membership_id
+-- belong to the retired draft schema. They may appear below only as
+-- legacy/reference material. Application code must use the canonical names.
+--
+-- See docs/UNIVERSAL_SCHEMA.md for the complete naming contract.
+-- ============================================================
+
+-- ============================================================
+-- EXAMCENTER DATABASE SCHEMA — LEGACY COMPATIBILITY REFERENCE
 -- DATABASE: cbt_app_db
 -- ENGINE: MySQL / MariaDB
 -- CHARSET: utf8mb4
