@@ -14,6 +14,8 @@ final class OllamaTheoryGrader {
         return GradingResult::fromModel($data,$max);
     }
     private function prompt(string $q,float $max,string $a):string{
-        return "Grade this written examination answer using your own reliable knowledge. There is no teacher answer key. Evaluate relevance, factual correctness, completeness and understanding. Give partial credit where justified. Do not penalize different wording. Do not invent facts or claim the student said something they did not say. Never award more than the maximum.\n\nQUESTION:\n{$q}\n\nMAXIMUM MARKS:\n{$max}\n\nSTUDENT ANSWER:\n{$a}\n\nReturn JSON only: {"awarded_marks":number,"confidence":number,"relevance_score":number,"correctness_score":number,"completeness_score":number,"understanding_score":number,"explanation":"string","strengths":["string"],"weaknesses":["string"],"missing_points":["string"]}. Scores except awarded_marks are 0..1.";
+        $schema = '{"awarded_marks":number,"confidence":number,"relevance_score":number,"correctness_score":number,"completeness_score":number,"understanding_score":number,"explanation":"string","strengths":["string"],"weaknesses":["string"],"missing_points":["string"]}';
+
+        return "Grade this written examination answer using your own reliable knowledge. There is no teacher answer key. Evaluate relevance, factual correctness, completeness and understanding. Give partial credit where justified. Do not penalize different wording. Do not invent facts or claim the student said something they did not say. Never award more than the maximum.\n\nQUESTION:\n{$q}\n\nMAXIMUM MARKS:\n{$max}\n\nSTUDENT ANSWER:\n{$a}\n\nReturn JSON only: " . $schema . ". Scores except awarded_marks are 0..1.";
     }
 }
