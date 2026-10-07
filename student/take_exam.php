@@ -2,7 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);
@@ -30,6 +31,16 @@ if ($conn->connect_error) {
     die("Database connection failed: " . $conn->connect_error);
 }
 
+$universal_exam_available = examcenterUniversalTableExists($conn, 'institutions')
+    && examcenterUniversalTableExists($conn, 'institution_memberships')
+    && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+    && examcenterUniversalColumnExists($conn, 'exam_attempts', 'institution_membership_id');
+$active_institution_id = $universal_exam_available
+    ? examcenterActiveInstitutionId($conn)
+    : null;
+$universal_exam_available = $universal_exam_available
+    && $active_institution_id !== null;
+
 // Sanitize session inputs
 $user_id = (int)$_SESSION['student_id'];
 $class_id = (int)$_SESSION['student_class'];
@@ -54,19 +65,38 @@ $test_title = $_SESSION['test_title'];
 error_log("Session: user_id=$user_id, academic_level=$academic_level_id, subject=$subject, title=$test_title");
 
 // Get test details including duration
-$stmt = $conn->prepare("SELECT id, duration FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ?");
+$test_id_from_session = (int)($_SESSION['current_test_id'] ?? 0);
+$test_scope = $universal_exam_available
+    ? " AND institution_id = ?"
+    : '';
+
+if ($test_id_from_session > 0) {
+    $stmt = $conn->prepare("SELECT id, duration FROM tests WHERE id = ? {$test_scope} LIMIT 1");
+} else {
+    $stmt = $conn->prepare("SELECT id, duration FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ? {$test_scope} LIMIT 1");
+}
 if ($stmt === false) {
     error_log("Prepare failed: SELECT id, duration FROM tests - " . $conn->error);
     die("Error preparing test query: " . $conn->error);
 }
-$stmt->bind_param("sis", $test_title, $academic_level_id, $_SESSION['student_subject']);
+if ($test_id_from_session > 0) {
+    if ($universal_exam_available) {
+        $stmt->bind_param('ii', $test_id_from_session, $active_institution_id);
+    } else {
+        $stmt->bind_param('i', $test_id_from_session);
+    }
+} elseif ($universal_exam_available) {
+    $stmt->bind_param('sisi', $test_title, $academic_level_id, $_SESSION['student_subject'], $active_institution_id);
+} else {
+    $stmt->bind_param('sis', $test_title, $academic_level_id, $_SESSION['student_subject']);
+}
 $stmt->execute();
 $test_result = $stmt->get_result();
 $test = $test_result->fetch_assoc();
 $stmt->close();
 
 if (!$test) {
-    error_log("No test found for title='$test_title', class='$class', subject='$subject'");
+    error_log("No test found for title='$test_title', academic_level='$academic_level_id', subject='$subject'");
     die("No test available for this combination of test title, class, and subject.");
 }
 
@@ -74,6 +104,20 @@ if (!$test) {
 $test_id = $test['id'];
 $_SESSION['current_test_id'] = $test_id;
 $exam_duration = isset($test['duration']) ? (int)$test['duration'] * 60 : 3600; // Convert minutes to seconds, default 60 minutes
+
+$institution_membership_id = null;
+if ($universal_exam_available) {
+    $stmt = $conn->prepare(
+        "SELECT id FROM institution_memberships
+         WHERE institution_id = ? AND legacy_student_id = ?
+         LIMIT 1"
+    );
+    $stmt->bind_param('ii', $active_institution_id, $user_id);
+    $stmt->execute();
+    $membership = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    $institution_membership_id = $membership['id'] ?? null;
+}
 
 // ===============================
 // CHECK RESULT & REATTEMPT STATUS
@@ -136,8 +180,13 @@ $current_index = $exam_state ? (int)$exam_state['current_index'] : 0;
 
 if (!$exam_state) {
     $now = date('Y-m-d H:i:s');
-    $stmt = $conn->prepare("INSERT INTO exam_attempts (user_id, test_id, time_left, current_index, started_at) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("iiiss", $user_id, $test_id, $exam_duration, $current_index, $now);
+    if ($universal_exam_available && $institution_membership_id) {
+        $stmt = $conn->prepare("INSERT INTO exam_attempts (user_id, test_id, time_left, current_index, started_at, institution_membership_id) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("iiissi", $user_id, $test_id, $exam_duration, $current_index, $now, $institution_membership_id);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO exam_attempts (user_id, test_id, time_left, current_index, started_at) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("iiiss", $user_id, $test_id, $exam_duration, $current_index, $now);
+    }
     $stmt->execute();
     $stmt->close();
 }

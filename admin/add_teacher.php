@@ -4,7 +4,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once '../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -135,6 +136,9 @@ try {
 |--------------------------------------------------------------------------
 */
 $classes = [];
+$organizational_units = [];
+$universal_teacher_available = false;
+$active_institution_id = null;
 
 try {
 
@@ -161,6 +165,26 @@ try {
     error_log("Error fetching classes: " . $e->getMessage());
 }
 
+$active_institution_id = examcenterActiveInstitutionId($conn);
+$universal_teacher_available = $active_institution_id !== null
+    && examcenterUniversalTableExists($conn, 'people')
+    && examcenterUniversalTableExists($conn, 'institution_memberships')
+    && examcenterUniversalTableExists($conn, 'unit_memberships')
+    && examcenterUniversalTableExists($conn, 'organizational_units');
+
+if ($universal_teacher_available) {
+    $stmt = $conn->prepare(
+        "SELECT id, unit_name, unit_code
+         FROM organizational_units
+         WHERE institution_id = ? AND status = 'active'
+         ORDER BY unit_name"
+    );
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -178,6 +202,7 @@ $username = '';
 
 $selected_subjects = [];
 $selected_classes = [];
+$selected_units = [];
 
 $is_edit_mode = false;
 $teacher_id = null;
@@ -272,6 +297,25 @@ if (isset($_GET['edit_id'])) {
 
             $stmt->close();
 
+            if ($universal_teacher_available) {
+                $stmt = $conn->prepare(
+                    "SELECT um.organizational_unit_id
+                     FROM unit_memberships um
+                     INNER JOIN institution_memberships im
+                         ON im.id = um.institution_membership_id
+                     WHERE im.institution_id = ?
+                       AND im.legacy_teacher_id = ?"
+                );
+                $stmt->bind_param('ii', $active_institution_id, $teacher_id);
+                $stmt->execute();
+                $unit_result = $stmt->get_result();
+                while ($row = $unit_result->fetch_assoc()) {
+                    $selected_units[] = (int)$row['organizational_unit_id'];
+                }
+                $unit_result->free();
+                $stmt->close();
+            }
+
         } else {
 
             $error = "Teacher not found.";
@@ -303,6 +347,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $selected_subjects = $_POST['subjects'] ?? [];
     $selected_classes  = $_POST['classes'] ?? [];
+    $selected_units    = $_POST['organizational_units'] ?? [];
+
+    if (!is_array($selected_subjects)) $selected_subjects = [];
+    if (!is_array($selected_classes)) $selected_classes = [];
+    if (!is_array($selected_units)) $selected_units = [];
 
 
     /*
@@ -540,6 +589,95 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $teacher_id = $conn->insert_id;
 
                     $stmt->close();
+                }
+
+                if ($universal_teacher_available) {
+                    $person_id = null;
+                    $membership_id = null;
+
+                    $stmt = $conn->prepare(
+                        "SELECT person_id, id
+                         FROM institution_memberships
+                         WHERE institution_id = ? AND legacy_teacher_id = ?
+                         LIMIT 1"
+                    );
+                    $stmt->bind_param('ii', $active_institution_id, $teacher_id);
+                    $stmt->execute();
+                    $membership = $stmt->get_result()->fetch_assoc();
+                    $stmt->close();
+
+                    $display_name = trim($first_name . ' ' . $last_name);
+
+                    if ($membership) {
+                        $person_id = (int)$membership['person_id'];
+                        $membership_id = (int)$membership['id'];
+                        $stmt = $conn->prepare(
+                            "UPDATE people
+                             SET first_name = ?, last_name = ?, full_name = ?,
+                                 email = ?, phone = ?, status = 'active'
+                             WHERE id = ?"
+                        );
+                        $stmt->bind_param('sssssi', $first_name, $last_name, $display_name, $email, $phone, $person_id);
+                        $stmt->execute();
+                        $stmt->close();
+                    } else {
+                        $person_code = 'teacher:' . $active_institution_id . ':' . $teacher_id;
+                        $stmt = $conn->prepare(
+                            "INSERT INTO people
+                             (person_code, first_name, last_name, full_name, email, phone)
+                             VALUES (?, ?, ?, ?, ?, ?)"
+                        );
+                        $stmt->bind_param('ssssss', $person_code, $first_name, $last_name, $display_name, $email, $phone);
+                        $stmt->execute();
+                        $person_id = $stmt->insert_id;
+                        $stmt->close();
+
+                        $membership_code = 'teacher:' . $teacher_id;
+                        $role_code = 'teacher';
+                        $membership_status = 'active';
+                        $stmt = $conn->prepare(
+                            "INSERT INTO institution_memberships
+                             (institution_id, person_id, membership_code, role_code, status, legacy_teacher_id)
+                             VALUES (?, ?, ?, ?, ?, ?)"
+                        );
+                        $stmt->bind_param('iisssi', $active_institution_id, $person_id, $membership_code, $role_code, $membership_status, $teacher_id);
+                        $stmt->execute();
+                        $membership_id = $stmt->insert_id;
+                        $stmt->close();
+                    }
+
+                    $stmt = $conn->prepare("DELETE FROM unit_memberships WHERE institution_membership_id = ?");
+                    $stmt->bind_param('i', $membership_id);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    $unit_ids = array_map('intval', $selected_units);
+                    foreach ($selected_classes as $class_id) {
+                        $stmt = $conn->prepare(
+                            "SELECT id FROM organizational_units
+                             WHERE institution_id = ? AND legacy_class_id = ?
+                             LIMIT 1"
+                        );
+                        $class_id = (int)$class_id;
+                        $stmt->bind_param('ii', $active_institution_id, $class_id);
+                        $stmt->execute();
+                        $mapped_unit = $stmt->get_result()->fetch_assoc();
+                        $stmt->close();
+                        if ($mapped_unit) $unit_ids[] = (int)$mapped_unit['id'];
+                    }
+
+                    $unit_ids = array_values(array_unique($unit_ids));
+                    foreach ($unit_ids as $unit_id) {
+                        $membership_role = 'teacher';
+                        $stmt = $conn->prepare(
+                            "INSERT IGNORE INTO unit_memberships
+                             (institution_membership_id, organizational_unit_id, membership_role)
+                             VALUES (?, ?, ?)"
+                        );
+                        $stmt->bind_param('iis', $membership_id, $unit_id, $membership_role);
+                        $stmt->execute();
+                        $stmt->close();
+                    }
                 }
 
 
@@ -1937,6 +2075,43 @@ aria-expanded="false"
 
             </div>
 
+            <?php if ($universal_teacher_available): ?>
+                <div class="selection-section">
+                    <div class="selection-header">
+                        <div>
+                            <h6 class="selection-title">
+                                <i class="fas fa-sitemap text-primary me-2"></i>
+                                Organizational Units
+                            </h6>
+                            <small class="text-muted">Assign this teacher to departments, faculties, teams, or other configured units.</small>
+                        </div>
+                        <span class="selection-count" id="unitCount">0 selected</span>
+                    </div>
+
+                    <?php if (!empty($organizational_units)): ?>
+                        <div class="selection-grid">
+                            <?php foreach ($organizational_units as $index => $unit): ?>
+                                <div class="selection-item">
+                                    <input
+                                        type="checkbox"
+                                        class="unit-checkbox"
+                                        name="organizational_units[]"
+                                        value="<?= (int)$unit['id'] ?>"
+                                        id="unit_<?= $index ?>"
+                                        <?= in_array((int)$unit['id'], $selected_units, true) ? 'checked' : '' ?>
+                                    >
+                                    <label class="selection-label" for="unit_<?= $index ?>">
+                                        <?= htmlspecialchars($unit['unit_name'] . ($unit['unit_code'] ? ' (' . $unit['unit_code'] . ')' : '')) ?>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="empty-selection">No active organizational units are available.</div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
 
             <!--
             |--------------------------------------------------------------------------
@@ -2286,6 +2461,9 @@ $(document).ready(function () {
         const classCount =
             $('.class-checkbox:checked').length;
 
+        const unitCount =
+            $('.unit-checkbox:checked').length;
+
 
         $('#subjectCount').text(
             subjectCount +
@@ -2301,10 +2479,17 @@ $(document).ready(function () {
                 ? ' selected'
                 : ' selected')
         );
+
+            $('#unitCount').text(
+                unitCount +
+                (unitCount === 1
+                ? ' selected'
+                : ' selected')
+            );
     }
 
 
-    $('.subject-checkbox, .class-checkbox').on(
+    $('.subject-checkbox, .class-checkbox, .unit-checkbox').on(
         'change',
         updateSelectionCounts
     );

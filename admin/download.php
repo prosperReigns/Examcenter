@@ -1,7 +1,7 @@
 <?php
 require '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../license/license_guard.php';
 $conn = Database::getInstance()->getConnection();
 
 $class = $_GET['class'];
@@ -9,7 +9,15 @@ $subject = $_GET['subject'];
 $title = $_GET['title'];
 
 // Fetch test
-$stmt = $conn->prepare("SELECT * FROM tests WHERE class=? AND subject=? AND title=? ORDER BY created_at DESC LIMIT 1");
+$stmt = $conn->prepare("SELECT t.*, COALESCE(ou.unit_name, CONCAT(al.level_code, ' ', s.stream_name)) AS test_class
+                                             FROM tests t
+                                             LEFT JOIN academic_levels al ON al.id = t.academic_level_id
+                                             LEFT JOIN classes c ON c.academic_level_id = al.id
+                                             LEFT JOIN streams s ON s.id = c.stream_id
+                                             LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
+                                             WHERE COALESCE(ou.unit_name, CONCAT(al.level_code, ' ', s.stream_name)) = ?
+                                                 AND t.subject = ? AND t.title = ?
+                                             ORDER BY t.created_at DESC LIMIT 1");
 $stmt->bind_param("sss", $class, $subject, $title);
 $stmt->execute();
 $test = $stmt->get_result()->fetch_assoc();
@@ -55,7 +63,7 @@ header("Content-Disposition: attachment; filename={$title}_{$subject}.doc");
 
 // Output test info
 echo "{$test['title']}\n";
-echo "Class: {$test['class']}\n";
+echo "Class: {$test['test_class']}\n";
 echo "Subject: {$test['subject']}\n";
 echo "Duration: {$test['duration']} mins\n\n";
 

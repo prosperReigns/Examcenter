@@ -2,6 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once '../includes/universal_architecture.php';
+require_once '../includes/test_context.php';
 
 // Initialize database connection
 $database = Database::getInstance();
@@ -12,6 +14,19 @@ if ($conn->connect_error) {
     header("Location: add_question.php");
     exit();
 }
+
+$universal_tests_available = examcenterUniversalTableExists($conn, 'institutions')
+    && examcenterUniversalTableExists($conn, 'organizational_units')
+    && examcenterUniversalTableExists($conn, 'courses')
+    && examcenterUniversalTableExists($conn, 'academic_periods')
+    && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+
+$active_institution_id = $universal_tests_available
+    ? examcenterActiveInstitutionId($conn)
+    : null;
 
 // Fetch assigned subjects
 $teacher_id = (int)$_SESSION['user_id'];
@@ -75,6 +90,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
     $stream_id = (int)($_POST['stream_id'] ?? 0);
     $subject = trim($_POST['subject'] ?? '');
     $duration = (int)($_POST['duration'] ?? 0);
+    $requested_course_id = (int)($_POST['course_id'] ?? 0);
+    $requested_unit_id = (int)($_POST['organizational_unit_id'] ?? 0);
+    $requested_period_id = (int)($_POST['academic_period_id'] ?? 0);
 
     if  (
         empty($year) ||
@@ -98,17 +116,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
 
     $class = $class_row['class_group'] ?? '';
 
-    if (!is_valid_subject($class, $subject, $assigned_subjects, $conn)) {
+    $subject_is_assigned = in_array($subject, $assigned_subjects, true);
+    $universal_request = $universal_tests_available && $active_institution_id !== null && (
+        $requested_course_id > 0
+        || $requested_unit_id > 0
+        || $requested_period_id > 0
+    );
+
+    if (!$subject_is_assigned || (!$universal_request && !is_valid_subject($class, $subject, $assigned_subjects, $conn))) {
         $_SESSION['error'] = "Invalid or unauthorized subject for selected class!";
         error_log("Invalid subject attempt: {$subject} for {$class} by teacher_id=$teacher_id");
         
     } else {
-        $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND academic_level_id= ? AND subject = ?");
+        $duplicate_scope = $universal_tests_available && $active_institution_id !== null
+            ? ' AND institution_id = ?'
+            : '';
+        $stmt = $conn->prepare("SELECT id FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ?{$duplicate_scope}");
         if (!$stmt) {
             error_log("Prepare failed for test check: " . $conn->error);
             $_SESSION['error'] = "Database error.";
         } else {
-            $stmt->bind_param("sis", $title, $academic_level_id, $subject);
+            if ($duplicate_scope !== '') {
+                $stmt->bind_param("sisi", $title, $academic_level_id, $subject, $active_institution_id);
+            } else {
+                $stmt->bind_param("sis", $title, $academic_level_id, $subject);
+            }
             $stmt->execute();
             $existing_test = $stmt->get_result()->fetch_assoc();
             $stmt->close();
@@ -116,30 +148,111 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
             if ($existing_test) {
                 $_SESSION['error'] = "A test with the same title, class, and subject already exists!";
             } else {
-                // Extract subject group from subject name (e.g. mathematics (JSS))
-                preg_match('/\((JSS|SS)\)$/i', $subject, $matches);
+                if (!$universal_request) {
+                    preg_match('/\((JSS|SS)\)$/i', $subject, $matches);
 
-                if (empty($matches)) {
-                    $_SESSION['error'] = "Invalid subject format.";
-                    header("Location: add_question.php");
-                    exit;
+                    if (empty($matches)) {
+                        $_SESSION['error'] = "Invalid subject format.";
+                        header("Location: add_question.php");
+                        exit;
+                    }
+
+                    $subject_group = strtoupper($matches[1]);
+
+                    if ($class !== $subject_group) {
+                        $_SESSION['error'] = "You cannot assign a {$subject_group} subject to a {$class} class.";
+                        header("Location: add_question.php");
+                        exit;
+                    }
                 }
 
-                $subject_group = strtoupper($matches[1]);
+                $programme_id = null;
+                $programme_level_id = null;
+                $academic_period_id = null;
+                $assessment_group_id = null;
+                $institution_id = null;
+                $organizational_unit_id = null;
+                $course_id = null;
 
-                if ($class !== $subject_group) {
-                    $_SESSION['error'] = "You cannot assign a {$subject_group} subject to a {$class} class.";
-                    header("Location: add_question.php");
-                    exit;
+                if ($universal_tests_available && $active_institution_id !== null) {
+                    $test_context = examcenterResolveTestContext(
+                        $conn,
+                        $subject,
+                        $academic_level_id,
+                        $stream_id
+                    );
+
+                    $institution_id = (int)$active_institution_id;
+                    $organizational_unit_id = $test_context['organizational_unit_id'];
+                    $course_id = $test_context['course_id'];
+
+                    if ($universal_request && $requested_course_id > 0) {
+                        $stmt = $conn->prepare("SELECT id FROM courses WHERE id = ? AND institution_id = ? AND status = 'active' LIMIT 1");
+                        $stmt->bind_param('ii', $requested_course_id, $institution_id);
+                        $stmt->execute();
+                        $course_id = $stmt->get_result()->fetch_assoc() ? $requested_course_id : null;
+                        $stmt->close();
+                    }
+
+                    if ($universal_request && $requested_unit_id > 0) {
+                        $stmt = $conn->prepare("SELECT id FROM organizational_units WHERE id = ? AND institution_id = ? AND status = 'active' LIMIT 1");
+                        $stmt->bind_param('ii', $requested_unit_id, $institution_id);
+                        $stmt->execute();
+                        $organizational_unit_id = $stmt->get_result()->fetch_assoc() ? $requested_unit_id : null;
+                        $stmt->close();
+                    }
+
+                    if ($universal_request && $requested_period_id > 0) {
+                        $stmt = $conn->prepare("SELECT id FROM academic_periods WHERE id = ? AND institution_id = ? AND status IN ('planned', 'active') LIMIT 1");
+                        $stmt->bind_param('ii', $requested_period_id, $institution_id);
+                        $stmt->execute();
+                        $academic_period_id = $stmt->get_result()->fetch_assoc() ? $requested_period_id : null;
+                        $stmt->close();
+                    }
                 }
 
-                // insert into tests
-                $stmt = $conn->prepare("INSERT INTO tests (title, academic_level_id, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                if ($universal_tests_available && $active_institution_id !== null) {
+                    $insert_query = "INSERT INTO tests (
+                        title, academic_level_id, subject, duration, year, created_at,
+                        institution_id, organizational_unit_id, programme_id,
+                        programme_level_id, academic_period_id, course_id,
+                        assessment_group_id
+                    ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)";
+                    $insert_types = 'sisisiiiiiii';
+                    $insert_params = [
+                        $title,
+                        $academic_level_id,
+                        $subject,
+                        $duration,
+                        $year,
+                        $institution_id,
+                        $organizational_unit_id,
+                        $programme_id,
+                        $programme_level_id,
+                        $academic_period_id,
+                        $course_id,
+                        $assessment_group_id
+                    ];
+                } else {
+                    $insert_query = "INSERT INTO tests (
+                        title, academic_level_id, subject, duration, year, created_at
+                    ) VALUES (?, ?, ?, ?, ?, NOW())";
+                    $insert_types = 'sisis';
+                    $insert_params = [
+                        $title,
+                        $academic_level_id,
+                        $subject,
+                        $duration,
+                        $year
+                    ];
+                }
+
+                $stmt = $conn->prepare($insert_query);
                 if (!$stmt) {
                     error_log("Prepare failed for test creation: " . $conn->error);
                     $_SESSION['error'] = "Database error.";
                 } else {
-                    $stmt->bind_param("sisis", $title, $academic_level_id, $subject, $duration, $year);
+                    $stmt->bind_param($insert_types, ...$insert_params);
                     if ($stmt->execute()) {
                         $_SESSION['current_test_id'] = $stmt->insert_id;
                         $_SESSION['success'] = "Test created successfully!";
@@ -169,17 +282,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
 // Handle test selection
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['select_test'])) {
     $test_id = (int)($_POST['test_id'] ?? 0);
-    if ($test_id <= 0) {
+    if ($test_id <= 0 || empty($assigned_subjects)) {
         $_SESSION['error'] = "Please select a valid test.";
     } else {
         $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
-        $stmt = $conn->prepare("SELECT id, title, academic_level_id, subject, duration, year FROM tests WHERE id = ? AND subject IN ($placeholders)");
+        $test_scope = $universal_tests_available && $active_institution_id !== null
+            ? ' AND institution_id = ?'
+            : '';
+        $stmt = $conn->prepare("SELECT id, title, academic_level_id, subject, duration, year FROM tests WHERE id = ? AND subject IN ($placeholders){$test_scope}");
         if (!$stmt) {
             error_log("Prepare failed for test selection: " . $conn->error);
             $_SESSION['error'] = "Database error.";
         } else {
             $params = array_merge([$test_id], $assigned_subjects);
             $types = 'i' . str_repeat('s', count($assigned_subjects));
+            if ($test_scope !== '') {
+                $params[] = $active_institution_id;
+                $types .= 'i';
+            }
             $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $test = $stmt->get_result()->fetch_assoc();

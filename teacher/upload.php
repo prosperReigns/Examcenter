@@ -5,7 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../license/license_guard.php';
+require_once '../includes/test_context.php';
 require '../vendor/autoload.php'; // PhpWord autoload
 use PhpOffice\PhpWord\IOFactory;
 
@@ -336,14 +337,50 @@ try {
             $stmt->bind_param("siss", $test_title, $academic_level_id, $test_subject, $test_year);
 
             $stmt->execute() or die($stmt->error);
+            $existing_test_id = null;
             $stmt->bind_result($existing_test_id);
             if ($stmt->fetch()) {
                 $test_id = $existing_test_id;
                 $stmt->close();
             } else {
                 $stmt->close();
-                $stmt = $conn->prepare("INSERT INTO tests (title, academic_level_id, subject, duration, year, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-            $stmt->bind_param("sisis", $test_title, $academic_level_id, $test_subject, $test_duration, $test_year);
+                $test_context = examcenterResolveTestContext(
+                    $conn,
+                    $test_subject,
+                    $academic_level_id,
+                    null
+                );
+                $programme_id = null;
+                $programme_level_id = null;
+                $academic_period_id = null;
+                $assessment_group_id = null;
+                $institution_id = $test_context['institution_id'];
+                $organizational_unit_id = $test_context['organizational_unit_id'];
+                $course_id = $test_context['course_id'];
+
+                $stmt = $conn->prepare(
+                    "INSERT INTO tests (
+                        title, academic_level_id, subject, duration, year, created_at,
+                        institution_id, organizational_unit_id, programme_id,
+                        programme_level_id, academic_period_id, course_id,
+                        assessment_group_id
+                    ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $stmt->bind_param(
+                    "sisisiiiiiii",
+                    $test_title,
+                    $academic_level_id,
+                    $test_subject,
+                    $test_duration,
+                    $test_year,
+                    $institution_id,
+                    $organizational_unit_id,
+                    $programme_id,
+                    $programme_level_id,
+                    $academic_period_id,
+                    $course_id,
+                    $assessment_group_id
+                );
                 $stmt->execute() or die($stmt->error);
                 $test_id = $stmt->insert_id;
                 $stmt->close();

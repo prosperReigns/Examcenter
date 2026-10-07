@@ -7,7 +7,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 
 // ---------------------------------------------------------
 // Error Reporting
@@ -128,17 +129,87 @@ $selected_subjects = [];
 
 $all_subjects = [];
 $active_subjects = [];
+$organizational_units = [];
+$courses = [];
+$academic_periods = [];
+$universal_schedule_available = false;
+$active_institution_id = null;
+$schedule_unit_id = (int)($_POST['organizational_unit_id'] ?? $_GET['organizational_unit_id'] ?? 0);
+$schedule_course_id = (int)($_POST['course_id'] ?? $_GET['course_id'] ?? 0);
+$schedule_period_id = (int)($_POST['academic_period_id'] ?? $_GET['academic_period_id'] ?? 0);
+
+$active_institution_id = examcenterActiveInstitutionId($conn);
+$universal_schedule_available = $active_institution_id !== null
+    && examcenterUniversalTableExists($conn, 'organizational_units')
+    && examcenterUniversalTableExists($conn, 'courses')
+    && examcenterUniversalTableExists($conn, 'academic_periods')
+    && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+
+if ($universal_schedule_available) {
+    $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT id, period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY period_name");
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
 
 // ---------------------------------------------------------
 // Fetch Available Subjects
 // ---------------------------------------------------------
 try {
 
-    $stmt = $conn->prepare(
-        "SELECT DISTINCT LCASE(subject_name) AS subject_name
-         FROM subjects
-         ORDER BY subject_name ASC"
-    );
+    $subject_query = "SELECT DISTINCT LCASE(s.subject_name) AS subject_name
+        FROM subjects s";
+    $subject_conditions = [];
+    $subject_params = [];
+    $subject_types = '';
+
+    if ($universal_schedule_available) {
+        $subject_query .= "
+            INNER JOIN tests t
+                ON LOWER(t.subject) = LOWER(s.subject_name)
+                OR LOWER(t.subject) LIKE CONCAT(LOWER(s.subject_name), ' (%)')
+            WHERE t.institution_id = ?";
+        $subject_params[] = $active_institution_id;
+        $subject_types .= 'i';
+
+        if ($schedule_unit_id > 0) {
+            $subject_query .= " AND t.organizational_unit_id = ?";
+            $subject_params[] = $schedule_unit_id;
+            $subject_types .= 'i';
+        }
+        if ($schedule_course_id > 0) {
+            $subject_query .= " AND t.course_id = ?";
+            $subject_params[] = $schedule_course_id;
+            $subject_types .= 'i';
+        }
+        if ($schedule_period_id > 0) {
+            $subject_query .= " AND t.academic_period_id = ?";
+            $subject_params[] = $schedule_period_id;
+            $subject_types .= 'i';
+        }
+    }
+
+    $subject_query .= " ORDER BY subject_name ASC";
+    $stmt = $conn->prepare($subject_query);
+
+    if (!empty($subject_params)) {
+        $stmt->bind_param($subject_types, ...$subject_params);
+    }
 
     $stmt->execute();
 
@@ -1647,6 +1718,51 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                         <?php endif; ?>
 
                     </div>
+
+                    <?php if ($universal_schedule_available): ?>
+                        <div class="col-12">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-layer-group me-2"></i>
+                                Universal filters narrow the subjects to tests configured for the selected unit, course, or academic period. The legacy schedule remains subject/date based for backward compatibility.
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label for="organizational_unit_id" class="form-label">Organizational Unit</label>
+                            <select name="organizational_unit_id" id="organizational_unit_id" class="form-select">
+                                <option value="0">All Units</option>
+                                <?php foreach ($organizational_units as $unit): ?>
+                                    <option value="<?= (int)$unit['id'] ?>" <?= $schedule_unit_id === (int)$unit['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($unit['unit_name'] . ($unit['unit_code'] ? ' (' . $unit['unit_code'] . ')' : '')) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label for="course_id" class="form-label">Course</label>
+                            <select name="course_id" id="course_id" class="form-select">
+                                <option value="0">All Courses</option>
+                                <?php foreach ($courses as $course): ?>
+                                    <option value="<?= (int)$course['id'] ?>" <?= $schedule_course_id === (int)$course['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars(($course['course_code'] ? $course['course_code'] . ' - ' : '') . $course['course_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label for="academic_period_id" class="form-label">Academic Period</label>
+                            <select name="academic_period_id" id="academic_period_id" class="form-select">
+                                <option value="0">All Periods</option>
+                                <?php foreach ($academic_periods as $period): ?>
+                                    <option value="<?= (int)$period['id'] ?>" <?= $schedule_period_id === (int)$period['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($period['period_type'] . ': ' . $period['period_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    <?php endif; ?>
 
                 </div>
 

@@ -4,7 +4,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+require_once '../license/license_guard.php';
 require_once '../vendor/autoload.php';
 
 use PhpOffice\PhpWord\PhpWord;
@@ -204,6 +205,55 @@ try {
         exit();
     }
 
+    $active_institution_id = examcenterActiveInstitutionId($conn);
+    $universal_questions_available = $active_institution_id !== null
+        && examcenterUniversalTableExists($conn, 'organizational_units')
+        && examcenterUniversalTableExists($conn, 'courses')
+        && examcenterUniversalTableExists($conn, 'academic_periods')
+        && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+
+    $universal_joins = $universal_questions_available ? "
+        LEFT JOIN organizational_units ou
+            ON ou.id = t.organizational_unit_id
+        LEFT JOIN courses co
+            ON co.id = t.course_id
+        LEFT JOIN academic_periods ap
+            ON ap.id = t.academic_period_id
+    " : '';
+    $universal_scope = $universal_questions_available
+        ? ' AND t.institution_id = ?'
+        : '';
+    $universal_class = $universal_questions_available
+        ? 'COALESCE(ou.unit_name, al.level_code)'
+        : 'al.level_code';
+
+    $organizational_units = [];
+    $courses = [];
+    $academic_periods = [];
+
+    if ($universal_questions_available) {
+        $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+        $stmt->bind_param('i', $active_institution_id);
+        $stmt->execute();
+        $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+        $stmt->bind_param('i', $active_institution_id);
+        $stmt->execute();
+        $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        $stmt = $conn->prepare("SELECT id, period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY period_name");
+        $stmt->bind_param('i', $active_institution_id);
+        $stmt->execute();
+        $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+    }
+
 
     /* =====================================================
        ASSIGNED SUBJECTS
@@ -262,6 +312,10 @@ try {
 
     $student_name_filter =
         trim($_GET['student_name'] ?? '');
+
+    $unit_filter = (int) ($_GET['unit'] ?? 0);
+    $course_filter = (int) ($_GET['course'] ?? 0);
+    $period_filter = (int) ($_GET['period'] ?? 0);
 
 
     /* =====================================================

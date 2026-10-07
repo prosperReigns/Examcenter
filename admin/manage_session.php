@@ -7,7 +7,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 
 // ---------------------------------------------------------------
 // Development error reporting
@@ -52,7 +53,7 @@ try {
 
         session_destroy();
 
-        header("Location: /EXAMCENTER/login.php?error=Unauthorized");
+        header("Location: ../login.php?error=Unauthorized");
         exit();
     }
 
@@ -80,6 +81,11 @@ try {
 
     die("System error");
 }
+
+$universal_periods_available = examcenterUniversalTableExists($conn, 'academic_periods');
+$universal_institution_id = examcenterActiveInstitutionId($conn);
+$universal_periods_available = $universal_periods_available
+    && $universal_institution_id !== null;
 
 
 // ================================================================
@@ -335,6 +341,22 @@ if (isset($_GET['action'])) {
 
             $ok = $stmt->execute();
 
+            if ($ok && $universal_periods_available) {
+                $yearPeriodId = examcenterFindAcademicPeriod(
+                    $conn,
+                    (int)$universal_institution_id,
+                    'year:' . $year
+                );
+                examcenterSyncAcademicPeriod(
+                    $conn,
+                    (int)$universal_institution_id,
+                    'session',
+                    $sessionName,
+                    'session:' . $year . ':' . $sessionName,
+                    $yearPeriodId
+                );
+            }
+
             $stmt->close();
 
 
@@ -455,6 +477,27 @@ if (isset($_GET['action'])) {
             );
 
             $ok = $stmt->execute();
+
+            if ($ok && $universal_periods_available) {
+                $yearPeriodId = examcenterFindAcademicPeriod(
+                    $conn,
+                    (int)$universal_institution_id,
+                    'year:' . $year
+                );
+                $sessionPeriodId = examcenterFindAcademicPeriod(
+                    $conn,
+                    (int)$universal_institution_id,
+                    'session:' . $year . ':' . $sessionName
+                );
+                examcenterSyncAcademicPeriod(
+                    $conn,
+                    (int)$universal_institution_id,
+                    'assessment',
+                    $examTitle,
+                    'assessment:' . $year . ':' . $sessionName . ':' . $examTitle,
+                    $sessionPeriodId ?: $yearPeriodId
+                );
+            }
 
             $stmt->close();
 
@@ -591,6 +634,38 @@ if (isset($_GET['action'])) {
 
             $conn->commit();
 
+            if ($universal_periods_available) {
+                $stmt = $conn->prepare(
+                    "UPDATE academic_periods
+                     SET status = 'planned'
+                     WHERE institution_id = ?
+                       AND period_type = 'academic_year'
+                       AND period_code <> ?
+                       AND status = 'active'"
+                );
+                $yearCode = 'year:' . $year;
+                $stmt->bind_param('is', $universal_institution_id, $yearCode);
+                $stmt->execute();
+                $stmt->close();
+
+                $stmt = $conn->prepare(
+                    "UPDATE academic_periods
+                     SET status = ?
+                     WHERE institution_id = ?
+                       AND period_type = 'academic_year'
+                       AND period_code = ?"
+                );
+                $periodStatus = $newStatus === 'active' ? 'active' : 'planned';
+                $stmt->bind_param(
+                    'sis',
+                    $periodStatus,
+                    $universal_institution_id,
+                    $yearCode
+                );
+                $stmt->execute();
+                $stmt->close();
+            }
+
 
             if ($ok) {
 
@@ -659,6 +734,24 @@ if (isset($_GET['action'])) {
             $stmt->bind_param("s", $year);
 
             $ok = $stmt->execute();
+
+            if ($ok && $universal_periods_available) {
+                $stmtUniversal = $conn->prepare(
+                    "UPDATE academic_periods
+                     SET status = 'cancelled'
+                     WHERE institution_id = ?
+                       AND (period_code = ? OR period_code LIKE CONCAT(?, ':%'))"
+                );
+                $yearCode = 'year:' . $year;
+                $stmtUniversal->bind_param(
+                    'iss',
+                    $universal_institution_id,
+                    $yearCode,
+                    $yearCode
+                );
+                $stmtUniversal->execute();
+                $stmtUniversal->close();
+            }
 
             $stmt->close();
 
@@ -988,6 +1081,18 @@ if (
 
 
                 if ($stmt->execute()) {
+
+                    if ($universal_periods_available) {
+                        examcenterSyncAcademicPeriod(
+                            $conn,
+                            (int)$universal_institution_id,
+                            'academic_year',
+                            $newYear,
+                            'year:' . $newYear,
+                            null,
+                            (int)$stmt->insert_id
+                        );
+                    }
 
                     $success =
                         "Academic year added successfully.";

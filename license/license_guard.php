@@ -43,7 +43,7 @@ function redirectLicenseError(
 ): void
 {
     header(
-        "Location: required.php?error="
+        "Location: ../license/required.php?error="
         . urlencode($message)
     );
 

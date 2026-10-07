@@ -131,7 +131,7 @@ function redirectByRole($role, $setupCompleted) {
                 header("Location: login.php");
                 exit();
             }
-            $target = $base_url . 'teacher/dashboard.php';
+            $target = 'teacher/dashboard.php';
             break;
         default:
             session_destroy();

@@ -8,7 +8,7 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+//require_once '../license/license_guard.php';
 
 // ---------------------------------------------------------------
 // Development error reporting
@@ -1580,6 +1580,38 @@ body {
         width: 100%;
     }
 
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .header-actions .btn {
+        border-radius: 9px;
+        padding: 9px 14px;
+        font-size: 0.82rem;
+    }
+
+    @media (max-width: 575.98px) {
+
+        .header-actions .btn-danger {
+            font-size: 0;
+            width: 42px;
+            height: 42px;
+            padding: 0;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-actions .btn-danger i {
+            font-size: 16px;
+            margin: 0 !important;
+        }
+
+    }
+
 }
 
 </style>
@@ -1740,16 +1772,27 @@ body {
 </div>
 
 
-<button
-    class="btn btn-primary d-lg-none"
-    id="sidebarToggle"
-    type="button"
-    aria-label="Toggle navigation"
->
+    <div class="header-actions">
 
-    <i class="fas fa-bars"></i>
+        <a
+            href="student_transcript.php?id=<?php echo (int) $student['id']; ?>&test_title=<?php echo urlencode($testTitleFilter); ?>&academic_year=<?php echo urlencode($academicYearFilter); ?>"
+            class="btn btn-danger"
+            target="_blank"
+        >
+            <i class="fas fa-file-pdf me-1"></i>
+            Download Transcript
+        </a>
 
-</button>
+        <button
+            class="btn btn-primary d-lg-none"
+            id="sidebarToggle"
+            type="button"
+            aria-label="Toggle navigation"
+        >
+            <i class="fas fa-bars"></i>
+        </button>
+
+    </div>
 
 </div>
 

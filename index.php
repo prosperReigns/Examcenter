@@ -54,7 +54,7 @@
             <div class="hero">
                 <div class="container">
                     <div class="text-center">
-                        <h1 class="hero-title">D-Portal CBT System</h1>
+                        <h1 class="hero-title">EXAMCENTER CBT System</h1>
                         <p class="hero-subtitle">A modern, intuitive platform for conducting computer-based tests in offline environments</p>
                     </div>
 
@@ -115,7 +115,7 @@
                                 </h2>
                                 <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                     <div class="accordion-body">
-                                        The D-Portal system uses local storage and service workers to cache all necessary resources. Once initially loaded, the system can function without an internet connection, syncing data when connectivity is restored.
+                                        The Examcenter system uses local storage and service workers to cache all necessary resources. Once initially loaded, the system can function without an internet connection, syncing data when connectivity is restored.
                                     </div>
                                 </div>
                             </div>
@@ -129,7 +129,7 @@
                                 </h2>
                                 <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                     <div class="accordion-body">
-                                        D-Portal works best on modern browsers including Chrome, Firefox, Edge, and Safari. For optimal performance, we recommend using the latest version of Safe Examination Browser.
+                                        Examcenter works best on modern browsers including Chrome, Firefox, Edge, and Safari. For optimal performance, we recommend using the latest version of Safe Examination Browser.
                                     </div>
                                 </div>
                             </div>
@@ -171,7 +171,7 @@
                                 </h2>
                                 <div id="collapseFive" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                     <div class="accordion-body">
-                                        D-Portal supports multiple question types including multiple choice, true/false, fill-in-the-blank, matching, and short answer questions.
+                                        Examcenter supports multiple question types including multiple choice, true/false, fill-in-the-blank, matching, and short answer questions.
                                     </div>
                                 </div>
                             </div>
@@ -185,7 +185,7 @@
         <section class="page about-page" id="about_page">
             <div class="container py-5">
                 <div class="text-center mb-5">
-                    <h1 class="hero-title">About D-Portal</h1>
+                    <h1 class="hero-title">About Examcenter</h1>
                     <p class="hero-subtitle">Innovative CBT solutions for modern educational needs</p>
                 </div>
 
@@ -200,7 +200,7 @@
                     <div class="col-lg-6">
                         <div class="about-content p-4">
                             <h3 class="mb-4">Our Mission</h3>
-                            <p class="mb-4">D-Portal was created to bridge the gap between technology and education in areas with limited or unreliable internet connectivity. Our mission is to provide a robust, user-friendly computer-based testing platform that works seamlessly both online and offline.</p>
+                            <p class="mb-4">Examcenter was created to bridge the gap between technology and education in areas with limited or unreliable internet connectivity. Our mission is to provide a robust, user-friendly computer-based testing platform that works seamlessly both online and offline.</p>
                             
                             <h3 class="mb-4">Key Features</h3>
                             <ul class="feature-list mb-4">
@@ -212,7 +212,7 @@
                             </ul>
                             
                             <h3 class="mb-4">The Team</h3>
-                            <p>D-Portal is developed and maintained by ImadeTech, a software company specializing in educational technology solutions. Our team consists of experienced developers, educators, and UX designers committed to improving learning experiences through technology.</p>
+                            <p>Examcenter is developed and maintained by ImadeTech, a software company specializing in educational technology solutions. Our team consists of experienced developers, educators, and UX designers committed to improving learning experiences through technology.</p>
                         </div>
                     </div>
                 </div>
@@ -255,7 +255,7 @@
     <!-- Footer -->
     <footer class="text-center">
         <div class="container">
-            <p>&copy; 2025 D-Portal CBT Portal — A subsidiary of <b>I</b>made<b>T</b>ech.</p>
+            <p>&copy; 2026 Examcenter CBT Portal — A subsidiary of <b>Kings Tech Softwares</b>.</p>
         </div>
     </footer>
 

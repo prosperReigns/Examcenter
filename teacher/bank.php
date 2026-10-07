@@ -4,7 +4,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 require_once '../vendor/autoload.php';
 
 use PhpOffice\PhpWord\PhpWord;
@@ -43,6 +44,20 @@ try {
     if ($conn->connect_error) {
         error_log("Database connection failed: " . $conn->connect_error);
         die("Connection failed: " . $conn->connect_error);
+    }
+
+    $universal_test_scope = examcenterUniversalTableExists($conn, 'institutions')
+        && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+
+    $active_institution_id = $universal_test_scope
+        ? examcenterActiveInstitutionId($conn)
+        : null;
+
+    if ($universal_test_scope && $active_institution_id === null) {
+        $universal_test_scope = false;
     }
 
 
@@ -160,6 +175,9 @@ try {
     */
 
     $tests = [];
+    $universal_test_select = '';
+    $universal_test_joins = '';
+    $universal_test_condition = '';
 
     if (!empty($assigned_subjects)) {
 
@@ -172,16 +190,32 @@ try {
             )
         );
 
+        $universal_test_select = $universal_test_scope
+            ? ', ou.unit_name, co.course_name, ap.period_name'
+            : '';
+        $universal_test_joins = $universal_test_scope
+            ? ' LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
+                LEFT JOIN courses co ON co.id = t.course_id
+                LEFT JOIN academic_periods ap ON ap.id = t.academic_period_id'
+            : '';
+        $universal_test_condition = $universal_test_scope
+            ? ' AND t.institution_id = ?'
+            : '';
+
         $stmt = $conn->prepare("
             SELECT
                 t.id,
                 t.title,
                 t.subject,
+                t.year,
                 al.level_code
+                {$universal_test_select}
             FROM tests t
             JOIN academic_levels al
                 ON al.id = t.academic_level_id
+            {$universal_test_joins}
             WHERE t.subject IN ($test_placeholders)
+            {$universal_test_condition}
             ORDER BY t.created_at DESC
         ");
 
@@ -192,9 +226,16 @@ try {
                 count($assigned_subjects)
             );
 
+            $test_params = $assigned_subjects;
+
+            if ($universal_test_scope) {
+                $test_params[] = $active_institution_id;
+                $types .= 'i';
+            }
+
             $stmt->bind_param(
                 $types,
-                ...$assigned_subjects
+                ...$test_params
             );
 
             $stmt->execute();
@@ -263,14 +304,18 @@ try {
                 t.id,
                 t.title,
                 t.subject,
+                t.year,
                 t.duration,
                 t.academic_level_id,
                 al.level_code
+                {$universal_test_select}
             FROM tests t
             JOIN academic_levels al
                 ON al.id = t.academic_level_id
+            {$universal_test_joins}
             WHERE t.id = ?
             AND t.subject IN ($test_placeholders)
+            {$universal_test_condition}
             LIMIT 1
         ";
 
@@ -287,6 +332,11 @@ try {
 
         foreach ($assigned_subjects as $subject) {
             $params[] = $subject;
+        }
+
+        if ($universal_test_scope) {
+            $types .= 'i';
+            $params[] = $active_institution_id;
         }
 
         $stmt = $conn->prepare($sql);
@@ -2002,6 +2052,10 @@ try {
                                             $test['level_code'] .
                                             ' - ' .
                                             $test['subject'] .
+                                            ' / ' .
+                                            $test['year'] .
+                                            (!empty($test['course_name']) ? ' / ' . $test['course_name'] : '') .
+                                            (!empty($test['unit_name']) ? ' / ' . $test['unit_name'] : '') .
                                             ')'
                                         ); ?>
                                     </option>
@@ -2074,6 +2128,15 @@ try {
             <div class="modal-body modal-preview">
                 <?php if ($current_test && !empty($questions)): ?>
                     <h6><?php echo htmlspecialchars($current_test['title']); ?> (<?php echo htmlspecialchars($current_test['level_code'] . ' - ' . $current_test['subject']); ?>)</h6>
+                    <?php if (!empty($current_test['course_name']) || !empty($current_test['unit_name']) || !empty($current_test['period_name'])): ?>
+                        <p class="text-muted mb-1">
+                            <?php echo htmlspecialchars(implode(' / ', array_filter([
+                                $current_test['course_name'] ?? '',
+                                $current_test['unit_name'] ?? '',
+                                $current_test['period_name'] ?? ''
+                            ]))); ?>
+                        </p>
+                    <?php endif; ?>
                     <p><small>Duration: <?php echo (int)$current_test['duration']; ?> minutes</small></p>
                     <hr>
                     <?php foreach ($questions as $index => $question): ?>

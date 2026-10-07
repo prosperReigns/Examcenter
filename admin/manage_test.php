@@ -2,7 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
 require_once '../vendor/autoload.php';
 
 use PhpOffice\PhpWord\PhpWord;
@@ -44,15 +45,55 @@ try {
         exit();
     }
 
-// Admin sees all tests
-$result = $conn->query("SELECT t.id, t.title, t.subject, t.duration, 
-                               CONCAT(al.level_code, ' ', s.stream_name) AS class
-                        FROM tests t
-                        JOIN academic_levels al ON t.academic_level_id = al.id
-                        JOIN classes c ON c.academic_level_id = al.id
-                        JOIN streams s ON c.stream_id = s.id
-                        GROUP BY t.id
-                        ORDER BY t.id DESC");
+$universal_tests_available = examcenterUniversalTableExists($conn, 'institutions')
+    && examcenterUniversalTableExists($conn, 'organizational_units')
+    && examcenterUniversalTableExists($conn, 'courses')
+    && examcenterUniversalTableExists($conn, 'programmes')
+    && examcenterUniversalTableExists($conn, 'programme_levels')
+    && examcenterUniversalTableExists($conn, 'academic_periods')
+    && examcenterUniversalTableExists($conn, 'assessment_groups')
+    && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+
+$universal_select = '';
+$universal_joins = '';
+$universal_group = '';
+$class_expression = "CONCAT(al.level_code, ' ', s.stream_name)";
+
+if ($universal_tests_available) {
+    $class_expression = "COALESCE(ou.unit_name, CONCAT(al.level_code, ' ', s.stream_name))";
+    $universal_select = ", i.institution_name, ou.unit_name,
+        co.course_code, co.course_name, p.programme_name,
+        pl.level_name AS programme_level_name, ap.period_name,
+        ag.group_name";
+    $universal_joins = "
+        LEFT JOIN institutions i ON i.id = t.institution_id
+        LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
+        LEFT JOIN courses co ON co.id = t.course_id
+        LEFT JOIN programmes p ON p.id = t.programme_id
+        LEFT JOIN programme_levels pl ON pl.id = t.programme_level_id
+        LEFT JOIN academic_periods ap ON ap.id = t.academic_period_id
+        LEFT JOIN assessment_groups ag ON ag.id = t.assessment_group_id";
+    $universal_group = ", i.institution_name, ou.unit_name, co.course_code,
+        co.course_name, p.programme_name, pl.level_name, ap.period_name,
+        ag.group_name, t.institution_id, t.organizational_unit_id,
+        t.programme_id, t.programme_level_id, t.academic_period_id,
+        t.course_id, t.assessment_group_id";
+}
+
+$result = $conn->query("SELECT t.id, t.title, t.subject, t.duration,
+                   {$class_expression} AS class
+                   {$universal_select}
+               FROM tests t
+               LEFT JOIN academic_levels al ON t.academic_level_id = al.id
+               LEFT JOIN classes c ON c.academic_level_id = al.id
+               LEFT JOIN streams s ON c.stream_id = s.id
+               {$universal_joins}
+               GROUP BY t.id, t.title, t.subject, t.duration,
+                   al.level_code, s.stream_name {$universal_group}
+               ORDER BY t.id DESC");
 
 
 
@@ -157,6 +198,11 @@ $conn->close();
                         <th><i class="fas fa-school me-1"></i> Class</th>
                         <th><i class="fas fa-book me-1"></i> Subject</th>
                         <th><i class="fas fa-clock me-1"></i> Duration</th>
+                        <?php if ($universal_tests_available): ?>
+                            <th>Institution</th>
+                            <th>Course / Programme</th>
+                            <th>Period / Group</th>
+                        <?php endif; ?>
                         <th class="text-center"><i class="fas fa-cogs me-1"></i> Actions</th>
                     </tr>
                 </thead>
@@ -168,6 +214,25 @@ $conn->close();
                         <td><span class="badge bg-primary"><?= htmlspecialchars($row['class']) ?></span></td>
                         <td><span class="badge bg-secondary"><?= htmlspecialchars($row['subject']) ?></span></td>
                         <td><i class="fas fa-clock text-warning"></i><?= htmlspecialchars($row['duration']) ?>mins</td>
+                        <?php if ($universal_tests_available): ?>
+                            <td>
+                                <div><?= htmlspecialchars($row['institution_name'] ?? 'Unassigned') ?></div>
+                                <small class="text-muted"><?= htmlspecialchars($row['unit_name'] ?? $row['class']) ?></small>
+                            </td>
+                            <td>
+                                <div><?= htmlspecialchars($row['course_name'] ?? 'General assessment') ?></div>
+                                <small class="text-muted">
+                                    <?= htmlspecialchars($row['programme_name'] ?? 'No programme') ?>
+                                    <?php if (!empty($row['programme_level_name'])): ?>
+                                        / <?= htmlspecialchars($row['programme_level_name']) ?>
+                                    <?php endif; ?>
+                                </small>
+                            </td>
+                            <td>
+                                <div><?= htmlspecialchars($row['period_name'] ?? 'No period') ?></div>
+                                <small class="text-muted"><?= htmlspecialchars($row['group_name'] ?? 'Open target') ?></small>
+                            </td>
+                        <?php endif; ?>
                         <td class="text-center">
                             <a class="btn btn-sm btn-outline-primary" 
                             href="download.php?class=<?= urlencode($row['class']) ?>&subject=<?= urlencode($row['subject']) ?>&title=<?= urlencode($row['title']) ?>"><i class="fas fa-download"></i>
@@ -189,7 +254,7 @@ $conn->close();
                     <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="5" class="text-center py-5">
+                            <td colspan="<?= $universal_tests_available ? 8 : 5 ?>" class="text-center py-5">
                                 <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
                                 <h5 class="text-muted">
                                     No Tests Found

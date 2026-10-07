@@ -3,7 +3,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+require_once '../license/license_guard.php';
 
 header('Content-Type: text/html; charset=UTF-8');
 
@@ -99,6 +100,11 @@ try {
 */
 $error = '';
 $success = '';
+$universal_questions_available = false;
+$active_institution_id = null;
+$organizational_units = [];
+$courses = [];
+$academic_periods = [];
 
 /*
 |--------------------------------------------------------------------------
@@ -241,6 +247,38 @@ if (
 $class_filter   = trim($_GET['class'] ?? '');
 $subject_filter = trim($_GET['subject'] ?? '');
 $search_term    = trim($_GET['search'] ?? '');
+$unit_filter    = (int)($_GET['unit'] ?? 0);
+$course_filter  = (int)($_GET['course'] ?? 0);
+$period_filter  = (int)($_GET['period'] ?? 0);
+
+$active_institution_id = examcenterActiveInstitutionId($conn);
+$universal_questions_available = $active_institution_id !== null
+    && examcenterUniversalTableExists($conn, 'organizational_units')
+    && examcenterUniversalTableExists($conn, 'courses')
+    && examcenterUniversalTableExists($conn, 'academic_periods')
+    && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+
+if ($universal_questions_available) {
+    $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT id, period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY period_name");
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -267,8 +305,17 @@ $count_query = "
     FROM new_questions q
     JOIN tests t
         ON q.test_id = t.id
-    JOIN classes c
-        ON t.academic_level_id = c.academic_level_id
+    LEFT JOIN classes c
+        ON q.class = c.class_name
+        OR q.class = CAST(c.id AS CHAR)
+    " . ($universal_questions_available ? "
+    LEFT JOIN organizational_units ou
+        ON ou.id = t.organizational_unit_id
+    LEFT JOIN courses co
+        ON co.id = t.course_id
+    LEFT JOIN academic_periods ap
+        ON ap.id = t.academic_period_id
+    " : '') . "
     WHERE 1=1
 ";
 
@@ -276,18 +323,34 @@ $select_query = "
     SELECT
         q.*,
         t.title AS test_title,
-        c.class_name AS class,
+        " . ($universal_questions_available
+            ? "COALESCE(ou.unit_name, c.class_name, q.class) AS class,
+               co.course_name, ap.period_name,
+               t.organizational_unit_id, t.course_id, t.academic_period_id"
+            : "COALESCE(c.class_name, q.class) AS class") . ",
         t.subject
     FROM new_questions q
     JOIN tests t
         ON q.test_id = t.id
-    JOIN classes c
-        ON t.academic_level_id = c.academic_level_id
+    LEFT JOIN classes c
+        ON q.class = c.class_name
+        OR q.class = CAST(c.id AS CHAR)
+    " . ($universal_questions_available ? "
+    LEFT JOIN organizational_units ou
+        ON ou.id = t.organizational_unit_id
+    LEFT JOIN courses co
+        ON co.id = t.course_id
+    LEFT JOIN academic_periods ap
+        ON ap.id = t.academic_period_id
+    " : '') . "
     WHERE 1=1
 ";
 
 $params = [];
 $types = '';
+$question_order = $universal_questions_available
+    ? 'COALESCE(ou.unit_name, c.class_name, q.class)'
+    : 'COALESCE(c.class_name, q.class)';
 
 /*
 |--------------------------------------------------------------------------
@@ -315,6 +378,30 @@ if ($subject_filter !== '') {
 
     $params[] = strtolower($subject_filter);
     $types .= 's';
+}
+
+if ($universal_questions_available && $unit_filter > 0) {
+    $condition = " AND t.organizational_unit_id = ?";
+    $count_query .= $condition;
+    $select_query .= $condition;
+    $params[] = $unit_filter;
+    $types .= 'i';
+}
+
+if ($universal_questions_available && $course_filter > 0) {
+    $condition = " AND t.course_id = ?";
+    $count_query .= $condition;
+    $select_query .= $condition;
+    $params[] = $course_filter;
+    $types .= 'i';
+}
+
+if ($universal_questions_available && $period_filter > 0) {
+    $condition = " AND t.academic_period_id = ?";
+    $count_query .= $condition;
+    $select_query .= $condition;
+    $params[] = $period_filter;
+    $types .= 'i';
 }
 
 /*
@@ -385,7 +472,7 @@ if ($current_page > $total_pages) {
 |--------------------------------------------------------------------------
 */
 $select_query .= "
-    ORDER BY q.class, t.subject, q.id DESC
+    ORDER BY {$question_order}, t.subject, q.id DESC
     LIMIT ? OFFSET ?
 ";
 
@@ -479,6 +566,8 @@ function buildPageUrl(
     string $search
 ): string {
 
+    global $unit_filter, $course_filter, $period_filter;
+
     $params = [
         'page' => $page
     ];
@@ -493,6 +582,18 @@ function buildPageUrl(
 
     if ($search !== '') {
         $params['search'] = $search;
+    }
+
+    if ($unit_filter > 0) {
+        $params['unit'] = $unit_filter;
+    }
+
+    if ($course_filter > 0) {
+        $params['course'] = $course_filter;
+    }
+
+    if ($period_filter > 0) {
+        $params['period'] = $period_filter;
     }
 
     return '?' . http_build_query($params);
@@ -510,7 +611,10 @@ $end_question = min(
 $has_filters = (
     $class_filter !== '' ||
     $subject_filter !== '' ||
-    $search_term !== ''
+    $search_term !== '' ||
+    $unit_filter > 0 ||
+    $course_filter > 0 ||
+    $period_filter > 0
 );
 
 ?>
@@ -1316,6 +1420,44 @@ $has_filters = (
 
                 </div>
 
+                <?php if ($universal_questions_available): ?>
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label fw-semibold" for="unitFilter">Organizational Unit</label>
+                        <select class="form-select" name="unit" id="unitFilter">
+                            <option value="0">All Units</option>
+                            <?php foreach ($organizational_units as $unit): ?>
+                                <option value="<?= (int)$unit['id'] ?>" <?= $unit_filter === (int)$unit['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($unit['unit_name'] . ($unit['unit_code'] ? ' (' . $unit['unit_code'] . ')' : '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label fw-semibold" for="courseFilter">Course</label>
+                        <select class="form-select" name="course" id="courseFilter">
+                            <option value="0">All Courses</option>
+                            <?php foreach ($courses as $course): ?>
+                                <option value="<?= (int)$course['id'] ?>" <?= $course_filter === (int)$course['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars(($course['course_code'] ? $course['course_code'] . ' - ' : '') . $course['course_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label fw-semibold" for="periodFilter">Academic Period</label>
+                        <select class="form-select" name="period" id="periodFilter">
+                            <option value="0">All Periods</option>
+                            <?php foreach ($academic_periods as $period): ?>
+                                <option value="<?= (int)$period['id'] ?>" <?= $period_filter === (int)$period['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($period['period_type'] . ': ' . $period['period_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endif; ?>
+
                 <!-- SUBJECT -->
 
                 <div class="col-lg-3 col-md-6">
@@ -1634,6 +1776,15 @@ $has_filters = (
                                 <?= htmlspecialchars($question['test_title']) ?>
 
                             </div>
+
+                            <?php if ($universal_questions_available): ?>
+                                <small class="text-muted d-block">
+                                    <?= htmlspecialchars($question['course_name'] ?? ''); ?>
+                                    <?php if (!empty($question['period_name'])): ?>
+                                        | <?= htmlspecialchars($question['period_name']); ?>
+                                    <?php endif; ?>
+                                </small>
+                            <?php endif; ?>
 
                         </td>
 

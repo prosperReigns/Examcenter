@@ -610,16 +610,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             $stmt->store_result();
 
+            $adminExists = $stmt->num_rows > 0;
 
-            if ($stmt->num_rows === 0) {
+            $stmt->close();
 
-                $stmt->close();
 
-                $hashedPassword =
-                    password_hash(
-                        $admin_password,
-                        PASSWORD_DEFAULT
-                    );
+            if (!$adminExists) {
+
+                $hashedPassword = password_hash(
+                    $admin_password,
+                    PASSWORD_DEFAULT
+                );
 
                 $stmt = $conn->prepare("
                     INSERT INTO admins
@@ -640,13 +641,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt->execute();
 
+                $stmt->close();
+
             } else {
 
-                $stmt->close();
+                throw new Exception(
+                    "An administrator with this username already exists."
+                );
             }
-
-
-            $stmt->close();
 
 
             /* Complete setup */
@@ -686,6 +688,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header(
                 "Location: dashboard.php"
             );
+            // header(
+            //     "Location: ../license/required.php"
+            // );
 
             exit();
         }

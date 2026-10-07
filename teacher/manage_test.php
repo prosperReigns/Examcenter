@@ -4,7 +4,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
 
 /* =========================================================
    ERROR REPORTING
@@ -64,6 +65,8 @@ $teacher = null;
 $assigned_subjects = [];
 
 $tests = [];
+$universal_tests_available = false;
+$active_institution_id = null;
 
 
 /* =========================================================
@@ -88,6 +91,16 @@ try {
 
 
     $conn->set_charset('utf8mb4');
+
+    $active_institution_id = examcenterActiveInstitutionId($conn);
+    $universal_tests_available = $active_institution_id !== null
+        && examcenterUniversalTableExists($conn, 'organizational_units')
+        && examcenterUniversalTableExists($conn, 'courses')
+        && examcenterUniversalTableExists($conn, 'academic_periods')
+        && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
 
 
     $teacher_id = (int) $_SESSION['user_id'];
@@ -285,6 +298,22 @@ try {
             )
         );
 
+        $universal_select = $universal_tests_available
+            ? ', ou.unit_name, co.course_code, co.course_name, ap.period_name'
+            : '';
+        $universal_joins = $universal_tests_available
+            ? "
+            LEFT JOIN organizational_units ou
+                ON ou.id = t.organizational_unit_id
+            LEFT JOIN courses co
+                ON co.id = t.course_id
+            LEFT JOIN academic_periods ap
+                ON ap.id = t.academic_period_id"
+            : '';
+        $universal_scope = $universal_tests_available
+            ? ' AND t.institution_id = ?'
+            : '';
+
 
         $query = "
             SELECT
@@ -298,13 +327,16 @@ try {
 
                 al.level_code,
                 al.class_group
+                {$universal_select}
 
             FROM tests AS t
 
             INNER JOIN academic_levels AS al
                 ON al.id = t.academic_level_id
+            {$universal_joins}
 
             WHERE t.subject IN ($placeholders)
+            {$universal_scope}
 
             ORDER BY
                 al.level_code ASC,
@@ -334,6 +366,11 @@ try {
 
 
         $params = $assigned_subjects;
+
+        if ($universal_tests_available) {
+            $params[] = $active_institution_id;
+            $types .= 'i';
+        }
 
 
         $stmt->bind_param(
@@ -1354,6 +1391,14 @@ try {
                                 Year
                             </th>
 
+                            <?php if ($universal_tests_available): ?>
+
+                                <th>
+                                    Universal Context
+                                </th>
+
+                            <?php endif; ?>
+
                             <th>
                                 Duration
                             </th>
@@ -1444,6 +1489,29 @@ try {
                                     </span>
 
                                 </td>
+
+
+                                <?php if ($universal_tests_available): ?>
+
+                                    <!-- UNIVERSAL CONTEXT -->
+
+                                    <td>
+
+                                        <div class="class-group">
+                                            <?= e($row['unit_name'] ?? 'No unit') ?>
+                                        </div>
+
+                                        <div class="class-group">
+                                            <?= e($row['course_name'] ?? 'General assessment') ?>
+                                        </div>
+
+                                        <div class="class-group">
+                                            <?= e($row['period_name'] ?? 'No period') ?>
+                                        </div>
+
+                                    </td>
+
+                                <?php endif; ?>
 
 
                                 <!-- DURATION -->

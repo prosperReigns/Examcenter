@@ -4,7 +4,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 require_once "../backup/backup_scheduler.php";
 
 /*
@@ -333,6 +334,47 @@ try {
 
     $totalStudents =
         getCount($conn, 'students');
+
+    $universal_dashboard_available = examcenterUniversalTableExists($conn, 'institutions')
+        && examcenterUniversalTableExists($conn, 'organizational_units')
+        && examcenterUniversalTableExists($conn, 'courses')
+        && examcenterUniversalTableExists($conn, 'academic_periods');
+    $universal_institutions = 0;
+    $universal_units = 0;
+    $universal_courses = 0;
+    $universal_periods = 0;
+    $universal_tests = 0;
+
+    if ($universal_dashboard_available) {
+        $universal_institutions = (int)getScalar(
+            $conn,
+            "SELECT COUNT(*) FROM institutions WHERE status = 'active'",
+            0
+        );
+        $universal_units = (int)getScalar(
+            $conn,
+            "SELECT COUNT(*) FROM organizational_units WHERE status = 'active'",
+            0
+        );
+        $universal_courses = (int)getScalar(
+            $conn,
+            "SELECT COUNT(*) FROM courses WHERE status = 'active'",
+            0
+        );
+        $universal_periods = (int)getScalar(
+            $conn,
+            "SELECT COUNT(*) FROM academic_periods WHERE status IN ('planned', 'active')",
+            0
+        );
+
+        if (columnExists($conn, 'tests', 'institution_id')) {
+            $universal_tests = (int)getScalar(
+                $conn,
+                "SELECT COUNT(*) FROM tests WHERE institution_id IS NOT NULL",
+                0
+            );
+        }
+    }
 
 
     /*
@@ -2177,6 +2219,42 @@ try {
         </div>
 
     </div>
+
+    <?php if ($universal_dashboard_available): ?>
+        <div class="card dashboard-card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="mb-1"><i class="fas fa-sitemap text-primary me-2"></i>Universal Architecture</h5>
+                        <small class="text-muted">Active institutions and configurable assessment structure.</small>
+                    </div>
+                    <a href="manage_classes.php" class="btn btn-sm btn-outline-primary">Manage Structure</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-2 col-6">
+                        <div class="stat-label">Institutions</div>
+                        <div class="stat-value"><?= number_format($universal_institutions) ?></div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-label">Units</div>
+                        <div class="stat-value"><?= number_format($universal_units) ?></div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-label">Courses</div>
+                        <div class="stat-value"><?= number_format($universal_courses) ?></div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-label">Periods</div>
+                        <div class="stat-value"><?= number_format($universal_periods) ?></div>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="stat-label">Mapped Tests</div>
+                        <div class="stat-value"><?= number_format($universal_tests) ?></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
 
     <!-- ========================================================

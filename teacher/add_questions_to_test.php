@@ -3,7 +3,8 @@ session_start();
 
 require_once "../db.php";
 require_once "../includes/system_guard.php";
-require_once __DIR__ . '/../license/license_guard.php';
+require_once "../includes/universal_architecture.php";
+//require_once '../license/license_guard.php';
 
 $teacher_id = (int)($_SESSION['user_id'] ?? 0);
 
@@ -45,6 +46,16 @@ if ($target_test_id > 0) {
 $database = Database::getInstance();
 $conn = $database->getConnection();
 
+$universal_test_scope = examcenterUniversalTableExists($conn, 'institutions')
+    && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+
+$active_institution_id = $universal_test_scope
+    ? examcenterActiveInstitutionId($conn)
+    : null;
+
 /*
  * Fetch the subjects this teacher is assigned to, so we can
  * confirm they're actually allowed to touch the chosen test
@@ -72,15 +83,30 @@ try {
 
     $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
 
+    $test_context_select = $universal_test_scope
+        ? ", institution_id, organizational_unit_id, course_id, academic_period_id"
+        : '';
+    $test_scope_condition = $universal_test_scope
+        ? ' AND institution_id = ?'
+        : '';
+
     $stmt = $conn->prepare("
-        SELECT academic_level_id, subject
+        SELECT academic_level_id, subject{$test_context_select}
         FROM tests
         WHERE id = ?
         AND subject IN ($placeholders)
+        {$test_scope_condition}
     ");
 
     $types = 'i' . str_repeat('s', count($assigned_subjects));
     $params = array_merge([$test_id], $assigned_subjects);
+    if ($universal_test_scope) {
+        if ($active_institution_id === null) {
+            throw new Exception("No active institution is configured.");
+        }
+        $types .= 'i';
+        $params[] = $active_institution_id;
+    }
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
 
@@ -153,7 +179,7 @@ try {
             "sisss",
             $question['question_text'],
             $test_id,
-            $test['academic_level_id'],
+            $question['class'],
             $test['subject'],
             $question['question_type']
         );

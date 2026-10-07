@@ -1,7 +1,8 @@
 <?php
 session_start();
 require_once '../db.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 
 // Initialize error variable
 $error = '';
@@ -11,6 +12,16 @@ $conn = Database::getInstance()->getConnection();
 if (!$conn) {
     $error = "Database connection failed. Please try again later.";
 }
+
+$universal_registration_available = examcenterUniversalTableExists($conn, 'institutions')
+    && examcenterUniversalTableExists($conn, 'people')
+    && examcenterUniversalTableExists($conn, 'institution_memberships')
+    && examcenterUniversalColumnExists($conn, 'tests', 'institution_id');
+$active_institution_id = $universal_registration_available
+    ? examcenterActiveInstitutionId($conn)
+    : null;
+$universal_registration_available = $universal_registration_available
+    && $active_institution_id !== null;
 
 // Generate CSRF token
 if (!isset($_SESSION['csrf_token'])) {
@@ -88,6 +99,7 @@ if (empty($error)) {
         SELECT DISTINCT year, title 
         FROM tests 
         WHERE title IS NOT NULL AND title != ''
+        " . ($universal_registration_available ? " AND institution_id = " . (int)$active_institution_id : '') . "
         ORDER BY year DESC, title ASC
     ");
     if ($stmt) {
@@ -144,25 +156,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 // 🔹 BUILD DB/SYSTEM SUBJECT (mathematics (JSS) or mathematics (SS))
                 $final_subject = ucfirst($subject) . ' (' . $class_group . ')';
 
+                $test_scope = $universal_registration_available
+                    ? " AND institution_id = ?"
+                    : '';
                 $stmt = $conn->prepare("
-                    SELECT id 
+                    SELECT id, institution_id, organizational_unit_id, course_id, academic_period_id
                     FROM tests
                     WHERE title = ?
                     AND academic_level_id = ?
                     AND year = ?
+                    {$test_scope}
+                    LIMIT 1
                 ");
                 if ($stmt) {
-                    $stmt->bind_param(
-                        "sis",
-                        $test_title,
-                        $selected_level_id,
-                        $exam_year
-                    );
+                    if ($universal_registration_available) {
+                        $stmt->bind_param("sisi", $test_title, $selected_level_id, $exam_year, $active_institution_id);
+                    } else {
+                        $stmt->bind_param("sis", $test_title, $selected_level_id, $exam_year);
+                    }
                     if ($stmt->execute()) {
                         $result = $stmt->get_result();
                         if ($result->num_rows === 0) {
                             $error = "No test available for this combination";
                         } else {
+                            $selected_test = $result->fetch_assoc();
                            
 				// Insert the student directly into the students table
 $stmt = $conn->prepare("INSERT INTO students (full_name, class) VALUES (?, ?)");
@@ -175,6 +192,44 @@ if ($stmt) {
         $_SESSION['student_subject'] = $final_subject;
         $_SESSION['test_title'] = $test_title;
         $_SESSION['exam_year'] = $exam_year;
+        $_SESSION['current_test_id'] = (int)$selected_test['id'];
+
+        if ($universal_registration_available) {
+            $person_code = 'student:' . $active_institution_id . ':' . $_SESSION['student_id'];
+            $stmt_person = $conn->prepare(
+                "INSERT INTO people (person_code, full_name, status)
+                 VALUES (?, ?, 'active')"
+            );
+            $stmt_person->bind_param('ss', $person_code, $name);
+            $stmt_person->execute();
+            $person_id = $stmt_person->insert_id;
+            $stmt_person->close();
+
+            $membership_code = 'student:' . $_SESSION['student_id'];
+            $role_code = 'student';
+            $membership_status = 'active';
+            $stmt_membership = $conn->prepare(
+                "INSERT INTO institution_memberships
+                 (institution_id, person_id, membership_code, role_code, status, legacy_student_id)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            $stmt_membership->bind_param('iisssi', $active_institution_id, $person_id, $membership_code, $role_code, $membership_status, $_SESSION['student_id']);
+            $stmt_membership->execute();
+            $membership_id = $stmt_membership->insert_id;
+            $stmt_membership->close();
+
+            if (!empty($selected_test['organizational_unit_id']) && examcenterUniversalTableExists($conn, 'unit_memberships')) {
+                $membership_role = 'student';
+                $stmt_unit = $conn->prepare(
+                    "INSERT IGNORE INTO unit_memberships
+                     (institution_membership_id, organizational_unit_id, membership_role)
+                     VALUES (?, ?, ?)"
+                );
+                $stmt_unit->bind_param('iis', $membership_id, $selected_test['organizational_unit_id'], $membership_role);
+                $stmt_unit->execute();
+                $stmt_unit->close();
+            }
+        }
 
         header("Location: take_exam.php");
         exit();

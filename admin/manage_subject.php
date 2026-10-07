@@ -2,7 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 
 // Enable error reporting
 ini_set('display_errors', 1);
@@ -34,10 +35,77 @@ if (!$admin || strtolower($admin['role']) !== 'admin') {
 }
 
 $error = $success = '';
+$course_schema_available = false;
+$institutions = [];
+$courses = [];
+
+$course_schema_available = examcenterUniversalTableExists($conn, 'courses')
+    && examcenterActiveInstitutionId($conn) !== null;
+
+if ($course_schema_available) {
+    $result = $conn->query(
+        "SELECT id, institution_name
+         FROM institutions
+         WHERE status = 'active'
+         ORDER BY institution_name"
+    );
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $institutions[] = $row;
+        }
+    }
+}
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['add_subject'])) {
+    if (isset($_POST['add_course'])) {
+        if (!$course_schema_available) {
+            $error = 'Course management is unavailable because the universal course schema is not installed.';
+        } else {
+            $institution_id = (int)($_POST['institution_id'] ?? 0);
+            $course_name = trim($_POST['course_name'] ?? '');
+            $course_code = strtoupper(trim($_POST['course_code'] ?? ''));
+            $course_type = trim($_POST['course_type'] ?? 'subject') ?: 'subject';
+            $description = trim($_POST['course_description'] ?? '');
+            $legacy_subject_id = (int)($_POST['legacy_subject_id'] ?? 0);
+
+            if ($institution_id <= 0 || $course_name === '') {
+                $error = 'Institution and course name are required.';
+            } else {
+                $stmt = $conn->prepare(
+                    "INSERT INTO courses (
+                        institution_id, course_code, course_name, course_type,
+                        description, legacy_subject_id
+                    ) VALUES (?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, 0))"
+                );
+                $stmt->bind_param(
+                    'issssi',
+                    $institution_id,
+                    $course_code,
+                    $course_name,
+                    $course_type,
+                    $description,
+                    $legacy_subject_id
+                );
+                if ($stmt->execute()) {
+                    $success = 'Course created successfully.';
+                } else {
+                    $error = 'Unable to create course. Course code may already exist for this institution.';
+                }
+                $stmt->close();
+            }
+        }
+    } elseif (isset($_POST['deactivate_course'])) {
+        if (!$course_schema_available) {
+            $error = 'Course management is unavailable because the universal course schema is not installed.';
+        } else {
+            $course_id = (int)($_POST['course_id'] ?? 0);
+            $stmt = $conn->prepare("UPDATE courses SET status = 'inactive' WHERE id = ?");
+            $stmt->bind_param('i', $course_id);
+            $success = $stmt->execute() ? 'Course deactivated successfully.' : 'Unable to deactivate course.';
+            $stmt->close();
+        }
+    } elseif (isset($_POST['add_subject'])) {
         $subject_name = trim($_POST['subject_name']);
         $class_levels = $_POST['class_level'] ?? [];
 
@@ -110,6 +178,22 @@ if ($result) {
         $subjects[] = $row;
     }
 }
+
+if ($course_schema_available) {
+    $result = $conn->query(
+        "SELECT c.id, c.course_code, c.course_name, c.course_type, c.description,
+                c.status, i.institution_name, s.subject_name
+         FROM courses c
+         INNER JOIN institutions i ON i.id = c.institution_id
+         LEFT JOIN subjects s ON s.id = c.legacy_subject_id
+         ORDER BY i.institution_name, c.course_name"
+    );
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $courses[] = $row;
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -166,7 +250,7 @@ if ($result) {
 
 <div class="main-content">
     <div class="header d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0">Manage Subjects</h2>
+    <h2 class="mb-0">Manage Subjects and Courses</h2>
     <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
     </div>
 
@@ -228,6 +312,123 @@ if ($result) {
     <?php endif; ?>
     <?php if ($success): ?>
         <div class="alert alert-success alert-dismissible fade show"><?php echo htmlspecialchars($success); ?><button class="btn-close" data-bs-dismiss="alert"></button></div>
+    <?php endif; ?>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-success text-white">
+            <i class="fas fa-book-open me-2"></i>Create Institution Course
+        </div>
+        <div class="card-body">
+            <?php if (!$course_schema_available): ?>
+                <div class="alert alert-warning mb-0">
+                    Course management is unavailable because the proposed
+                    institutions and courses tables are not installed.
+                    Legacy subject management remains available.
+                </div>
+            <?php elseif (!$institutions): ?>
+                <div class="alert alert-warning mb-0">
+                    Create an active institution before adding courses.
+                </div>
+            <?php else: ?>
+                <form method="POST" action="" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="institution_id" class="form-label">Institution</label>
+                        <select class="form-select" id="institution_id" name="institution_id" required>
+                            <option value="">Select institution</option>
+                            <?php foreach ($institutions as $institution): ?>
+                                <option value="<?= (int)$institution['id'] ?>">
+                                    <?= htmlspecialchars($institution['institution_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="course_name" class="form-label">Course Name</label>
+                        <input type="text" class="form-control" id="course_name" name="course_name" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="course_code" class="form-label">Code</label>
+                        <input type="text" class="form-control" id="course_code" name="course_code" placeholder="Optional">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="course_type" class="form-label">Type</label>
+                        <input type="text" class="form-control" id="course_type" name="course_type" value="subject" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="course_description" class="form-label">Description</label>
+                        <textarea class="form-control" id="course_description" name="course_description" rows="2"></textarea>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="legacy_subject_id" class="form-label">Legacy Subject Mapping</label>
+                        <select class="form-select" id="legacy_subject_id" name="legacy_subject_id">
+                            <option value="0">None</option>
+                            <?php foreach ($subjects as $subject): ?>
+                                <option value="<?= (int)$subject['id'] ?>">
+                                    <?= htmlspecialchars($subject['subject_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" name="add_course" class="btn btn-success w-100">
+                            <i class="fas fa-plus me-2"></i>Add Course
+                        </button>
+                    </div>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php if ($course_schema_available): ?>
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-dark text-white">
+                <i class="fas fa-layer-group me-2"></i>Institution Courses
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="coursesTable">
+                        <thead>
+                            <tr>
+                                <th>Institution</th>
+                                <th>Course</th>
+                                <th>Code</th>
+                                <th>Type</th>
+                                <th>Legacy Subject</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($courses as $course): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($course['institution_name']) ?></td>
+                                    <td><?= htmlspecialchars($course['course_name']) ?></td>
+                                    <td><?= htmlspecialchars($course['course_code'] ?: '-') ?></td>
+                                    <td><?= htmlspecialchars($course['course_type']) ?></td>
+                                    <td><?= htmlspecialchars($course['subject_name'] ?: '-') ?></td>
+                                    <td><?= htmlspecialchars($course['status']) ?></td>
+                                    <td>
+                                        <?php if ($course['status'] === 'active'): ?>
+                                            <form method="POST" action="" onsubmit="return confirm('Deactivate this course?');">
+                                                <input type="hidden" name="course_id" value="<?= (int)$course['id'] ?>">
+                                                <button type="submit" name="deactivate_course" class="btn btn-outline-danger btn-sm">
+                                                    <i class="fas fa-ban"></i> Deactivate
+                                                </button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="text-muted">Inactive</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if (!$courses): ?>
+                                <tr><td colspan="7" class="text-center text-muted">No courses found.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     <?php endif; ?>
 
     <div class="row">
@@ -330,6 +531,13 @@ $(document).ready(function() {
             { "orderable": false, "targets": 2 } // Disable ordering on action column
         ]
     });
+    if ($('#coursesTable').length) {
+        $('#coursesTable').DataTable({
+            pageLength: 10,
+            lengthChange: false,
+            ordering: true
+        });
+    }
 });
 </script>
 

@@ -3,7 +3,8 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
+require_once '../includes/universal_architecture.php';
+//require_once '../license/license_guard.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -70,6 +71,11 @@ $assigned_subjects = [];
 $levels = [];
 $test_titles = [];
 $academic_years = [];
+$universal_context_available = false;
+$universal_institution_id = null;
+$universal_courses = [];
+$organizational_units = [];
+$academic_periods = [];
 
 $edit_question = null;
 
@@ -122,6 +128,50 @@ try {
         session_destroy();
         header("Location: ../login.php?error=Unauthorized");
         exit();
+    }
+
+    $universal_institution_id = examcenterActiveInstitutionId($conn);
+    $universal_context_available = $universal_institution_id !== null
+        && examcenterUniversalTableExists($conn, 'courses')
+        && examcenterUniversalTableExists($conn, 'organizational_units')
+        && examcenterUniversalTableExists($conn, 'academic_periods');
+
+    if ($universal_context_available) {
+        $institutionId = (int)$universal_institution_id;
+
+        $stmt = $conn->prepare(
+            "SELECT id, course_code, course_name, course_type
+             FROM courses
+             WHERE institution_id = ? AND status = 'active'
+             ORDER BY course_name"
+        );
+        $stmt->bind_param('i', $institutionId);
+        $stmt->execute();
+        $universal_courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        $stmt = $conn->prepare(
+            "SELECT ou.id, ou.unit_name, ou.unit_code, ut.type_name
+             FROM organizational_units ou
+             INNER JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id
+             WHERE ou.institution_id = ? AND ou.status = 'active'
+             ORDER BY ut.type_name, ou.unit_name"
+        );
+        $stmt->bind_param('i', $institutionId);
+        $stmt->execute();
+        $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        $stmt = $conn->prepare(
+            "SELECT id, period_name, period_type, period_code
+             FROM academic_periods
+             WHERE institution_id = ? AND status IN ('planned', 'active')
+             ORDER BY period_type, period_name"
+        );
+        $stmt->bind_param('i', $institutionId);
+        $stmt->execute();
+        $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
     }
 
     /*
@@ -223,6 +273,17 @@ try {
     | FETCH AVAILABLE TESTS
     |--------------------------------------------------------------------------
     */
+    $universal_test_columns = $universal_context_available
+        ? ", t.institution_id, t.organizational_unit_id, t.programme_id,
+             t.programme_level_id, t.academic_period_id, t.course_id,
+             t.assessment_group_id, ou.unit_name, c.course_name, ap.period_name"
+        : '';
+    $universal_test_joins = $universal_context_available
+        ? " LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
+            LEFT JOIN courses c ON c.id = t.course_id
+            LEFT JOIN academic_periods ap ON ap.id = t.academic_period_id"
+        : '';
+
     if (!empty($assigned_subjects)) {
 
         $placeholders = implode(
@@ -237,12 +298,14 @@ try {
                 t.subject,
                 t.year,
                 t.duration,
-                t.created_at,
+                t.created_at
+                {$universal_test_columns},
                 al.level_code,
                 al.class_group
             FROM tests t
             INNER JOIN academic_levels al
                 ON al.id = t.academic_level_id
+            {$universal_test_joins}
             WHERE t.subject IN ($placeholders)
             ORDER BY t.created_at DESC
         ");
@@ -286,12 +349,14 @@ try {
                 t.subject,
                 t.year,
                 t.duration,
-                t.created_at,
+                t.created_at
+                {$universal_test_columns},
                 al.level_code,
                 al.class_group
             FROM tests t
             INNER JOIN academic_levels al
                 ON al.id = t.academic_level_id
+            {$universal_test_joins}
             WHERE t.id = ?
               AND t.subject IN ($placeholders)
             LIMIT 1
@@ -1382,6 +1447,44 @@ try {
 
                                 </div>
 
+                                <?php if ($universal_context_available): ?>
+                                    <div class="setup-col-3">
+                                        <label class="form-label" for="course_id">Course</label>
+                                        <select class="form-select" name="course_id" id="course_id">
+                                            <option value="">Optional course</option>
+                                            <?php foreach ($universal_courses as $course): ?>
+                                                <option value="<?= (int)$course['id'] ?>">
+                                                    <?= e(($course['course_code'] ? $course['course_code'] . ' - ' : '') . $course['course_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="setup-col-3">
+                                        <label class="form-label" for="organizational_unit_id">Assessment Unit</label>
+                                        <select class="form-select" name="organizational_unit_id" id="organizational_unit_id">
+                                            <option value="">Optional class, department, faculty or team</option>
+                                            <?php foreach ($organizational_units as $unit): ?>
+                                                <option value="<?= (int)$unit['id'] ?>">
+                                                    <?= e($unit['type_name'] . ': ' . $unit['unit_name'] . ($unit['unit_code'] ? ' (' . $unit['unit_code'] . ')' : '')) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="setup-col-3">
+                                        <label class="form-label" for="academic_period_id">Academic Period</label>
+                                        <select class="form-select" name="academic_period_id" id="academic_period_id">
+                                            <option value="">Optional period</option>
+                                            <?php foreach ($academic_periods as $period): ?>
+                                                <option value="<?= (int)$period['id'] ?>">
+                                                    <?= e($period['period_type'] . ': ' . $period['period_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                <?php endif; ?>
+
 
                                 <div class="setup-col-2">
 
@@ -1664,6 +1767,7 @@ try {
                                                     . $test['subject']
                                                     . ' / '
                                                     . $test['year']
+                                                    . (!empty($test['course_name']) ? ' / ' . $test['course_name'] : '')
                                                 ) ?>
 
                                             </option>
