@@ -195,6 +195,45 @@ if (!$exam_state) {
     $stmt->close();
 }
 
+// Ensure every Core attempt also has a server-side attempt session.
+// Legacy exam_attempts rows remain for backward compatibility.
+$stmt = $conn->prepare(
+    "SELECT id, attempt_no, status
+     FROM exam_attempt_sessions
+     WHERE user_id=? AND test_id=?
+     ORDER BY attempt_no DESC
+     LIMIT 1"
+);
+$stmt->bind_param('ii', $user_id, $test_id);
+$stmt->execute();
+$attemptSession = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$attemptSession || in_array((string)$attemptSession['status'], ['submitted', 'expired'], true)) {
+    $attemptNo = $attemptSession ? ((int)$attemptSession['attempt_no'] + 1) : 1;
+    $startedAt = date('Y-m-d H:i:s');
+    $expiresAt = date('Y-m-d H:i:s', time() + $time_left);
+
+    $stmt = $conn->prepare(
+        "INSERT INTO exam_attempt_sessions
+            (user_id,test_id,attempt_no,institution_membership_id,
+             started_at,last_activity_at,expires_at,status)
+         VALUES (?,?,?,?,?,?,?,'in_progress')"
+    );
+    $stmt->bind_param(
+        'iiiisss',
+        $user_id,
+        $test_id,
+        $attemptNo,
+        $institution_membership_id,
+        $startedAt,
+        $startedAt,
+        $expiresAt
+    );
+    $stmt->execute();
+    $stmt->close();
+}
+
 // Get questions for the test (unchanged)
 $stmt = $conn->prepare("SELECT * FROM new_questions WHERE test_id = ? ORDER BY id");
 if ($stmt === false) {
