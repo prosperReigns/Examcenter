@@ -13,7 +13,8 @@ Examcenter Pro Architecture v2 combines:
 - Idempotent database migrations and legacy-to-universal backfill.
 
 See `docs/PRO_ARCHITECTURE.md` for the architecture contract.
-See `docs/SYSTEM_AUDIT.md` for the latest system audit and known remaining gaps.
+See `docs/UNIVERSAL_SCHEMA.md` for the canonical Universal schema contract.
+See `docs/SYSTEM_AUDIT.md` for the latest system audit and remaining gaps.
 
 ## Local setup
 
