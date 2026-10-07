@@ -176,7 +176,7 @@ if ($universal_teacher_available) {
     $stmt = $conn->prepare(
         "SELECT id, unit_name, unit_code
          FROM organizational_units
-         WHERE institution_id = ? AND status = 'active'
+         WHERE institution_id = ? AND is_active = 1
          ORDER BY unit_name"
     );
     $stmt->bind_param('i', $active_institution_id);
