@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 require_once __DIR__ . '/universal_architecture.php';
 
@@ -18,16 +19,15 @@ function examcenterResolveTestContext(
         return $context;
     }
 
-    $result = $conn->query(
-        "SELECT id FROM institutions WHERE status = 'active' ORDER BY id LIMIT 1"
-    );
-    $institution = $result ? $result->fetch_assoc() : null;
-    if (!$institution) {
-        return $context;
-    }
-    $context['institution_id'] = (int)$institution['id'];
+    $institutionId = examcenterActiveInstitutionId($conn);
+    if ($institutionId === null) return $context;
+    $context['institution_id'] = $institutionId;
 
-    if (examcenterUniversalTableExists($conn, 'courses') && examcenterUniversalTableExists($conn, 'subjects')) {
+    if (
+        examcenterUniversalTableExists($conn, 'courses') &&
+        examcenterUniversalTableExists($conn, 'subjects') &&
+        examcenterUniversalColumnExists($conn, 'courses', 'legacy_subject_id')
+    ) {
         $stmt = $conn->prepare(
             "SELECT c.id
              FROM courses c
@@ -36,13 +36,11 @@ function examcenterResolveTestContext(
              ORDER BY c.id
              LIMIT 1"
         );
-        $stmt->bind_param('is', $context['institution_id'], $subject);
+        $stmt->bind_param('is', $institutionId, $subject);
         $stmt->execute();
         $course = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        if ($course) {
-            $context['course_id'] = (int)$course['id'];
-        }
+        if ($course) $context['course_id'] = (int)$course['id'];
     }
 
     if (
@@ -60,18 +58,11 @@ function examcenterResolveTestContext(
                AND ou.institution_id = ?
              LIMIT 1"
         );
-        $stmt->bind_param(
-            'iii',
-            $academicLevelId,
-            $streamId,
-            $context['institution_id']
-        );
+        $stmt->bind_param('iii', $academicLevelId, $streamId, $institutionId);
         $stmt->execute();
         $unit = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        if ($unit) {
-            $context['organizational_unit_id'] = (int)$unit['id'];
-        }
+        if ($unit) $context['organizational_unit_id'] = (int)$unit['id'];
     }
 
     return $context;
