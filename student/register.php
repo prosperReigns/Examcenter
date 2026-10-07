@@ -3,6 +3,19 @@ session_start();
 require_once '../db.php';
 require_once '../includes/universal_architecture.php';
 
+$conn = Database::getInstance()->getConnection();
+if (
+    examcenterUniversalTableExists($conn, 'institutions') &&
+    examcenterUniversalTableExists($conn, 'tests') &&
+    examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+) {
+    $activeInstitutionId = examcenterActiveInstitutionId($conn);
+    if ($activeInstitutionId !== null) {
+        header('Location: universal_register.php', true, 302);
+        exit;
+    }
+}
+
 // Initialize error variable
 $error = '';
 
