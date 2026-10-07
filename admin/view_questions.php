@@ -261,13 +261,13 @@ $universal_questions_available = $active_institution_id !== null
     && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
 
 if ($universal_questions_available) {
-    $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+    $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY unit_name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+    $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY course_name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -324,8 +324,8 @@ $select_query = "
         q.*,
         t.title AS test_title,
         " . ($universal_questions_available
-            ? "COALESCE(ou.unit_name, c.class_name, q.class) AS class,
-               co.course_name, ap.period_name,
+            ? "COALESCE(ou.name, c.class_name, q.class) AS class,
+               co.name, ap.name,
                t.organizational_unit_id, t.course_id, t.academic_period_id"
             : "COALESCE(c.class_name, q.class) AS class") . ",
         t.subject
@@ -349,7 +349,7 @@ $select_query = "
 $params = [];
 $types = '';
 $question_order = $universal_questions_available
-    ? 'COALESCE(ou.unit_name, c.class_name, q.class)'
+    ? 'COALESCE(ou.name, c.class_name, q.class)'
     : 'COALESCE(c.class_name, q.class)';
 
 /*
