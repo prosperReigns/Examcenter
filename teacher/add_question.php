@@ -154,7 +154,7 @@ try {
             "SELECT ou.id, ou.name AS unit_name, ou.code, ut.name
              FROM organizational_units ou
              INNER JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id
-             WHERE ou.institution_id = ? AND ou.is_active = 'active'
+             WHERE ou.institution_id = ? AND ou.is_active = 1
              ORDER BY ut.name, ou.name"
         );
         $stmt->bind_param('i', $institutionId);
@@ -163,10 +163,10 @@ try {
         $stmt->close();
 
         $stmt = $conn->prepare(
-            "SELECT id, period_name, period_type, period_code
+            "SELECT id, name AS period_name, period_type, code AS period_code
              FROM academic_periods
              WHERE institution_id = ? AND status IN ('planned', 'active')
-             ORDER BY period_type, period_name"
+             ORDER BY period_type, name"
         );
         $stmt->bind_param('i', $institutionId);
         $stmt->execute();
