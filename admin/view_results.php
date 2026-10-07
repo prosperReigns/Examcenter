@@ -121,9 +121,9 @@ try {
     $student_class_select = 'c.class_name AS student_class';
     $class_condition = 'c.class_name = ?';
     if ($universal_reporting_available) {
-        $student_class_select = 'COALESCE(ou.name, c.class_name, s.class) AS student_class';
-        $class_condition = 'COALESCE(ou.name, c.class_name, s.class) = ?';
-        $universal_select = ", ccourse.name, ap.name, t.organizational_unit_id,
+        $student_class_select = 'COALESCE(ou.name AS unit_name, c.class_name, s.class) AS student_class';
+        $class_condition = 'COALESCE(ou.name AS unit_name, c.class_name, s.class) = ?';
+        $universal_select = ", ccourse.name AS course_name, ap.name AS period_name, t.organizational_unit_id,
             t.course_id, t.academic_period_id";
         $universal_joins = "
             LEFT JOIN organizational_units ou
@@ -132,7 +132,7 @@ try {
                 ON ccourse.id = t.course_id
             LEFT JOIN academic_periods ap
                 ON ap.id = COALESCE(r.academic_period_id, t.academic_period_id)";
-        $universal_select = str_replace('c.course_name', 'ccourse.name', $universal_select);
+        $universal_select = str_replace('c.course_name', 'ccourse.name AS course_name', $universal_select);
         if (examcenterUniversalColumnExists($conn, 'tests', 'institution_id')) {
             $universal_scope_condition = ' AND t.institution_id = ?';
         }
