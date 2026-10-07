@@ -128,7 +128,7 @@ These were identified but are intentionally not disguised as "implemented" by th
    - enterprise customisation
    - multi-campus central administration beyond the current base module
 4. Existing Pro CRUD pages need a second security pass for CSRF, scoped institution access and role-specific authorization.
-5. The server-side `exam_attempt_sessions` model is now present, but the complete browser recovery flow should be migrated from the legacy per-question `exam_attempts` timing model to it.
+5. Server-side `exam_attempt_sessions` are now created by Core exam delivery and updated by answer saving/submission. The legacy per-question `exam_attempts` table remains as a compatibility store and can be removed only after a controlled data migration.
 6. The current repository contains legacy and Universal schemas simultaneously. They must remain backward compatible until a controlled migration removes the legacy dependency.
 
 ## Product boundary confirmed
