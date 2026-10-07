@@ -72,7 +72,7 @@ try {
             $conn->begin_transaction();
             if ($action === 'course') {
                 $course_type = trim($_POST['course_type'] ?? 'course') ?: 'course';
-                $stmt = $conn->prepare("INSERT INTO courses (institution_id, course_code, course_name, course_type) VALUES (?, NULLIF(?, ''), ?, ?)");
+                $stmt = $conn->prepare("INSERT INTO courses (institution_id, code, name, course_type) VALUES (?, NULLIF(?, ''), ?, ?)");
                 $stmt->bind_param('isss', $institution_id, $code, $name, $course_type);
                 $stmt->execute();
                 $stmt->close();
@@ -80,14 +80,14 @@ try {
             } else {
                 $type_code = strtoupper(trim($_POST['unit_type'] ?? 'DEPARTMENT'));
                 $parent_id = (int)($_POST['parent_id'] ?? 0);
-                $stmt = $conn->prepare("SELECT id FROM organizational_unit_types WHERE type_code = ? LIMIT 1");
+                $stmt = $conn->prepare("SELECT id FROM organizational_unit_types WHERE code = ? LIMIT 1");
                 $stmt->bind_param('s', $type_code);
                 $stmt->execute();
                 $type = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
                 if (!$type) {
                     $type_name = ucwords(strtolower(str_replace('_', ' ', $type_code)));
-                    $stmt = $conn->prepare("INSERT INTO organizational_unit_types (type_code, type_name) VALUES (?, ?)");
+                    $stmt = $conn->prepare("INSERT INTO organizational_unit_types (code, name) VALUES (?, ?)");
                     $stmt->bind_param('ss', $type_code, $type_name);
                     $stmt->execute();
                     $type_id = $stmt->insert_id;
@@ -180,9 +180,9 @@ if ($result) {
 if ($universal_schema_available) {
     $result = $conn->query("SELECT ou.id, ou.name, ou.code, ou.is_active, COALESCE(ut.name, 'Unit') AS type_name, p.name AS parent_name FROM organizational_units ou JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id LEFT JOIN organizational_units p ON p.id = ou.parent_id WHERE ou.institution_id = " . (int)$institution_id . " ORDER BY ou.name");
     if ($result) while ($row = $result->fetch_assoc()) $units[] = $row;
-    $result = $conn->query("SELECT id, course_code, course_name, course_type, is_active FROM courses WHERE institution_id = " . (int)$institution_id . " ORDER BY course_name");
+    $result = $conn->query("SELECT id, code AS course_code, name AS course_name, course_type, is_active FROM courses WHERE institution_id = " . (int)$institution_id . " ORDER BY course_name");
     if ($result) while ($row = $result->fetch_assoc()) $courses[] = $row;
-    $result = $conn->query("SELECT DISTINCT type_code, type_name FROM organizational_unit_types ORDER BY type_name");
+    $result = $conn->query("SELECT DISTINCT code AS type_code, name AS type_name FROM organizational_unit_types ORDER BY name");
     if ($result) while ($row = $result->fetch_assoc()) $unit_types[] = $row;
 }
 ?>
