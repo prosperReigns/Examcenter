@@ -111,6 +111,21 @@ if (str_contains($universal, 'period_code')) {
     auditFail('Universal period helper still assumes academic_periods.period_code.');
 }
 
+// Every explicit require_pro('feature') code must be registered in ProFeatures.
+$featureFile = file_get_contents($root . '/includes/pro_features.php') ?: '';
+preg_match_all("/='([a-z0-9_]+)'/", $featureFile, $featureMatches);
+$registeredFeatures = array_fill_keys($featureMatches[1] ?? [], true);
+foreach ($phpFiles as $path) {
+    $content = file_get_contents($root . '/' . $path) ?: '';
+    if (preg_match_all("/require_pro\\(\\s*['\"]([^'\"]+)['\"]/", $content, $matches)) {
+        foreach ($matches[1] as $feature) {
+            if ($feature !== 'pro' && empty($registeredFeatures[$feature])) {
+                auditFail("Unregistered Pro feature code '{$feature}' in {$path}.");
+            }
+        }
+    }
+}
+
 $hardcodedUniversal = [
     'super_admin/system_setup.php',
     'super_admin/manage_classes.php',
