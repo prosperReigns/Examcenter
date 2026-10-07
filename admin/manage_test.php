@@ -65,8 +65,8 @@ $class_expression = "CONCAT(al.level_code, ' ', s.stream_name)";
 if ($universal_tests_available) {
     $class_expression = "COALESCE(ou.name, CONCAT(al.level_code, ' ', s.stream_name))";
     $universal_select = ", i.name AS institution_name, ou.name AS unit_name,
-        co.code, co.name AS course_name, p.name AS programme_name,
-        pl.name AS level_name AS programme_level_name, ap.name AS period_name,
+        co.code AS course_code, co.name AS course_name, p.name AS programme_name,
+        pl.name AS programme_level_name, ap.name AS period_name,
         ag.name AS group_name";
     $universal_joins = "
         LEFT JOIN institutions i ON i.id = t.institution_id
@@ -76,7 +76,7 @@ if ($universal_tests_available) {
         LEFT JOIN programme_levels pl ON pl.id = t.programme_level_id
         LEFT JOIN academic_periods ap ON ap.id = t.academic_period_id
         LEFT JOIN assessment_groups ag ON ag.id = t.assessment_group_id";
-    $universal_group = ", i.name AS institution_name, ou.name AS unit_name, co.code,
+    $universal_group = ", i.name AS institution_name, ou.name AS unit_name, co.code AS course_code,
         co.name AS course_name, p.name AS programme_name, pl.name AS level_name, ap.name AS period_name,
         ag.name AS group_name, t.institution_id, t.organizational_unit_id,
         t.programme_id, t.programme_level_id, t.academic_period_id,
