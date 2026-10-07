@@ -10,6 +10,18 @@ on:
 jobs:
   php-audit:
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,3 +41,12 @@ jobs:
 
       - name: Static Examcenter audit
         run: php scripts/audit_system.php
+
+      - name: MariaDB Universal end-to-end test
+        env:
+          EXAMCENTER_DB_HOST: 127.0.0.1
+          EXAMCENTER_DB_PORT: 3306
+          EXAMCENTER_DB_USER: root
+          EXAMCENTER_DB_PASSWORD: root
+          EXAMCENTER_DB_NAME: cbt_app_ci
+        run: php scripts/integration_mariadb.php
