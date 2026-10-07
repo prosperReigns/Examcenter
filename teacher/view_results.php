@@ -234,7 +234,7 @@ try {
     }
 
     if ($universal_reporting_available) {
-        $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY name");
+        $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -246,7 +246,7 @@ try {
         $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT id, period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY name");
+        $stmt = $conn->prepare("SELECT id, name AS period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
