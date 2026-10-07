@@ -56,6 +56,7 @@ $required = [
     'database/migrations/20261005_0002_theory_assessment.sql',
     'database/migrations/20261005_0003_pro_assessment_suite.sql',
     'database/migrations/20261007_0004_system_audit_hardening.sql',
+    'database/migrations/20261007_0005_legacy_universal_reconciliation.php',
     'database/migrate.php',
     'includes/pro.php',
     'includes/pro_features.php',
