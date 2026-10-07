@@ -41,44 +41,63 @@ $active_institution_id = $universal_exam_available
 $universal_exam_available = $universal_exam_available
     && $active_institution_id !== null;
 
-// Sanitize session inputs
+// Resolve the active assessment from the session. Universal mode does not
+// require a legacy class/academic-level record.
 $user_id = (int)$_SESSION['student_id'];
-$class_id = (int)$_SESSION['student_class'];
+$subject = (string)$_SESSION['student_subject'];
+$test_title = (string)$_SESSION['test_title'];
+$test_id_from_session = (int)($_SESSION['current_test_id'] ?? 0);
 
-$stmt = $conn->prepare("SELECT academic_level_id FROM classes WHERE id = ?");
-$stmt->bind_param("i", $class_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$class_row = $result->fetch_assoc();
-$stmt->close();
+$universal_exam_available =
+    examcenterUniversalTableExists($conn, 'institutions') &&
+    examcenterUniversalTableExists($conn, 'institution_memberships') &&
+    examcenterUniversalColumnExists($conn, 'tests', 'institution_id') &&
+    examcenterUniversalColumnExists($conn, 'exam_attempts', 'institution_membership_id') &&
+    !empty($_SESSION['institution_membership_id']);
 
-if (!$class_row) {
-    die("Invalid class selected.");
+$active_institution_id = $universal_exam_available
+    ? examcenterActiveInstitutionId($conn)
+    : null;
+
+$academic_level_id = 0;
+
+if (!$universal_exam_available) {
+    $class_id = (int)$_SESSION['student_class'];
+    $stmt = $conn->prepare("SELECT academic_level_id FROM classes WHERE id = ?");
+    $stmt->bind_param("i", $class_id);
+    $stmt->execute();
+    $class_row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$class_row) {
+        die("Invalid class selected.");
+    }
+
+    $academic_level_id = (int)$class_row['academic_level_id'];
 }
 
-$academic_level_id = (int)$class_row['academic_level_id'];
-
-$subject = $_SESSION['student_subject'];
-$test_title = $_SESSION['test_title'];
-
-// Debug session variables
-error_log("Session: user_id=$user_id, academic_level=$academic_level_id, subject=$subject, title=$test_title");
-
-// Get test details including duration
-$test_id_from_session = (int)($_SESSION['current_test_id'] ?? 0);
-$test_scope = $universal_exam_available
-    ? " AND institution_id = ?"
-    : '';
+$test_scope = $universal_exam_available ? " AND institution_id = ?" : '';
 
 if ($test_id_from_session > 0) {
-    $stmt = $conn->prepare("SELECT id, duration FROM tests WHERE id = ? {$test_scope} LIMIT 1");
+    $stmt = $conn->prepare(
+        "SELECT id, duration FROM tests
+         WHERE id = ? {$test_scope}
+         LIMIT 1"
+    );
 } else {
-    $stmt = $conn->prepare("SELECT id, duration FROM tests WHERE title = ? AND academic_level_id = ? AND subject = ? {$test_scope} LIMIT 1");
+    $stmt = $conn->prepare(
+        "SELECT id, duration FROM tests
+         WHERE title = ? AND academic_level_id = ? AND subject = ?
+         {$test_scope}
+         LIMIT 1"
+    );
 }
-if ($stmt === false) {
-    error_log("Prepare failed: SELECT id, duration FROM tests - " . $conn->error);
-    die("Error preparing test query: " . $conn->error);
+
+if (!$stmt) {
+    error_log("Prepare failed: SELECT test - " . $conn->error);
+    die("Unable to load assessment.");
 }
+
 if ($test_id_from_session > 0) {
     if ($universal_exam_available) {
         $stmt->bind_param('ii', $test_id_from_session, $active_institution_id);
@@ -86,40 +105,25 @@ if ($test_id_from_session > 0) {
         $stmt->bind_param('i', $test_id_from_session);
     }
 } elseif ($universal_exam_available) {
-    $stmt->bind_param('sisi', $test_title, $academic_level_id, $_SESSION['student_subject'], $active_institution_id);
+    $stmt->bind_param('sisi', $test_title, $academic_level_id, $subject, $active_institution_id);
 } else {
-    $stmt->bind_param('sis', $test_title, $academic_level_id, $_SESSION['student_subject']);
+    $stmt->bind_param('sis', $test_title, $academic_level_id, $subject);
 }
+
 $stmt->execute();
-$test_result = $stmt->get_result();
-$test = $test_result->fetch_assoc();
+$test = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$test) {
-    error_log("No test found for title='$test_title', academic_level='$academic_level_id', subject='$subject'");
-    die("No test available for this combination of test title, class, and subject.");
+    die("No assessment is available for this candidate.");
 }
 
-
-$test_id = $test['id'];
+$test_id = (int)$test['id'];
 $_SESSION['current_test_id'] = $test_id;
-$exam_duration = isset($test['duration']) ? (int)$test['duration'] * 60 : 3600; // Convert minutes to seconds, default 60 minutes
+$exam_duration = isset($test['duration'])
+    ? (int)$test['duration'] * 60
+    : 3600;
 
-$institution_membership_id = null;
-if ($universal_exam_available) {
-    $stmt = $conn->prepare(
-        "SELECT id FROM institution_memberships
-         WHERE institution_id = ? AND legacy_student_id = ?
-         LIMIT 1"
-    );
-    $stmt->bind_param('ii', $active_institution_id, $user_id);
-    $stmt->execute();
-    $membership = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    $institution_membership_id = $membership['id'] ?? null;
-}
-
-// ===============================
 // CHECK RESULT & REATTEMPT STATUS
 // ===============================
 $stmt = $conn->prepare("
