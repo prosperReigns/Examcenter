@@ -227,7 +227,7 @@ try {
         ? ' AND t.institution_id = ?'
         : '';
     $universal_class = $universal_questions_available
-        ? 'COALESCE(ou.unit_name, al.level_code)'
+        ? 'COALESCE(ou.name, al.level_code)'
         : 'al.level_code';
 
     $organizational_units = [];
@@ -235,13 +235,13 @@ try {
     $academic_periods = [];
 
     if ($universal_questions_available) {
-        $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+        $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY unit_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+        $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY course_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
