@@ -64,6 +64,9 @@
               // mathematical grammar before Function() is used; no identifiers,
               // properties, strings, or arbitrary JavaScript are accepted.
               if (!/^[0-9+\-*/().^!π\s_a-zA-Z]+$/.test(expr)) throw new Error('Invalid characters');
+              if (/\b(?!sin\b|cos\b|tan\b|sqrt\b|log10\b|factorial\b)[A-Za-z_][A-Za-z0-9_]*\b/.test(expr)) {
+                  throw new Error('Invalid identifier');
+              }
               const normalized = expr
                   .replace(/π/g, 'Math.PI')
                   .replace(/\^/g, '**')
@@ -73,9 +76,6 @@
                   .replace(/\bsqrt\(/g, 'Math.sqrt(')
                   .replace(/\blog10\(/g, 'Math.log10(')
                   .replace(/factorial\(/g, 'factorial(');
-              if (/\b(?!Math\.(sin|cos|tan|sqrt|log10)|factorial\b)[A-Za-z_$][A-Za-z0-9_$]*\b/.test(normalized)) {
-                  throw new Error('Invalid function');
-              }
               const factorial = (n) => {
                   if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n || n > 170) throw new Error('Invalid factorial');
                   let r = 1; for (let i = 2; i <= n; i++) r *= i; return r;
