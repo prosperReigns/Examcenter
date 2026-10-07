@@ -11,7 +11,7 @@ if (!isset($_SESSION['student_id']) || !isset($_SESSION['exam_questions']) || !i
 
 $conn = Database::getInstance()->getConnection();
 $student_id = $_SESSION['student_id'];
-$test_id = $_SESSION['current_test_id'];
+$test_id = (int)$_SESSION['current_test_id'];
 $questions = $_SESSION['exam_questions'];
 $submitted_answers = $_POST['answers'] ?? [];
 $submit_reason = $_POST['submit_reason'] ?? 'manual';
