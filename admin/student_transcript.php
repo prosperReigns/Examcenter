@@ -200,9 +200,9 @@ if ($universal_transcript_available && examcenterUniversalTableExists($conn, 'in
         "SELECT ou.name AS unit_name, ou.code
          FROM institution_memberships im
          INNER JOIN unit_memberships um
-             ON um.institution_membership_id = im.id
+             ON um.person_id = im.person_id
          INNER JOIN organizational_units ou
-             ON ou.id = um.organizational_unit_id
+             ON ou.id = um.unit_id
          WHERE im.legacy_student_id = ?
            AND im.status = 'active'
            AND um.status = 'active'
