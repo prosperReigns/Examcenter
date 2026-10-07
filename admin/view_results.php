@@ -139,13 +139,13 @@ try {
     }
 
     if ($universal_reporting_available) {
-        $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY unit_name");
+        $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY unit_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY course_name");
+        $stmt = $conn->prepare("SELECT id, code AS course_code, name AS course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY course_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
