@@ -52,8 +52,8 @@ if ($universal_available) {
         ou.name AS unit_name,
         co.code,
         co.name AS course_name,
-        p.programme_name,
-        pl.level_name AS programme_level_name,
+        p.name AS programme_name,
+        pl.name AS programme_level_name,
         ap.name AS period_name,
         ap.period_type";
     $joins .= "
