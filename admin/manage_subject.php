@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $stmt = $conn->prepare(
                     "INSERT INTO courses (
-                        institution_id, course_code, course_name, course_type,
+                        institution_id, code, name, course_type,
                         description, legacy_subject_id
                     ) VALUES (?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, 0))"
                 );
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Course management is unavailable because the universal course schema is not installed.';
         } else {
             $course_id = (int)($_POST['course_id'] ?? 0);
-            $stmt = $conn->prepare("UPDATE courses SET status = 'inactive' WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE courses SET is_active = 0 WHERE id = ?");
             $stmt->bind_param('i', $course_id);
             $success = $stmt->execute() ? 'Course deactivated successfully.' : 'Unable to deactivate course.';
             $stmt->close();
@@ -186,7 +186,7 @@ if ($course_schema_available) {
          FROM courses c
          INNER JOIN institutions i ON i.id = c.institution_id
          LEFT JOIN subjects s ON s.id = c.legacy_subject_id
-         ORDER BY i.name, c.course_name"
+         ORDER BY i.name, c.name"
     );
     if ($result) {
         while ($row = $result->fetch_assoc()) {
