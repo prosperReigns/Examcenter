@@ -11,18 +11,18 @@ const MIGRATION_KEYS = [
     '20261007_0005_legacy_universal_reconciliation',
 ];
 
-$db = Database::connection();
+$connection = Database::connection();
 
-if (!$db->query("CREATE TABLE IF NOT EXISTS schema_migrations (
+if (!$connection->query("CREATE TABLE IF NOT EXISTS schema_migrations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     migration_key VARCHAR(191) NOT NULL UNIQUE,
     applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")) {
-    throw new RuntimeException('Unable to create schema_migrations: ' . $db->error);
+    throw new RuntimeException('Unable to create schema_migrations: ' . $connection->error);
 }
 
 foreach (MIGRATION_KEYS as $migrationKey) {
-    $check = $db->prepare(
+    $check = $connection->prepare(
         "SELECT id FROM schema_migrations WHERE migration_key = ? LIMIT 1"
     );
     $check->bind_param('s', $migrationKey);
@@ -39,21 +39,21 @@ foreach (MIGRATION_KEYS as $migrationKey) {
     $phpPath = __DIR__ . '/migrations/' . $migrationKey . '.php';
 
     if (is_file($phpPath)) {
-        $GLOBALS['db'] = $db;
+        $GLOBALS['db'] = $connection;
         try {
             require $phpPath;
         } finally {
             unset($GLOBALS['db']);
         }
 
-        $stmt = $db->prepare(
+        $stmt = $connection->prepare(
             "INSERT INTO schema_migrations (migration_key) VALUES (?)"
         );
         $stmt->bind_param('s', $migrationKey);
         if (!$stmt->execute()) {
             $stmt->close();
             throw new RuntimeException(
-                "Could not record migration {$migrationKey}: " . $db->error
+                "Could not record migration {$migrationKey}: " . $connection->error
             );
         }
         $stmt->close();
@@ -69,32 +69,32 @@ foreach (MIGRATION_KEYS as $migrationKey) {
         );
     }
 
-    if (!$db->multi_query($sql)) {
+    if (!$connection->multi_query($sql)) {
         throw new RuntimeException(
-            "Migration failed ({$migrationKey}): {$db->error}"
+            "Migration failed ({$migrationKey}): {$connection->error}"
         );
     }
 
     do {
-        if ($result = $db->store_result()) {
+        if ($result = $connection->store_result()) {
             $result->free();
         }
-    } while ($db->more_results() && $db->next_result());
+    } while ($connection->more_results() && $connection->next_result());
 
-    if ($db->errno) {
+    if ($connection->errno) {
         throw new RuntimeException(
-            "Migration failed ({$migrationKey}): {$db->error}"
+            "Migration failed ({$migrationKey}): {$connection->error}"
         );
     }
 
-    $stmt = $db->prepare(
+    $stmt = $connection->prepare(
         "INSERT INTO schema_migrations (migration_key) VALUES (?)"
     );
     $stmt->bind_param('s', $migrationKey);
     if (!$stmt->execute()) {
         $stmt->close();
         throw new RuntimeException(
-            "Could not record migration {$migrationKey}: " . $db->error
+            "Could not record migration {$migrationKey}: " . $connection->error
         );
     }
     $stmt->close();
