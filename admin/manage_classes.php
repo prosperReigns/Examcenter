@@ -178,7 +178,7 @@ if ($result) {
 }
 
 if ($universal_schema_available) {
-    $result = $conn->query("SELECT ou.id, ou.name, ou.code, ou.is_active, COALESCE(ut.type_name, 'Unit') AS type_name, p.name AS parent_name FROM organizational_units ou JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id LEFT JOIN organizational_units p ON p.id = ou.parent_unit_id WHERE ou.institution_id = " . (int)$institution_id . " ORDER BY ou.name");
+    $result = $conn->query("SELECT ou.id, ou.name, ou.code, ou.is_active, COALESCE(ut.name, 'Unit') AS type_name, p.name AS parent_name FROM organizational_units ou JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id LEFT JOIN organizational_units p ON p.id = ou.parent_unit_id WHERE ou.institution_id = " . (int)$institution_id . " ORDER BY ou.name");
     if ($result) while ($row = $result->fetch_assoc()) $units[] = $row;
     $result = $conn->query("SELECT id, course_code, course_name, course_type, status FROM courses WHERE institution_id = " . (int)$institution_id . " ORDER BY course_name");
     if ($result) while ($row = $result->fetch_assoc()) $courses[] = $row;
