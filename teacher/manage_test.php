@@ -1551,6 +1551,14 @@ try {
 
                                         </a>
 
+                                        <a
+                                            class="btn btn-secondary"
+                                            href="theory_assessment.php?test_id=<?= (int) $row['id'] ?>"
+                                        >
+                                            <i class="fas fa-pen-nib"></i>
+                                            <span>AI Theory</span>
+                                        </a>
+
 
                                         <button
                                             type="button"

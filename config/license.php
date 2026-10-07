@@ -1,131 +1,38 @@
 <?php
-
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | License Server
-    |--------------------------------------------------------------------------
-    */
-
-    "server" => "https://5138-197-211-53-98.ngrok-free.app",
-
-    "portal_url" =>
-        "https://5138-197-211-53-98.ngrok-free.app",
-
-    /*
-    |--------------------------------------------------------------------------
-    | API Version
-    |--------------------------------------------------------------------------
-    */
-
+    "server" => getenv("EXAMCENTER_LICENSE_SERVER") ?: "",
+    "portal_url" => getenv("EXAMCENTER_LICENSE_PORTAL_URL") ?: "",
     "api_version" => "v1",
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Connection
-    |--------------------------------------------------------------------------
-    */
-
     "timeout" => 20,
-
     "connect_timeout" => 5,
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | License Verification
-    |--------------------------------------------------------------------------
-    */
-
     "verification_interval" => 7,
-
     "grace_period" => 7,
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | API Endpoints
-    |--------------------------------------------------------------------------
-    */
-
     "endpoints" => [
-
-        "trial_url" =>
-            "/trial",
-
-
-        "purchase_start" =>
-            "/api/public/start-purchase",
-
-
-        /*
-        Check purchase status
-        */
-
-        "purchase_status" =>
-            "/api/public/purchase",
-
-
-        /*
-        Verify signed license
-        */
-
-        "verify" =>
-            "/api/public/validate-license",
-
-
-        /*
-        Heartbeat
-        */
-
-        "heartbeat" =>
-            "/api/public/devices/heartbeat",
-
-        "checkout" =>
-            "/activation",
-
-        "license_delivery" =>
-            "/api/public/license",
-
-        "plans" =>
-            "/public/plans",
-
+        "trial_url" => "/trial",
+        "purchase_start" => "/api/public/start-purchase",
+        "purchase_status" => "/api/public/purchase",
+        "verify" => "/api/public/validate-license",
+        "heartbeat" => "/api/public/devices/heartbeat",
+        "checkout" => "/activation",
+        "license_delivery" => "/api/public/license",
+        "plans" => "/public/plans",
     ],
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Local Storage
-    |--------------------------------------------------------------------------
-    */
-
+    "pro_v2" => [
+        "server" => getenv("EXAMCENTER_PRO_SERVER") ?: (getenv("EXAMCENTER_LICENSE_SERVER") ?: ""),
+        "timeout" => 20,
+        "connect_timeout" => 5,
+        "plans" => "/api/v2/public/plans",
+        "activate" => "/api/v2/public/entitlements/activate",
+        "heartbeat" => "/api/v2/public/entitlements/heartbeat",
+        "device_change" => "/api/v2/public/entitlements/device-change",
+        "feature_check" => "/api/v2/public/entitlements/feature-check",
+    ],
     "storage" => [
-
-        "license_file" =>
-            __DIR__ .
-            "/../license/storage/license.lic",
-
-        "cache_file" =>
-            __DIR__ .
-            "/../license/cache.json",
-
+        "license_file" => __DIR__ . "/../license/storage/license.lic",
+        "cache_file" => __DIR__ . "/../license/cache.json",
+        "pro_entitlement_file" => __DIR__ . "/../license/storage/pro-entitlement.enc",
     ],
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cryptography
-    |--------------------------------------------------------------------------
-    */
-
     "crypto" => [
-
-        "public_key" =>
-            __DIR__ .
-            "/../keys/public.pem",
-
+        "public_key" => __DIR__ . "/../keys/public.pem",
     ],
-
 ];

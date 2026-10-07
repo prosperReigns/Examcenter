@@ -1,44 +1,14 @@
 <?php
-
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Application
-    |--------------------------------------------------------------------------
-    */
-
-    "name" =>
-        "examcenter",
-
+    "name" => "examcenter",
     "display_name" => "CBT Examination System",
-
-    "version" => "1.0.0",
-
-    "environment" => "production",
-
-    "vendor" =>
-        "ExamCenter Technologies",
-
-    "timezone" => "Africa/Lagos",
-
-    "license_secret" =>
-        "315c19cb96ec49f6f2ebf648222b32f1bc905eb491670543beedd4b92eaa14ea",
-
-    "api_secret" =>                 "4cfe382d9298299ae53887383c4162b934401654f627325848a3ff366d703f21",
-
-    'base_url' => '',
-
-     /*
-    |--------------------------------------------------------------------------
-    | Support
-    |--------------------------------------------------------------------------
-    */
-
-    "support_email" =>
-        "support@examcenter.com",
-
-
-    "support_phone" =>
-        "+234 XXX XXX XXXX",
+    "version" => getenv("EXAMCENTER_VERSION") ?: "2.0.0",
+    "environment" => getenv("EXAMCENTER_ENV") ?: "production",
+    "vendor" => "ExamCenter Technologies",
+    "timezone" => getenv("EXAMCENTER_TIMEZONE") ?: "Africa/Lagos",
+    "license_secret" => getenv("EXAMCENTER_LICENSE_SECRET") ?: "",
+    "api_secret" => getenv("EXAMCENTER_API_SECRET") ?: "",
+    "base_url" => getenv("EXAMCENTER_BASE_URL") ?: "",
+    "support_email" => getenv("EXAMCENTER_SUPPORT_EMAIL") ?: "support@examcenter.com",
+    "support_phone" => getenv("EXAMCENTER_SUPPORT_PHONE") ?: "+234 XXX XXX XXXX",
 ];

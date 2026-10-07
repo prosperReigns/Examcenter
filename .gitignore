@@ -2,3 +2,9 @@
 keys/
 storage/
 vendor/
+# Examcenter runtime state
+license/installation.id
+license/cache.json
+license/security.log
+license/storage/*.enc
+license/storage/*.lic

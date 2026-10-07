@@ -2,8 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once '../includes/universal_architecture.php';
-//require_once '../license/license_guard.php';
+require_once __DIR__ . '/../license/license_guard.php';
+require_once __DIR__ . '/../includes/pro.php';
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);
@@ -572,6 +572,8 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     <script>
         let currentIndex = <?php echo $current_index; ?>;
         const totalQuestions = <?php echo count($questions); ?>;
+        const proSecureEnabled = <?php echo $proSecureEnabled ? 'true' : 'false'; ?>;
+        const securePolicy = <?php echo json_encode($securePolicy, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
         const containers = document.querySelectorAll('.question-container');
         const questionBoxes = document.querySelectorAll('.question-box');
         const timerEl = document.getElementById('examTimer');
@@ -583,6 +585,12 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         let timerWarning = false;
         let timerDanger = false;
         let tabSwitchCount = 0;
+        const maxSecureViolations = Number(securePolicy.max_violations || 3);
+        function logSecureEvent(type, severity='medium', evidence={}) {
+            if (!proSecureEnabled) return;
+            const data = new FormData(); data.append('test_id', '<?php echo $test_id; ?>'); data.append('student_id', '<?php echo $user_id; ?>'); data.append('event_type', type); data.append('severity', severity); data.append('evidence', JSON.stringify(evidence)); data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
+            fetch('pro_security_event.php',{method:'POST',body:data}).catch(()=>{});
+        }
 
         // Timer
         function startTimer() {

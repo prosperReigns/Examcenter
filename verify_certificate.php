@@ -1,0 +1,5 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__.'/pro/ProAssessmentService.php';
+$token=preg_replace('/[^a-f0-9]/i','',(string)($_GET['token']??''));$certificate=$token?(new ProAssessmentService())->verifyCertificate($token):null;
+?><!doctype html><html><head><meta charset="utf-8"><title>Certificate Verification | Examcenter</title><link rel="stylesheet" href="css/bootstrap.min.css"></head><body><div class="container py-5"><div class="card p-4 mx-auto" style="max-width:720px"><h2>Certificate Verification</h2><?php if($certificate):?><div class="alert alert-success">Valid certificate record</div><dl><dt>Certificate No.</dt><dd><?=htmlspecialchars($certificate['certificate_no'])?></dd><dt>Recipient</dt><dd><?=htmlspecialchars($certificate['recipient_name'])?></dd><dt>Institution</dt><dd><?=htmlspecialchars($certificate['institution_name'])?></dd><dt>Issued</dt><dd><?=htmlspecialchars($certificate['issued_at'])?></dd><dt>Status</dt><dd><?=htmlspecialchars($certificate['status'])?></dd></dl><?php else:?><p class="text-muted">Enter a certificate verification token in the URL.</p><?php endif;?></div></div></body></html>

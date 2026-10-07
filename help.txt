@@ -1,48 +1,37 @@
-SECTION 1: PROJECT OVERVIEW
-
-Examcenter is a locally hosted, offline-first computer-based testing
-application. The repository contains PHP pages, MySQLi database access,
-HTML/CSS/JavaScript interfaces, question authoring, question banks,
-scheduled subject examinations, student attempts, scoring/results, teacher
-and administrator management, audit logging, licensing, and database backup
-features.
-
-The current database name in db.php is cbt_app_db. The application connects
-to 127.0.0.1 on port 3307 as root with an empty password in the checked-in
-configuration and sets the connection character set to utf8mb4. The backup
-configuration uses the same database name but separately specifies localhost
-and does not specify the application port; this should be reconciled only as
-part of a later configuration review, not during this documentation phase.
-
-The current model is primarily Nigerian primary/secondary-school-oriented.
-The supplied schema explicitly models PRIMARY, JSS and SS in subject_levels,
-and JSS/SS in academic_levels.class_group. The application also uses class,
-stream, academic level, subject, student and teacher concepts directly.
-These are current implementation facts, not universal requirements.
-
-The target vision is a configurable assessment platform for schools,
-universities, colleges, training providers, certification bodies and
-corporate organizations. Institution type, organizational units, academic or
-professional classifications, memberships, assessment eligibility and exam
-execution must become separable concepts. This target architecture is
-PROPOSED - NOT YET IMPLEMENTED.
-
-============================================================
-SECTION 2: EXISTING DATABASE ARCHITECTURE
-============================================================
-
-The complete supplied CREATE TABLE text is preserved immediately below.
-It is the repository's documented schema source, not proof of the live
-database. No live database metadata was available during this review, so
-SHOW CREATE TABLE, actual indexes, triggers, existing rows and migrations
-remain UNVERIFIED. The SQL below must not be executed as a migration.
+-- ============================================================
+-- EXAMCENTER UNIVERSAL DATABASE SCHEMA — AUTHORITATIVE REFERENCE
+-- DATABASE: cbt_app_db
+-- ENGINE: MySQL / MariaDB
 -- CHARSET: utf8mb4
+--
+-- This file documents the complete schema currently used by
+-- Examcenter on branch pro-architecture-v2.
+--
+-- IMPORTANT:
+-- 1. The legacy tables remain supported for backward compatibility.
+-- 2. Universal Architecture v2 is additive to the legacy schema.
+-- 3. Theory Assessment and Pro Assessment Suite are additive.
+-- 4. The executable migration files under database/migrations/
+--    are the source of truth for applying schema changes.
+-- 5. Keep this file synchronized whenever database schema changes.
+-- 6. Core examination functionality must remain usable offline
+--    without a Pro entitlement.
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS cbt_app_db
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
+CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+USE cbt_app_db;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ============================================================
+-- LEGACY / CORE CBT SCHEMA
+-- ============================================================
+
+-- Create new admins table structure
+-- Create the database
+CREATE DATABASE IF NOT EXISTS cbt_app_db;
 USE cbt_app_db;
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -1437,103 +1426,5 @@ CREATE TABLE IF NOT EXISTS backup_settings (
     next_backup DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 21: ACTIVITY LOGGING AND AUDITING
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS activities_log (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    activity TEXT,
-    admin_id INT,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    created_at DATETIME
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    admin_id INT NULL,
-    username VARCHAR(100),
-    action VARCHAR(100) NOT NULL,
-    module VARCHAR(100) NOT NULL,
-    description TEXT,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    computer_name VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_audit_admin (admin_id),
-    INDEX idx_audit_module (module),
-    INDEX idx_audit_action (action),
-    INDEX idx_audit_created (created_at),
-    FOREIGN KEY (admin_id)
-        REFERENCES admins(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 23: DEFAULT INSTITUTION TYPES
--- ============================================================
-
-INSERT IGNORE INTO institution_types
-    (type_code, type_name, description)
-VALUES
-    ('primary_school', 'Primary School',
-     'Primary education institution'),
-    ('secondary_school', 'Secondary School',
-     'Secondary education institution'),
-    ('university', 'University',
-     'Degree-awarding institution'),
-    ('college', 'College',
-     'College or higher education institution'),
-    ('vocational', 'Vocational Institution',
-     'Vocational education and training'),
-    ('professional', 'Professional Training Institution',
-     'Professional education and certification'),
-    ('company', 'Company',
-     'Business or corporate organization'),
-    ('training_centre', 'Training Centre',
-     'General training organization'),
-    ('other', 'Other',
-     'Other institution type');
-
--- ============================================================
--- SECTION 24: DEFAULT ORGANIZATIONAL UNIT TYPES
--- General types available across institution categories.
--- Institutions may add their own types.
--- ============================================================
-
-INSERT IGNORE INTO organizational_unit_types
-    (institution_type_id, type_code, type_name, description)
-VALUES
-    (NULL, 'campus', 'Campus', 'Institution campus'),
-    (NULL, 'faculty', 'Faculty', 'Academic faculty'),
-    (NULL, 'school', 'School', 'School or academic division'),
-    (NULL, 'department', 'Department', 'Department'),
-    (NULL, 'programme', 'Programme', 'Programme unit'),
-    (NULL, 'level', 'Level', 'Educational or training level'),
-    (NULL, 'class', 'Class', 'School class'),
-    (NULL, 'stream', 'Stream', 'Class stream'),
-    (NULL, 'team', 'Team', 'Organizational team'),
-    (NULL, 'division', 'Division', 'Company division'),
-    (NULL, 'cohort', 'Cohort', 'Training or recruitment cohort'),
-    (NULL, 'group', 'Group', 'General organizational group');
-
--- ============================================================
--- SECTION 25: LEGACY DEFAULT SETTINGS
--- ============================================================
-
-SET FOREIGN_KEY_CHECKS = 1;
-
--- Retain this setting for installations that use it.
--- INSERT INTO settings (setting_name, setting_value)
--- VALUES ('show_results_immediately', '1');
-
--- ============================================================
--- END OF EXAMCENTER UNIVERSAL ARCHITECTURE SCHEMA
--- ============================================================
+    ON UPDATE CURRENT_TIMESTAMP
+);
