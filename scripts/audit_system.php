@@ -131,6 +131,9 @@ $legacyUniversalPatterns = [
     '/\\bum\\.(?:institution_membership_id|organizational_unit_id)\\b/i',
 ];
 foreach ($phpFiles as $path) {
+    // The reconciliation migration intentionally references retired draft columns
+    // in order to read old installations. It is the compatibility boundary.
+    if ($path === 'database/migrations/20261007_0005_legacy_universal_reconciliation.php') continue;
     $content = file_get_contents($root . '/' . $path) ?: '';
     foreach ($legacyUniversalPatterns as $pattern) {
         if (preg_match($pattern, $content, $match)) {
@@ -144,6 +147,7 @@ $featureFile = file_get_contents($root . '/includes/pro_features.php') ?: '';
 preg_match_all("/='([a-z0-9_]+)'/", $featureFile, $featureMatches);
 $registeredFeatures = array_fill_keys($featureMatches[1] ?? [], true);
 foreach ($phpFiles as $path) {
+    if ($path === 'scripts/audit_system.php') continue;
     $content = file_get_contents($root . '/' . $path) ?: '';
     if (preg_match_all("/require_pro\\(\\s*['\"]([^'\"]+)['\"]/", $content, $matches)) {
         foreach ($matches[1] as $feature) {
