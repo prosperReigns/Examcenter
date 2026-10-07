@@ -324,8 +324,8 @@ $select_query = "
         q.*,
         t.title AS test_title,
         " . ($universal_questions_available
-            ? "COALESCE(ou.name, c.class_name, q.class) AS class,
-               co.name, ap.name,
+            ? "COALESCE(ou.name AS unit_name, c.class_name, q.class) AS class,
+               co.name AS course_name, ap.name AS period_name,
                t.organizational_unit_id, t.course_id, t.academic_period_id"
             : "COALESCE(c.class_name, q.class) AS class") . ",
         t.subject
@@ -349,7 +349,7 @@ $select_query = "
 $params = [];
 $types = '';
 $question_order = $universal_questions_available
-    ? 'COALESCE(ou.name, c.class_name, q.class)'
+    ? 'COALESCE(ou.name AS unit_name, c.class_name, q.class)'
     : 'COALESCE(c.class_name, q.class)';
 
 /*
