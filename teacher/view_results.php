@@ -234,19 +234,19 @@ try {
     }
 
     if ($universal_reporting_available) {
-        $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+        $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT id, code AS course_code, name AS course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+        $stmt = $conn->prepare("SELECT id, code AS course_code, name AS course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT id, period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY period_name");
+        $stmt = $conn->prepare("SELECT id, period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
