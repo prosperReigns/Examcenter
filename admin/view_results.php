@@ -121,8 +121,8 @@ try {
     $student_class_select = 'c.class_name AS student_class';
     $class_condition = 'c.class_name = ?';
     if ($universal_reporting_available) {
-        $student_class_select = 'COALESCE(ou.name AS unit_name, c.class_name, s.class) AS student_class';
-        $class_condition = 'COALESCE(ou.name AS unit_name, c.class_name, s.class) = ?';
+        $student_class_select = 'COALESCE(ou.name, c.class_name, s.class) AS student_class';
+        $class_condition = 'COALESCE(ou.name, c.class_name, s.class) = ?';
         $universal_select = ", ccourse.name AS course_name, ap.name AS period_name, t.organizational_unit_id,
             t.course_id, t.academic_period_id";
         $universal_joins = "
