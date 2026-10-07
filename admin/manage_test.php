@@ -63,7 +63,7 @@ $universal_group = '';
 $class_expression = "CONCAT(al.level_code, ' ', s.stream_name)";
 
 if ($universal_tests_available) {
-    $class_expression = "COALESCE(ou.name AS unit_name, CONCAT(al.level_code, ' ', s.stream_name))";
+    $class_expression = "COALESCE(ou.name, CONCAT(al.level_code, ' ', s.stream_name))";
     $universal_select = ", i.name AS institution_name, ou.name AS unit_name,
         co.code, co.name AS course_name, p.name AS programme_name,
         pl.name AS level_name AS programme_level_name, ap.name AS period_name,
