@@ -143,7 +143,7 @@ try {
             "SELECT id, code AS course_code, name AS course_name, course_type
              FROM courses
              WHERE institution_id = ? AND is_active = 1
-             ORDER BY course_name"
+             ORDER BY name"
         );
         $stmt->bind_param('i', $institutionId);
         $stmt->execute();
