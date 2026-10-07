@@ -1,0 +1,31 @@
+name: Examcenter PHP Audit
+
+on:
+  push:
+    branches:
+      - main
+      - audit/**
+  pull_request:
+
+jobs:
+  php-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli, mbstring, json
+          tools: composer
+
+      - name: PHP syntax
+        shell: bash
+        run: |
+          set -e
+          find . -type f -name '*.php'             -not -path './vendor/*'             -not -path './.git/*'             -print0 | xargs -0 -n1 php -l
+
+      - name: Static Examcenter audit
+        run: php scripts/audit_system.php
