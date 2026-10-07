@@ -50,16 +50,7 @@ if(!$db->multi_query($fixture)) failTest('Legacy fixture failed: '.$db->error);
 while($db->more_results() && $db->next_result()) { if($db->errno) failTest('Legacy fixture statement failed: '.$db->error); }
 if($db->errno) failTest('Legacy fixture failed: '.$db->error);
 
-try {
-    require __DIR__.'/../database/migrate.php';
-} catch (Throwable $e) {
-    $diagnostic = $db->query("SHOW ENGINE INNODB STATUS");
-    if ($diagnostic) {
-        $row = $diagnostic->fetch_assoc();
-        fwrite(STDERR, (string)($row['Status'] ?? ''));
-    }
-    throw $e;
-}
+require __DIR__.'/../database/migrate.php';
 
 $requiredTables=['institution_types','institutions','organizational_unit_types','organizational_units','academic_periods',
 'programmes','programme_levels','people','institution_memberships','unit_memberships','courses','course_assignments',
