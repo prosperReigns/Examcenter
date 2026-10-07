@@ -145,7 +145,7 @@ assertTrue((int)$join['person_id']===$personId,'Membership relation failed.');
 $db->query("ALTER TABLE people ADD COLUMN person_code VARCHAR(150) NULL");
 $legacyRef='LEGACY-CI-001'; $legacyName='Legacy Reconciled Person';
 $stmt=$db->prepare("INSERT INTO people (institution_id,display_name,person_code) VALUES (?,?,?)"); $stmt->bind_param('iss',$institutionId,$legacyName,$legacyRef); $legacyPersonId=insertId($stmt);
-$GLOBALS['db']=$db; require __DIR__.'/../database/migrations/20261007_0005_legacy_universal_reconciliation.php'; unset($GLOBALS['db']);
+$migrationDb=$db; $GLOBALS['db']=$migrationDb; require __DIR__.'/../database/migrations/20261007_0005_legacy_universal_reconciliation.php';
 $stmt=$db->prepare("SELECT external_ref FROM people WHERE id=?"); $stmt->bind_param('i',$legacyPersonId); $stmt->execute(); $legacyPerson=$stmt->get_result()->fetch_assoc(); $stmt->close();
 assertTrue(($legacyPerson['external_ref']??null)===$legacyRef,'Legacy reconciliation did not backfill people.external_ref.');
 
