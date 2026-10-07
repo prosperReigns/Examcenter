@@ -206,7 +206,7 @@ if ($universal_transcript_available && examcenterUniversalTableExists($conn, 'in
          WHERE im.legacy_student_id = ?
            AND im.status = 'active'
            AND um.status = 'active'
-         ORDER BY ou.name AS unit_name
+         ORDER BY ou.name
          LIMIT 1"
     );
     $stmt->bind_param('i', $studentId);
