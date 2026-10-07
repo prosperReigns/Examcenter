@@ -1,55 +1,58 @@
 -- ============================================================
--- EXAMCENTER UNIVERSAL ARCHITECTURE — CANONICAL RUNTIME CONTRACT
--- ============================================================
--- The executable migrations are authoritative:
---   20261005_0001_universal_architecture.sql
---   20261005_0002_theory_assessment.sql
---   20261005_0003_pro_assessment_suite.sql
---   20261007_0004_system_audit_hardening.sql
---   20261007_0005_legacy_universal_reconciliation.php
---
--- Canonical Universal names:
--- institutions: name, code, is_active
--- institution_types: code, name, is_active
--- organizational_units: parent_id, code, name, is_active
--- organizational_unit_types: code, name, is_active
--- academic_periods: parent_id, code, name, starts_at, ends_at
--- programmes: code, name, is_active
--- programme_levels: organizational_unit_id, code, name, sort_order
--- people: institution_id, display_name, external_ref, is_active
--- institution_memberships: institution_id, person_id, role_code, status
--- unit_memberships: unit_id, person_id, membership_role, status
--- courses: programme_id, code, name, is_active
--- course_assignments: course_id, unit_id, person_id, academic_period_id, role_code
--- assessment_groups: code, name, group_type, weighting
--- assessment_group_assignments: unit_id, programme_id, academic_period_id, course_id
---
--- Older names such as institution_name, unit_name, course_name,
--- period_name, type_name, parent_unit_id and institution_membership_id
--- belong to the retired draft schema. They may appear below only as
--- legacy/reference material. Application code must use the canonical names.
---
--- See docs/UNIVERSAL_SCHEMA.md for the complete naming contract.
--- ============================================================
-
--- ============================================================
--- EXAMCENTER DATABASE SCHEMA — LEGACY COMPATIBILITY REFERENCE
+-- EXAMCENTER UNIVERSAL DATABASE SCHEMA — AUTHORITATIVE REFERENCE
 -- DATABASE: cbt_app_db
 -- ENGINE: MySQL / MariaDB
 -- CHARSET: utf8mb4
+-- ============================================================
 --
--- This file documents the complete schema currently used by
--- Examcenter on branch pro-architecture-v2.
+-- This file documents the DATABASE SCHEMA ACTUALLY USED by the current
+-- Examcenter runtime.
 --
--- IMPORTANT:
--- 1. The legacy tables remain supported for backward compatibility.
--- 2. Universal Architecture v2 is additive to the legacy schema.
--- 3. Theory Assessment and Pro Assessment Suite are additive.
--- 4. The executable migration files under database/migrations/
---    are the source of truth for applying schema changes.
--- 5. Keep this file synchronized whenever database schema changes.
--- 6. Core examination functionality must remain usable offline
---    without a Pro entitlement.
+-- SOURCE OF TRUTH
+--   database/migrations/20261005_0001_universal_architecture.sql
+--   database/migrations/20261005_0002_theory_assessment.sql
+--   database/migrations/20261005_0003_pro_assessment_suite.sql
+--   database/migrations/20261007_0004_system_audit_hardening.sql
+--   database/migrations/20261007_0005_legacy_universal_reconciliation.php
+--
+-- Migration files are authoritative for installation/update behavior.
+-- This help file is a human-readable consolidated schema reference.
+--
+-- ARCHITECTURE
+--   1. Legacy Core CBT tables remain for backward compatibility.
+--   2. Universal tables provide configurable institution/unit/programme/
+--      level/period/course/person/assessment relationships.
+--   3. Theory Assessment is an additive assessment capability.
+--   4. Pro Assessment Suite is additive and entitlement-gated.
+--   5. Core exam delivery remains usable offline and is not Pro-locked.
+--
+-- CANONICAL UNIVERSAL COLUMN NAMES
+--   institutions: name, code, is_active
+--   institution_types: code, name, is_active
+--   organizational_units: parent_id, code, name, is_active
+--   organizational_unit_types: code, name, is_active
+--   academic_periods: parent_id, code, name, starts_at, ends_at
+--   programmes: code, name, is_active
+--   programme_levels: organizational_unit_id, code, name, sort_order
+--   people: institution_id, display_name, external_ref, is_active
+--   institution_memberships: institution_id, person_id, role_code, status
+--   unit_memberships: unit_id, person_id, membership_role, status
+--   courses: programme_id, code, name, is_active
+--   course_assignments: course_id, unit_id, person_id, academic_period_id,
+--                       role_code
+--   assessment_groups: code, name, group_type, weighting
+--   assessment_group_assignments: unit_id, programme_id,
+--                                  academic_period_id, course_id
+--   tests: institution_id, organizational_unit_id, programme_id,
+--          programme_level_id, academic_period_id, course_id,
+--          assessment_group_id
+--
+-- LEGACY COMPATIBILITY
+--   Retired draft Universal names such as institution_name, institution_code,
+--   unit_name, unit_code, period_name, period_code, parent_unit_id and
+--   institution_membership_id are NOT canonical runtime names. Migration
+--   20261007_0005 reads old installations and backfills canonical fields.
+--
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS cbt_app_db
@@ -60,535 +63,7 @@ USE cbt_app_db;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ============================================================
--- LEGACY / CORE CBT SCHEMA
--- ============================================================
-
--- Create new admins table structure
--- Create the database
-CREATE DATABASE IF NOT EXISTS cbt_app_db;
-USE cbt_app_db;
-
-SET FOREIGN_KEY_CHECKS = 0;
-
--- ============================================================
--- SECTION 1: INSTITUTION TYPES AND INSTITUTIONS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS institution_types (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    type_code VARCHAR(50) NOT NULL UNIQUE,
-    type_name VARCHAR(100) NOT NULL,
-    description TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS institutions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    institution_type_id INT NOT NULL,
-    institution_code VARCHAR(100) NULL UNIQUE,
-    institution_name VARCHAR(255) NOT NULL,
-    country VARCHAR(100) NULL,
-    state_region VARCHAR(100) NULL,
-    city VARCHAR(100) NULL,
-    address TEXT NULL,
-    email VARCHAR(150) NULL,
-    phone VARCHAR(30) NULL,
-    timezone VARCHAR(100) DEFAULT 'Africa/Lagos',
-    status ENUM('active','inactive','suspended')
-        NOT NULL DEFAULT 'active',
-    settings JSON NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (institution_type_id)
-
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    COLLATE=utf8mb4_unicode_ci;
-
--- The existing proposed-schema draft continues after the analysis sections.
-
-============================================================
-SECTION 3: EXISTING APPLICATION DEPENDENCIES
-============================================================
-
-The following dependencies are verified from repository source queries and
-the supplied schema. File names identify dependency surfaces; this is not an
-exhaustive call graph.
-
-DATABASE CONNECTION
-- db.php defines the Database singleton and exposes mysqli connections.
-- includes/bootstrap.php, includes/system_guard.php and license guards are
-    loaded by application areas that require authenticated or licensed access.
-- The connection is configured for utf8mb4.
-
-IDENTITY AND ACCESS
-- login.php and the admin/teacher/student areas use session IDs and roles.
-- admins, teachers and super_admins are separate identity tables in the
-    supplied schema. Their cross-table relationships are not declared.
-- teachers are connected to subjects by teacher_subjects.subject, a text
-    value, and to classes by teacher_classes.
-
-CLASSES, STUDENTS AND SUBJECTS
-- admin/manage_classes.php and student-management pages use classes,
-    streams, academic_levels and students.
-- students.class is a required VARCHAR value, while classes is a separate
-    normalized table. The supplied schema does not connect students.class to
-    classes.id.
-- subjects is keyed by subject_name. teacher_subjects.subject and several
-    test fields also store subject names rather than subject_id values.
-- subject_levels.class_level is a fixed PRIMARY/JSS/SS ENUM.
-
-TESTS, QUESTIONS AND ATTEMPTS
-- admin/manage_test.php, teacher/manage_test.php, teacher/add_question.php,
-    teacher/bank.php and related pages use tests, new_questions, question_bank
-    and the question-type detail tables.
-- tests is filtered by academic_level_id and subject; it has no teacher_id or
-    stream_id in the supplied schema.
-- student/take_exam.php and student/save_answer.php use exam_attempts.
-    The unique key is (user_id, test_id, question_id), so one logical attempt
-    is represented by multiple question rows rather than by a separate
-    attempt header in the supplied schema.
-- results joins user_id to students.id in teacher/admin result pages, but the
-    supplied schema declares no foreign key for results.user_id.
-- The question detail tables cascade from new_questions. tests deletion can
-    cascade to question_bank, results and exam_attempts according to the
-    supplied foreign keys, which is a historical-data risk.
-
-SCHEDULING, RECORDS AND REPORTING
-- admin/exam_schedule.php reads subjects and writes/reads the active exam
-    scheduling surface. active_exams is the only supplied schedule-like table.
-- admin/manage_session.php and teacher/add_question.php use academic_years.
-- student_subject_scores and student_term_remarks support school report
-    records; the schema comment calls academic_year_id a term even though the
-    table is named academic_years.
-- Teacher/admin result views join results, students, tests, academic_levels
-    and sometimes classes for filtering and exports.
-
-BACKUPS, AUDIT AND LICENSING
-- backup/backup_functions.php, backup/config.php and backup pages use
-    backups, backup_settings and admins. mysqldump includes routines, triggers
-    and events, so later schema changes must preserve backup/restore testing.
-- includes/audit.php and admin audit pages use audit_logs; the supplied
-    schema also contains activities_log, creating two logging surfaces.
-- license/helpers.php and license/verify.php read and write licenses. The
-    current local identity is represented by school_name, machine_fingerprint,
-    installation_id and signatures; no institution foreign key exists.
-
-VERIFIED DISCREPANCIES REQUIRING INVESTIGATION
-- admin/download.php contains a query for tests.class, but tests.class is
-    absent from the supplied CREATE TABLE definition. This path may be stale,
-    may depend on an unrecorded live column, or may be broken.
-- teacher/get-results-details.php queries exam_results, but exam_results is
-    absent from the supplied schema. This path may be legacy or broken.
-- Some pages use academic_levels.level_code as the class source of truth,
-    while other code accepts class text or attempts to use classes.class_name.
-- The repository contains no independently located migration/schema file in
-    the reviewed source set. The live database, if available, must be compared
-    using SHOW CREATE TABLE and INFORMATION_SCHEMA before implementation.
-
-============================================================
-SECTION 4: CURRENT ARCHITECTURAL LIMITATIONS
-============================================================
-
-1. Institution isolation is not modeled. schools exists, but no supplied
-     foreign keys connect it to students, teachers, classes, subjects, tests,
-     results or licenses. The current design therefore does not provide a
-     verified multi-institution tenant boundary.
-2. academic_levels.class_group and subject_levels.class_level hardcode
-     Nigerian/primary categories. They cannot represent Year 10, Grade 8,
-     freshman, doctoral study, a corporate team or a certification cohort.
-3. Class identity is duplicated as students.class, classes.class_name,
-     academic_levels.level_code and tests.academic_level_id. These values can
-     disagree and historical meaning depends on application conventions.
-4. Subjects are duplicated as names in subjects, teacher_subjects and tests.
-     Renaming, localization, course codes and cross-programme offerings are
-     therefore difficult to enforce safely.
-5. Academic years combine year/session/exam-title data and are also used as
-     a term in student_subject_scores. Periods and assessment events are not
-     clearly separated.
-6. Results and attempts identify users with unverified integer conventions;
-     no declared candidate/person foreign key protects referential integrity.
-7. An assessment targets an academic level directly. There is no separate
-     target, eligibility, scheduled sitting or attempt-header abstraction for
-     institution-wide, cross-unit or selected-candidate assessments.
-8. Separate identity tables make employees, candidates, administrators and
-     learners difficult to model consistently or assign to multiple units.
-9. The question model is useful for preserving current functionality, but
-     each type has a separate table and answer storage is text/boolean. Any
-     universal extension must avoid breaking existing question IDs and scoring.
-10. Cascade rules on tests and questions can remove historical results or
-        question records. Deletion policy needs explicit archival rules.
-
-============================================================
-SECTION 5: PROPOSED UNIVERSAL ARCHITECTURE
-============================================================
-
-All designs in Sections 5-10 are PROPOSED - NOT YET IMPLEMENTED.
-
-The central rule is to keep five concepts separate:
-
-PERSON AND IDENTITY: one person/candidate identity can have institutional
-roles, credentials and more than one membership.
-
-ORGANIZATION: an institution owns configurable unit types and units. An
-institution may have no department, faculty, class or academic level.
-
-ACADEMIC OR PROFESSIONAL CLASSIFICATION: periods, levels, programmes,
-qualifications, courses and subjects describe learning context. They are not
-the same as an organizational reporting line.
-
-MEMBERSHIP: a person may belong to multiple units, programmes, cohorts or
-teams with effective dates and a role. Membership must be separate from the
-unit table so cross-department courses and joint programmes do not require
-duplicating a person.
-
-ASSESSMENT ELIGIBILITY: an assessment may target an institution, one or more
-units, a programme, level, course, explicit assessment group or individual
-candidate. Eligibility must be evaluated independently of the organization
-tree and recorded for the scheduled sitting where necessary.
-
-ILLUSTRATIVE CONFIGURATIONS
-
-Nigerian secondary school:
-    Institution -> Secondary School -> SS2
-    SS2 may be an organizational unit, an academic level, or both through an
-    explicit mapping; the design must not force that choice globally.
-
-UK secondary school:
-    Institution -> Secondary School -> Year 10
-
-Nigerian university:
-    Institution -> Faculty -> Department -> Programme -> Level
-
-American university:
-    Institution -> College -> Department; academic classification is a
-    separate year/freshman-sophomore model.
-
-Corporate organization:
-    Organization -> Division -> Department -> Team
-    An assessment can target several teams without creating a new hierarchy.
-
-LIMITS OF A PURE TREE
-
-organizational_units.parent_id supports a convenient hierarchy, but a tree
-cannot represent all affiliations. Cross-listed courses, joint programmes,
-matrix reporting and temporary project teams require separate membership,
-course-offering and assessment-target relations. Parent links should permit
-NULL, and units should be deactivated rather than deleted when history uses
-them.
-
-ASSESSMENT LIFECYCLE
-
-Assessment definition -> assessment targets/eligibility -> scheduled session
--> candidate attempt -> response/scoring -> result/review/history.
-
-The current tests, question_bank, new_questions, question detail tables,
-exam_attempts and results should be adapted incrementally around this
-lifecycle. They should not be duplicated for each institution type.
-
-============================================================
-SECTION 6: PROPOSED DATABASE SCHEMA
-============================================================
-
-Every item below is PROPOSED - NOT YET IMPLEMENTED. Types are indicative and
-must follow the existing MySQL/MariaDB version and naming conventions.
-
-institution_types: configurable category such as school, university,
-corporate or training provider. Proposed fields: id BIGINT/INT PK, code
-VARCHAR(50) UNIQUE, name VARCHAR(150), description TEXT, is_active TINYINT,
-created_at DATETIME. Optional; institution records may use a generic type.
-
-institutions: tenant and institutional identity. Proposed fields: id PK,
-institution_type_id FK, name VARCHAR(255), code VARCHAR(100) UNIQUE within
-the deployment, timezone VARCHAR(64), locale VARCHAR(16), status,
-created_at, updated_at. Every future tenant-owned record should ultimately
-have institution_id, with indexes and foreign keys enforcing isolation.
-
-organizational_unit_types: institution-configurable labels such as Faculty,
-Class, Division or Team. Proposed fields: id PK, institution_id FK nullable
-only if globally reusable, name, code, parent_allowed, is_active, UNIQUE
-(institution_id, code).
-
-organizational_units: configurable units. Proposed fields: id PK,
-institution_id FK, unit_type_id FK, parent_id FK to organizational_units
-nullable, name, code, status, valid_from, valid_to, created_at, updated_at.
-Indexes: (institution_id, parent_id), (institution_id, unit_type_id), and a
-unique active/business code per institution where appropriate. Do not assume
-all units need a parent.
-
-people: shared person/candidate record. Proposed fields: id PK,
-institution_id FK where deployment isolation requires it, external_reference,
-given_name, family_name, display_name, email, phone, status, created_at,
-updated_at. A separate account/role relation should be considered before
-merging authentication into people. Existing students and teachers must be
-mapped without losing IDs.
-
-organizational_unit_members: many-to-many membership. Proposed fields: id PK,
-institution_id FK, person_id FK, organizational_unit_id FK, membership_role,
-is_primary, valid_from, valid_to, status, UNIQUE(person_id, unit_id,
-valid_from). Index person and unit lookups. Historical memberships must not
-be overwritten.
-
-academic_periods: institution-owned sessions, terms, semesters or cohorts.
-Proposed fields: id PK, institution_id FK, parent_period_id nullable,
-period_type, name, starts_at, ends_at, status, UNIQUE(institution_id, name).
-This replaces neither academic_years nor historical rows until migration is
-validated.
-
-academic_levels: evolve the existing concept with institution_id, name,
-code, level_type, sequence_number and optional parent/programme links. Keep
-legacy level IDs and level_code during transition; remove fixed ENUMs only in
-a later migration.
-
-programmes and courses: optional institution-owned academic/professional
-catalog records. A programme may reference a qualification and units; a
-course may be offered to multiple programmes through a course_offerings
-relation. Existing subjects remain valid for simple school deployments.
-
-subjects: retain the current table initially, then add institution ownership,
-stable code and optional course/catalog links. Replace text joins only after
-all callers can use subject_id.
-
-assessment_groups: named candidate cohorts or eligibility sets. Proposed
-fields: id PK, institution_id FK, name, group_type, period_id nullable,
-created_at, status. A separate assessment_group_members table should support
-explicit people; rule/target tables may support dynamic groups.
-
-assessment_assignments: links an assessment to a person, group, unit,
-programme, level, course or institution. Proposed fields: id PK,
-assessment_id FK to the eventual assessment definition, target_type,
-target_id, group_id nullable, period_id nullable, availability/status,
-created_at. Add uniqueness preventing duplicate active targets and indexes by
-assessment, institution and target. This is the main decoupling from classes.
-
-ASSESSMENT ENGINE CHANGES
-
-The existing tests table can initially act as the assessment definition. Add
-an adapter or nullable universal identifiers before considering a rename.
-Create a distinct scheduled-session concept only when current scheduling
-requirements are mapped. Create an attempt header only if it solves the
-current per-question attempt limitation; retain existing exam_attempts rows
-as response history. Results should gain explicit candidate/assessment/session
-references while preserving test_id and user_id during the transition.
-
-============================================================
-SECTION 7: EXISTING VS PROPOSED SCHEMA
-============================================================
-
-EXISTING: schools, school_name only.
-CURRENT PURPOSE: one school-name record, with no verified ownership links.
-PROPOSED CHANGE: institutions plus institution_types and tenant keys.
-REASON: support schools, universities and companies with isolation.
-IMPACT: every dependent table and license lookup needs staged mapping.
-
-EXISTING: academic_levels.class_group ENUM('JSS','SS').
-CURRENT PURPOSE: secondary-school level classification.
-PROPOSED CHANGE: configurable level type/code per institution; preserve the
-legacy value in a compatibility mapping.
-REASON: support Year, Grade, university level and non-academic structures.
-IMPACT: class filters, tests, reports and subject-level queries.
-
-EXISTING: classes, streams, teacher_classes and students.class.
-CURRENT PURPOSE: school classes and teacher assignments.
-PROPOSED CHANGE: map classes to organizational_units and move membership to
-organizational_unit_members while retaining legacy IDs.
-REASON: support arbitrary units and multiple memberships.
-IMPACT: student, teacher, result and export queries.
-
-EXISTING: subjects, subject_levels, teacher_subjects.subject and tests.subject.
-CURRENT PURPOSE: subject catalog and text-based assignment/filtering.
-PROPOSED CHANGE: add institution scope and stable subject/course references;
-retain text values during a compatibility period.
-REASON: avoid name collisions and support international catalogues.
-IMPACT: teacher permissions, tests, schedules and reports.
-
-EXISTING: academic_years and tests.year.
-CURRENT PURPOSE: school sessions and test labels.
-PROPOSED CHANGE: academic_periods plus explicit assessment/session dates.
-REASON: separate year, term, semester, cohort and exam event.
-IMPACT: reports and historical filters.
-
-EXISTING: tests, question_bank, new_questions, type tables.
-CURRENT PURPOSE: assessment definitions and question composition.
-PROPOSED CHANGE: preserve engine; add universal assessment identity and
-assignment/target relations.
-REASON: target individuals, groups, units or institutions without cloning
-question data.
-IMPACT: low initially, but assignment and scheduling code must be adapted.
-
-EXISTING: exam_attempts and results.
-CURRENT PURPOSE: per-question answers and scored test results.
-PROPOSED CHANGE: add explicit candidate, assessment, session and result
-version references; preserve test_id/user_id as legacy links.
-REASON: distinguish attempt, response, score and historical result.
-IMPACT: scoring, reattempts, exports and deletion policies.
-
-EXISTING: licenses.school_name.
-CURRENT PURPOSE: local license identity and activation.
-PROPOSED CHANGE: optional institution_id after a stable mapping exists;
-retain school_name for old licenses.
-REASON: support product editions and institution types without breaking
-offline activation. Licensing implementation is unchanged in this phase.
-
-EXISTING: audit_logs, activities_log, backups, backup_settings.
-CURRENT PURPOSE: operational history and database backup metadata.
-PROPOSED CHANGE: add tenant context only after isolation rules are approved;
-preserve audit and backup history.
-REASON: trace universal operations and retain offline recoverability.
-
-============================================================
-SECTION 8: MIGRATION AND BACKWARD COMPATIBILITY
-============================================================
-
-Phase 0 - discovery: take a verified backup; capture SHOW CREATE TABLE,
-INFORMATION_SCHEMA constraints/indexes, row counts and representative
-relationships. Inventory every query that uses legacy columns, including
-tests.class and exam_results, and decide whether those paths are stale.
-
-Phase 1 - additive foundation: add new tables and nullable mapping columns
-only. Do not drop or rename legacy tables. Create an explicit mapping from
-schools to institutions, JSS/SS levels and existing classes to units.
-
-Phase 2 - dual reads/controlled writes: continue writing legacy values while
-writing mapped universal records in the same local transaction where
-possible. Use feature flags and log unmapped records. Existing IDs remain
-stable; no historical test, question, attempt or result is recreated with a
-new ID unless an auditable mapping is stored.
-
-Phase 3 - backfill and validate: map students, teachers, subjects, teacher
-assignments, academic years and classes. Compare counts, nulls, duplicates,
-subject names, test targets, result totals and attempt totals. Validate
-reports against pre-migration exports.
-
-Phase 4 - staged cutover: enable universal assignment and membership flows
-for a pilot institution while preserving legacy result and exam paths. Keep
-legacy columns readable until all supported flows pass offline tests.
-
-Rollback: restore the pre-migration backup or reverse only additive mappings,
-disable feature flags, and return reads to legacy tables. Never rollback by
-deleting shared historical rows. Test restore using the existing mysqldump
-workflow before production use.
-
-Backward-compatibility rules: preserve JSS/SS labels, class names, student
-and teacher identifiers, subject names, test/question IDs, attempts, results,
-academic-year rows and license records. Use soft deactivation for units and
-catalog data referenced by history.
-
-============================================================
-SECTION 9: IMPLEMENTATION ROADMAP
-============================================================
-
-1. Universal database foundation. Add mapping tables, institution scope and
-     integrity documentation. Acceptance: no legacy row loses identity and all
-     existing offline workflows pass regression tests.
-2. Dynamic organizational units. Implement configurable unit types, nullable
-     parent links, deactivation and membership. Acceptance: JS/SS classes can
-     be mapped and a non-school hierarchy can be represented.
-3. Institution onboarding/templates. Provide optional school, university,
-     training and corporate templates without making them mandatory. Acceptance:
-     a new institution can configure names and depth locally offline.
-4. People and memberships. Unify candidate/learner/employee references while
-     retaining old student/teacher accounts. Acceptance: one person can hold
-     multiple current memberships with history.
-5. Universal assessment assignment. Add targets, groups and scheduled
-     sessions around the existing tests engine. Acceptance: individual,
-     multi-unit, programme, level, group and institution targets work offline.
-6. University and college support. Add programmes, courses, offerings,
-     levels and qualifications only where needed. Acceptance: courses can span
-     departments without duplicating candidates or questions.
-7. Corporate assessment support. Support divisions, teams, recruitment and
-     competency classifications using the same target model. Acceptance: an
-     assessment can span teams and produce auditable results.
-8. Internationalization. Add locale, timezone, terminology and configurable
-     grading/period conventions. Acceptance: no fixed JSS/SS or country-specific
-     value is required for a new institution.
-9. Migration verification and stabilization. Run restore, offline, security,
-     performance and report comparisons. Acceptance: rollback is documented,
-     legacy history is readable, and unresolved data exceptions are zero or
-     explicitly approved.
-
-============================================================
-SECTION 10: RISKS AND DESIGN DECISIONS
-============================================================
-
-- Schema abstraction can become harder to query than the current simple
-    school model. Prefer additive, purpose-specific relations over a universal
-    key-value table.
-- Tenant isolation must be enforced by foreign keys, application checks and
-    indexed institution scope; a name field such as school_name is insufficient.
-- Flexible trees do not replace memberships, course offerings or assessment
-    targets. Keep those relations separate.
-- Existing cascade rules and stale query paths can destroy or hide history.
-    Deletion and archival policy requires approval before migration.
-- Offline operation means all structure, membership, assessment and result
-    decisions must be locally available. Licensing and synchronization must not
-    become runtime prerequisites.
-- Adding institution_id to every table has performance and migration cost;
-    the required tenant boundary must be approved before broad alteration.
-- Authentication consolidation could affect roles and licensing. Do not merge
-    admins, teachers, super_admins and students until access behavior is mapped.
-- Grading, terminology, date formats, privacy retention and assessment
-    integrity vary by institution and country; they must be configuration, not
-    hardcoded universal assumptions.
-
-UNRESOLVED QUESTIONS REQUIRING APPROVAL OR FURTHER INVESTIGATION
-
-1. Is the live database schema identical to the supplied SQL, especially for
-     tests.class, exam_results, indexes, triggers and deletion rules?
-2. Is schools intended to represent exactly one local institution, or is it
-     legacy data that should map to a new institutions record?
-3. Should people be globally unique across institutions in one deployment,
-     or scoped per institution for privacy and isolation?
-4. Should a class be an organizational unit, an academic classification, or a
-     mapped representation of both?
-5. What is the supported MariaDB/MySQL version and does it support the chosen
-     CHECK, generated-column and JSON features?
-6. Should test scheduling remain subject/day based through active_exams, or
-     become a general scheduled session with timezone-aware boundaries?
-7. What retention and immutability rules apply to attempts, results, audit
-     logs, licenses and backups?
-8. Which legacy pages are still in production, and should stale queries be
-     repaired or retired in a separate approved phase?
-
-FINAL VERIFICATION STATUS
-
-Only help.txt was modified for this documentation task. No PHP, JavaScript,
-CSS, HTML, SQL/configuration file or database table was changed, and no
-migration was executed. The supplied schema and repository queries were
-reviewed; live database definitions and row-level relationships remain
-unverified because a live metadata inspection was not available. Proposed
-schemas are clearly labelled and must not be treated as implemented.
-
-============================================================
-APPENDIX: CONTINUATION OF THE EXISTING PROPOSED-SCHEMA DRAFT
-============================================================
-
-The following schema text was already present in help.txt before this review.
-It is retained for later reconciliation and remains PROPOSED - NOT YET
-IMPLEMENTED. The institutions table was closed above so the preserved draft
-can be read without inserting the analysis into an unfinished definition.
-
--- ============================================================
--- SECTION 2: UNIVERSAL ORGANIZATIONAL STRUCTURE
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS organizational_unit_types (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    institution_type_id INT NULL,
-    type_code VARCHAR(50) NOT NULL,
-    type_name VARCHAR(100) NOT NULL,
-    description TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    -- UNIQUE (institution_type_id, type_code),
-    FOREIGN KEY (institution_type_id)
-        REFERENCES institution_types(id)
-        ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 3: LEGACY SCHOOL STRUCTURE
+-- PART A: LEGACY / CORE CBT SCHEMA
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS streams (
@@ -620,47 +95,6 @@ CREATE TABLE IF NOT EXISTS classes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- SECTION 4: UNIVERSAL ORGANIZATIONAL UNITS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS organizational_units (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    institution_id INT NOT NULL,
-    unit_type_id INT NOT NULL,
-    parent_unit_id BIGINT NULL,
-    unit_code VARCHAR(100) NULL,
-    unit_name VARCHAR(255) NOT NULL,
-    description TEXT NULL,
-    sort_order INT NOT NULL DEFAULT 0,
-    status ENUM('active','inactive','archived')
-        NOT NULL DEFAULT 'active',
-    legacy_class_id INT NULL UNIQUE,
-    metadata JSON NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_org_institution_parent
-        (institution_id, parent_unit_id),
-    INDEX idx_org_unit_type (unit_type_id),
-    UNIQUE (institution_id, unit_code),
-    FOREIGN KEY (institution_id)
-        REFERENCES institutions(id),
-    FOREIGN KEY (unit_type_id)
-        REFERENCES organizational_unit_types(id),
-    FOREIGN KEY (parent_unit_id)
-        REFERENCES organizational_units(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (legacy_class_id)
-        REFERENCES classes(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 5: LEGACY ACADEMIC YEARS
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS academic_years (
     id INT AUTO_INCREMENT PRIMARY KEY,
     year VARCHAR(9) NOT NULL,
@@ -671,87 +105,6 @@ CREATE TABLE IF NOT EXISTS academic_years (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 6: UNIVERSAL ACADEMIC AND OPERATIONAL PERIODS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS academic_periods (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    institution_id INT NOT NULL,
-    parent_period_id BIGINT NULL,
-    period_type VARCHAR(50) NOT NULL,
-    period_name VARCHAR(150) NOT NULL,
-    period_code VARCHAR(100) NULL,
-    start_date DATE NULL,
-    end_date DATE NULL,
-    status ENUM('planned','active','completed','cancelled')
-        NOT NULL DEFAULT 'planned',
-    legacy_academic_year_id INT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE (institution_id, period_code),
-    INDEX idx_period_institution_type
-        (institution_id, period_type),
-    FOREIGN KEY (institution_id)
-        REFERENCES institutions(id),
-    FOREIGN KEY (parent_period_id)
-        REFERENCES academic_periods(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (legacy_academic_year_id)
-        REFERENCES academic_years(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 7: PROGRAMMES AND LEVELS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS programmes (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    institution_id INT NOT NULL,
-    organizational_unit_id BIGINT NULL,
-    programme_code VARCHAR(100) NULL,
-    programme_name VARCHAR(255) NOT NULL,
-    programme_type VARCHAR(100) NOT NULL,
-    description TEXT NULL,
-    duration_value INT NULL,
-    duration_unit VARCHAR(30) NULL,
-    status ENUM('active','inactive','archived')
-        NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE (institution_id, programme_code),
-    INDEX idx_programme_unit (organizational_unit_id),
-    FOREIGN KEY (institution_id)
-        REFERENCES institutions(id),
-    FOREIGN KEY (organizational_unit_id)
-        REFERENCES organizational_units(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS programme_levels (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    programme_id BIGINT NOT NULL,
-    level_code VARCHAR(100) NOT NULL,
-    level_name VARCHAR(150) NOT NULL,
-    level_order INT NOT NULL DEFAULT 0,
-    description TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (programme_id, level_code),
-    FOREIGN KEY (programme_id)
-        REFERENCES programmes(id)
-        ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 8: LEGACY ADMINISTRATORS AND TEACHERS
--- ============================================================
 
 CREATE TABLE IF NOT EXISTS admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -784,10 +137,6 @@ CREATE TABLE IF NOT EXISTS teachers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- SECTION 9: LEGACY STUDENTS
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS students (
     id INT AUTO_INCREMENT PRIMARY KEY,
     full_name VARCHAR(150) NOT NULL,
@@ -805,90 +154,6 @@ CREATE TABLE IF NOT EXISTS students (
         ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 10: UNIVERSAL PEOPLE AND MEMBERSHIPS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS people (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    person_code VARCHAR(100) NULL UNIQUE,
-    first_name VARCHAR(100) NULL,
-    middle_name VARCHAR(100) NULL,
-    last_name VARCHAR(100) NULL,
-    full_name VARCHAR(255) NOT NULL,
-    email VARCHAR(150) NULL,
-    phone VARCHAR(30) NULL,
-    photo VARCHAR(255) NULL,
-    status ENUM('active','inactive','suspended')
-        NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS institution_memberships (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    institution_id INT NOT NULL,
-    person_id BIGINT NOT NULL,
-    membership_code VARCHAR(100) NULL,
-    role_code VARCHAR(50) NOT NULL,
-    start_date DATE NULL,
-    end_date DATE NULL,
-    status ENUM('active','inactive','suspended','completed')
-        NOT NULL DEFAULT 'active',
-    legacy_student_id INT NULL UNIQUE,
-    legacy_teacher_id INT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (institution_id, person_id, role_code),
-    INDEX idx_membership_institution_role
-        (institution_id, role_code),
-    FOREIGN KEY (institution_id)
-        REFERENCES institutions(id),
-    FOREIGN KEY (person_id)
-        REFERENCES people(id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (legacy_student_id)
-        REFERENCES students(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (legacy_teacher_id)
-        REFERENCES teachers(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS unit_memberships (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    institution_membership_id BIGINT NOT NULL,
-    organizational_unit_id BIGINT NOT NULL,
-    membership_role VARCHAR(50) NOT NULL DEFAULT 'member',
-    academic_period_id BIGINT NULL,
-    start_date DATE NULL,
-    end_date DATE NULL,
-    status ENUM('active','inactive','completed')
-        NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (
-        institution_membership_id,
-        organizational_unit_id,
-        academic_period_id
-    ),
-    INDEX idx_unit_membership_unit (organizational_unit_id),
-    FOREIGN KEY (institution_membership_id)
-        REFERENCES institution_memberships(id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (organizational_unit_id)
-        REFERENCES organizational_units(id),
-    FOREIGN KEY (academic_period_id)
-        REFERENCES academic_periods(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 11: LEGACY SCHOOL AND SUBJECT RELATIONSHIPS
--- ============================================================
 
 CREATE TABLE IF NOT EXISTS schools (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -935,67 +200,6 @@ CREATE TABLE IF NOT EXISTS teacher_classes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- SECTION 12: UNIVERSAL COURSES AND ASSIGNMENTS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS courses (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    institution_id INT NOT NULL,
-    course_code VARCHAR(100) NULL,
-    course_name VARCHAR(255) NOT NULL,
-    course_type VARCHAR(50) NOT NULL DEFAULT 'subject',
-    description TEXT NULL,
-    status ENUM('active','inactive','archived')
-        NOT NULL DEFAULT 'active',
-    legacy_subject_id INT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE (institution_id, course_code),
-    FOREIGN KEY (institution_id)
-        REFERENCES institutions(id),
-    FOREIGN KEY (legacy_subject_id)
-        REFERENCES subjects(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS course_assignments (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    course_id BIGINT NOT NULL,
-    organizational_unit_id BIGINT NULL,
-    instructor_membership_id BIGINT NULL,
-    academic_period_id BIGINT NULL,
-    programme_level_id BIGINT NULL,
-    assignment_type VARCHAR(50) NOT NULL DEFAULT 'teaching',
-    status ENUM('active','inactive','completed')
-        NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_course_assignment_course (course_id),
-    INDEX idx_course_assignment_unit (organizational_unit_id),
-    INDEX idx_course_assignment_instructor (instructor_membership_id),
-    FOREIGN KEY (course_id)
-        REFERENCES courses(id),
-    FOREIGN KEY (organizational_unit_id)
-        REFERENCES organizational_units(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (instructor_membership_id)
-        REFERENCES institution_memberships(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (academic_period_id)
-        REFERENCES academic_periods(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (programme_level_id)
-        REFERENCES programme_levels(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 13: LEGACY ASSESSMENTS
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS tests (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200)
@@ -1040,76 +244,6 @@ CREATE TABLE IF NOT EXISTS tests (
         ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 14: UNIVERSAL ASSESSMENT GROUPS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS assessment_groups (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    institution_id INT NOT NULL,
-    group_code VARCHAR(100) NULL,
-    group_name VARCHAR(255) NOT NULL,
-    group_type VARCHAR(100) NOT NULL,
-    description TEXT NULL,
-    academic_period_id BIGINT NULL,
-    programme_id BIGINT NULL,
-    organizational_unit_id BIGINT NULL,
-    status ENUM('draft','active','completed','archived')
-        NOT NULL DEFAULT 'draft',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE (institution_id, group_code),
-    FOREIGN KEY (institution_id)
-        REFERENCES institutions(id),
-    FOREIGN KEY (academic_period_id)
-        REFERENCES academic_periods(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (programme_id)
-        REFERENCES programmes(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (organizational_unit_id)
-        REFERENCES organizational_units(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS assessment_assignments (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    assessment_group_id BIGINT NOT NULL,
-    institution_membership_id BIGINT NULL,
-    organizational_unit_id BIGINT NULL,
-    programme_level_id BIGINT NULL,
-    course_id BIGINT NULL,
-    assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    due_at DATETIME NULL,
-    status ENUM('assigned','in_progress','completed','cancelled')
-        NOT NULL DEFAULT 'assigned',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_assessment_assignment_group (assessment_group_id),
-    INDEX idx_assessment_assignment_member (institution_membership_id),
-    FOREIGN KEY (assessment_group_id)
-        REFERENCES assessment_groups(id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (institution_membership_id)
-        REFERENCES institution_memberships(id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (organizational_unit_id)
-        REFERENCES organizational_units(id)
-        ON DELETE CASCADE,
-    FOREIGN KEY (programme_level_id)
-        REFERENCES programme_levels(id)
-        ON DELETE SET NULL,
-    FOREIGN KEY (course_id)
-        REFERENCES courses(id)
-        ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-  -- ============================================================
--- SECTION 15: QUESTION MANAGEMENT
--- ============================================================
 
 CREATE TABLE IF NOT EXISTS new_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1214,10 +348,6 @@ CREATE TABLE IF NOT EXISTS question_bank (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- SECTION 16: EXAMINATION SCHEDULING AND ATTEMPTS
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS active_exams (
     id INT AUTO_INCREMENT PRIMARY KEY,
     subject VARCHAR(100),
@@ -1270,10 +400,6 @@ CREATE TABLE IF NOT EXISTS reattempt_schedule (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 17: RESULTS AND ACADEMIC PERFORMANCE
--- ============================================================
 
 CREATE TABLE IF NOT EXISTS results (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1371,10 +497,6 @@ CREATE TABLE IF NOT EXISTS grade_scales (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- SECTION 18: SYSTEM SETTINGS AND SETUP
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     setting_name VARCHAR(100),
@@ -1390,10 +512,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- SECTION 19: LICENSING
--- ============================================================
 
 CREATE TABLE IF NOT EXISTS licenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1422,10 +540,6 @@ CREATE TABLE IF NOT EXISTS licenses (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- SECTION 20: BACKUP MANAGEMENT
--- ============================================================
-
 CREATE TABLE IF NOT EXISTS backups (
     id INT AUTO_INCREMENT PRIMARY KEY,
     filename VARCHAR(255) NOT NULL,
@@ -1444,21 +558,453 @@ CREATE TABLE IF NOT EXISTS backups (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS backup_settings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    auto_backup_enabled TINYINT(1) NOT NULL DEFAULT 1,
-    backup_frequency ENUM(
-        'hourly',
-        'daily',
-        'weekly',
-        'monthly'
-    ) DEFAULT 'daily',
-    backup_time TIME DEFAULT '00:00:00',
-    retention_days INT DEFAULT 30,
-    max_backups INT DEFAULT 50,
-    last_backup DATETIME NULL,
-    next_backup DATETIME NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ON UPDATE CURRENT_TIMESTAMP
-);
+-- ============================================================
+-- PART B: CANONICAL UNIVERSAL + ENTITLEMENT SCHEMA
+-- ============================================================
+
+-- Examcenter Universal Architecture / Pro Architecture v2
+-- MySQL / MariaDB, utf8mb4
+-- Additive migration: legacy CBT tables remain operational.
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    migration_key VARCHAR(191) NOT NULL UNIQUE,
+    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS institution_types (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(80) NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    description TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS institutions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_type_id INT UNSIGNED NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(100) NULL UNIQUE,
+    timezone VARCHAR(100) NOT NULL DEFAULT 'Africa/Lagos',
+    country_code CHAR(2) NULL,
+    settings JSON NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_institutions_type FOREIGN KEY (institution_type_id) REFERENCES institution_types(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS organizational_unit_types (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(80) NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    description TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS organizational_units (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    unit_type_id INT UNSIGNED NOT NULL,
+    parent_id BIGINT UNSIGNED NULL,
+    legacy_class_id INT NULL,
+    code VARCHAR(100) NULL,
+    name VARCHAR(255) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_org_unit_code (institution_id, code),
+    CONSTRAINT fk_org_units_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_org_units_type FOREIGN KEY (unit_type_id) REFERENCES organizational_unit_types(id),
+    CONSTRAINT fk_org_units_parent FOREIGN KEY (parent_id) REFERENCES organizational_units(id) ON DELETE SET NULL,
+    CONSTRAINT fk_org_units_legacy_class FOREIGN KEY (legacy_class_id) REFERENCES classes(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS academic_periods (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    parent_id BIGINT UNSIGNED NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    period_type VARCHAR(50) NOT NULL,
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'inactive',
+    metadata JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_period_code (institution_id, code),
+    CONSTRAINT fk_period_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_period_parent FOREIGN KEY (parent_id) REFERENCES academic_periods(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS programmes (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    programme_type VARCHAR(80) NULL,
+    description TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_programme_code (institution_id, code),
+    CONSTRAINT fk_programmes_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS programme_levels (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    programme_id BIGINT UNSIGNED NOT NULL,
+    organizational_unit_id BIGINT UNSIGNED NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    metadata JSON NULL,
+    UNIQUE KEY uq_programme_level (programme_id, code),
+    CONSTRAINT fk_programme_levels_programme FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_programme_levels_unit FOREIGN KEY (organizational_unit_id) REFERENCES organizational_units(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS people (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    first_name VARCHAR(120) NULL,
+    middle_name VARCHAR(120) NULL,
+    last_name VARCHAR(120) NULL,
+    display_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NULL,
+    phone VARCHAR(50) NULL,
+    external_ref VARCHAR(150) NULL,
+    photo_path VARCHAR(500) NULL,
+    metadata JSON NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_person_external_ref (institution_id, external_ref),
+    CONSTRAINT fk_people_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS institution_memberships (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    person_id BIGINT UNSIGNED NOT NULL,
+    role_code VARCHAR(50) NOT NULL,
+    legacy_student_id INT NULL,
+    legacy_teacher_id INT NULL,
+    legacy_admin_id INT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'active',
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    metadata JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_person_role (institution_id, person_id, role_code),
+    CONSTRAINT fk_membership_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_membership_person FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
+    CONSTRAINT fk_membership_student FOREIGN KEY (legacy_student_id) REFERENCES students(id) ON DELETE SET NULL,
+    CONSTRAINT fk_membership_teacher FOREIGN KEY (legacy_teacher_id) REFERENCES teachers(id) ON DELETE SET NULL,
+    CONSTRAINT fk_membership_admin FOREIGN KEY (legacy_admin_id) REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS unit_memberships (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    unit_id BIGINT UNSIGNED NOT NULL,
+    person_id BIGINT UNSIGNED NOT NULL,
+    membership_role VARCHAR(50) NOT NULL DEFAULT 'member',
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_unit_person_role (unit_id, person_id, membership_role),
+    CONSTRAINT fk_unit_membership_unit FOREIGN KEY (unit_id) REFERENCES organizational_units(id) ON DELETE CASCADE,
+    CONSTRAINT fk_unit_membership_person FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS courses (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    programme_id BIGINT UNSIGNED NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    course_type VARCHAR(80) NULL,
+    description TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_course_code (institution_id, code),
+    CONSTRAINT fk_courses_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_courses_programme FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS course_assignments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    course_id BIGINT UNSIGNED NOT NULL,
+    unit_id BIGINT UNSIGNED NULL,
+    person_id BIGINT UNSIGNED NULL,
+    academic_period_id BIGINT UNSIGNED NULL,
+    role_code VARCHAR(50) NOT NULL DEFAULT 'teacher',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_course_assignment (course_id, unit_id, person_id, academic_period_id, role_code),
+    CONSTRAINT fk_course_assignment_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_assignment_unit FOREIGN KEY (unit_id) REFERENCES organizational_units(id) ON DELETE SET NULL,
+    CONSTRAINT fk_course_assignment_person FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE SET NULL,
+    CONSTRAINT fk_course_assignment_period FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS assessment_groups (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    group_type VARCHAR(80) NULL,
+    weighting DECIMAL(8,3) NULL,
+    metadata JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_assessment_group (institution_id, code),
+    CONSTRAINT fk_assessment_groups_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS assessment_group_assignments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    assessment_group_id BIGINT UNSIGNED NOT NULL,
+    unit_id BIGINT UNSIGNED NULL,
+    programme_id BIGINT UNSIGNED NULL,
+    academic_period_id BIGINT UNSIGNED NULL,
+    course_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_assessment_group_assignment (assessment_group_id, unit_id, programme_id, academic_period_id, course_id),
+    CONSTRAINT fk_aga_group FOREIGN KEY (assessment_group_id) REFERENCES assessment_groups(id) ON DELETE CASCADE,
+    CONSTRAINT fk_aga_unit FOREIGN KEY (unit_id) REFERENCES organizational_units(id) ON DELETE SET NULL,
+    CONSTRAINT fk_aga_programme FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE SET NULL,
+    CONSTRAINT fk_aga_period FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE SET NULL,
+    CONSTRAINT fk_aga_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS universal_assessment_context (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    test_id INT NOT NULL,
+    institution_id BIGINT UNSIGNED NOT NULL,
+    unit_id BIGINT UNSIGNED NULL,
+    programme_id BIGINT UNSIGNED NULL,
+    academic_period_id BIGINT UNSIGNED NULL,
+    course_id BIGINT UNSIGNED NULL,
+    assessment_group_id BIGINT UNSIGNED NULL,
+    assessment_type VARCHAR(80) NOT NULL DEFAULT 'exam',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_assessment_context_test (test_id),
+    CONSTRAINT fk_uac_test FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE,
+    CONSTRAINT fk_uac_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_uac_unit FOREIGN KEY (unit_id) REFERENCES organizational_units(id) ON DELETE SET NULL,
+    CONSTRAINT fk_uac_programme FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE SET NULL,
+    CONSTRAINT fk_uac_period FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id) ON DELETE SET NULL,
+    CONSTRAINT fk_uac_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL,
+    CONSTRAINT fk_uac_group FOREIGN KEY (assessment_group_id) REFERENCES assessment_groups(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pro_entitlement_cache (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    entitlement_id CHAR(36) NULL,
+    product_code VARCHAR(80) NOT NULL DEFAULT 'examcenter',
+    edition VARCHAR(50) NOT NULL DEFAULT 'pro',
+    status VARCHAR(30) NOT NULL DEFAULT 'unknown',
+    installation_id VARCHAR(255) NOT NULL,
+    machine_id VARCHAR(255) NOT NULL,
+    starts_at DATETIME NULL,
+    expires_at DATETIME NULL,
+    package_version INT NOT NULL DEFAULT 2,
+    public_key_version VARCHAR(30) NULL,
+    signed_package LONGTEXT NOT NULL,
+    last_verified_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pro_entitlement_installation (installation_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pro_entitlement_features (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    entitlement_cache_id BIGINT UNSIGNED NOT NULL,
+    feature_code VARCHAR(100) NOT NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pro_entitlement_feature (entitlement_cache_id, feature_code),
+    CONSTRAINT fk_pro_feature_cache FOREIGN KEY (entitlement_cache_id) REFERENCES pro_entitlement_cache(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO institution_types (code, name) VALUES
+('primary_school', 'Primary School'),
+('secondary_school', 'Secondary School'),
+('tertiary_institution', 'Tertiary Institution'),
+('vocational_institution', 'Vocational / Training Institution'),
+('corporate', 'Corporate / Organisation'),
+('assessment_centre', 'Assessment Centre'),
+('other', 'Other');
+
+INSERT IGNORE INTO organizational_unit_types (code, name) VALUES
+('campus', 'Campus'),
+('faculty', 'Faculty'),
+('department', 'Department'),
+('school', 'School / College'),
+('grade', 'Grade / Year'),
+('class', 'Class / Stream'),
+('cohort', 'Cohort'),
+('programme', 'Programme'),
+('division', 'Division'),
+('team', 'Team'),
+('custom', 'Custom');
+
+CREATE TABLE IF NOT EXISTS theory_assessments (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,instructions TEXT NULL,marking_mode VARCHAR(40) NOT NULL DEFAULT 'offline_ai',ai_model VARCHAR(150) NULL,ai_model_version VARCHAR(100) NULL,status VARCHAR(30) NOT NULL DEFAULT 'draft',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_theory_test (test_id),CONSTRAINT fk_theory_assessment_test FOREIGN KEY (test_id) REFERENCES tests(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_questions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,theory_assessment_id BIGINT UNSIGNED NOT NULL,question_number INT UNSIGNED NOT NULL,question_text LONGTEXT NOT NULL,maximum_marks DECIMAL(8,2) NOT NULL,answer_guidance LONGTEXT NULL,allow_ai_knowledge BOOLEAN NOT NULL DEFAULT TRUE,metadata JSON NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_theory_question_number (theory_assessment_id,question_number),CONSTRAINT fk_theory_question_assessment FOREIGN KEY (theory_assessment_id) REFERENCES theory_assessments(id) ON DELETE CASCADE,CHECK (maximum_marks > 0)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_submissions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,theory_assessment_id BIGINT UNSIGNED NOT NULL,student_id INT NOT NULL,started_at DATETIME NULL,submitted_at DATETIME NULL,status VARCHAR(30) NOT NULL DEFAULT 'in_progress',total_marks DECIMAL(10,2) NULL,maximum_marks DECIMAL(10,2) NULL,grading_status VARCHAR(30) NOT NULL DEFAULT 'pending',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_theory_submission_student (theory_assessment_id,student_id),CONSTRAINT fk_theory_submission_assessment FOREIGN KEY (theory_assessment_id) REFERENCES theory_assessments(id) ON DELETE CASCADE,CONSTRAINT fk_theory_submission_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_answers (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,submission_id BIGINT UNSIGNED NOT NULL,theory_question_id BIGINT UNSIGNED NOT NULL,answer_text LONGTEXT NOT NULL,word_count INT UNSIGNED NOT NULL DEFAULT 0,submitted_at DATETIME NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_theory_answer (submission_id,theory_question_id),CONSTRAINT fk_theory_answer_submission FOREIGN KEY (submission_id) REFERENCES theory_submissions(id) ON DELETE CASCADE,CONSTRAINT fk_theory_answer_question FOREIGN KEY (theory_question_id) REFERENCES theory_questions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_marks (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,answer_id BIGINT UNSIGNED NOT NULL,awarded_marks DECIMAL(8,2) NOT NULL DEFAULT 0,maximum_marks DECIMAL(8,2) NOT NULL,percentage DECIMAL(7,3) NOT NULL DEFAULT 0,confidence DECIMAL(5,4) NULL,relevance_score DECIMAL(5,4) NULL,correctness_score DECIMAL(5,4) NULL,completeness_score DECIMAL(5,4) NULL,understanding_score DECIMAL(5,4) NULL,explanation LONGTEXT NULL,strengths LONGTEXT NULL,weaknesses LONGTEXT NULL,missing_points LONGTEXT NULL,grading_model VARCHAR(150) NULL,grading_model_version VARCHAR(100) NULL,grading_prompt_version VARCHAR(50) NULL,status VARCHAR(30) NOT NULL DEFAULT 'ai_provisional',graded_at DATETIME NULL,reviewed_by INT NULL,reviewed_at DATETIME NULL,review_reason TEXT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_theory_mark_answer (answer_id),CONSTRAINT fk_theory_mark_answer FOREIGN KEY (answer_id) REFERENCES theory_answers(id) ON DELETE CASCADE,CHECK (awarded_marks >= 0),CHECK (awarded_marks <= maximum_marks),CHECK (percentage >= 0 AND percentage <= 100)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_grading_runs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,submission_id BIGINT UNSIGNED NOT NULL,model_name VARCHAR(150) NOT NULL,model_version VARCHAR(100) NULL,prompt_version VARCHAR(50) NOT NULL,runtime VARCHAR(100) NOT NULL DEFAULT 'ollama',started_at DATETIME NOT NULL,completed_at DATETIME NULL,status VARCHAR(30) NOT NULL DEFAULT 'running',error_message TEXT NULL,metadata JSON NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_theory_run_submission FOREIGN KEY (submission_id) REFERENCES theory_submissions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_grading_events (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,grading_run_id BIGINT UNSIGNED NOT NULL,answer_id BIGINT UNSIGNED NULL,event_type VARCHAR(50) NOT NULL,event_data JSON NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_theory_event_run FOREIGN KEY (grading_run_id) REFERENCES theory_grading_runs(id) ON DELETE CASCADE,CONSTRAINT fk_theory_event_answer FOREIGN KEY (answer_id) REFERENCES theory_answers(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_ai_settings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NULL,enabled BOOLEAN NOT NULL DEFAULT TRUE,provider VARCHAR(50) NOT NULL DEFAULT 'ollama',model_name VARCHAR(150) NOT NULL DEFAULT 'qwen3:1.7b',embedding_model VARCHAR(150) NULL DEFAULT 'nomic-embed-text',endpoint VARCHAR(255) NOT NULL DEFAULT 'http://127.0.0.1:11434',timeout_seconds INT UNSIGNED NOT NULL DEFAULT 300,temperature DECIMAL(4,3) NOT NULL DEFAULT 0.1,max_retries TINYINT UNSIGNED NOT NULL DEFAULT 2,metadata JSON NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,CONSTRAINT fk_theory_ai_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_ai_knowledge_sources (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NULL,title VARCHAR(255) NOT NULL,source_type VARCHAR(50) NOT NULL DEFAULT 'local_document',file_path VARCHAR(1000) NULL,content_hash CHAR(64) NULL,indexed BOOLEAN NOT NULL DEFAULT FALSE,metadata JSON NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,CONSTRAINT fk_theory_knowledge_institution FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS theory_manual_reviews (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,mark_id BIGINT UNSIGNED NOT NULL,reviewer_id INT NULL,original_awarded_marks DECIMAL(8,2) NOT NULL,final_awarded_marks DECIMAL(8,2) NOT NULL,reason TEXT NOT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_theory_review_mark FOREIGN KEY (mark_id) REFERENCES theory_marks(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Examcenter Pro Assessment Suite (additive)
+CREATE TABLE IF NOT EXISTS pro_feature_catalog (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,feature_code VARCHAR(100) NOT NULL UNIQUE,name VARCHAR(180) NOT NULL,description TEXT NULL,is_active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_question_bank_items (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,question_id INT NOT NULL,topic VARCHAR(180) NULL,subtopic VARCHAR(180) NULL,difficulty VARCHAR(30) NULL,bloom_level VARCHAR(50) NULL,learning_objective VARCHAR(255) NULL,status VARCHAR(30) NOT NULL DEFAULT 'draft',version_no INT UNSIGNED NOT NULL DEFAULT 1,parent_item_id BIGINT UNSIGNED NULL,author_person_id BIGINT UNSIGNED NULL,reviewer_person_id BIGINT UNSIGNED NULL,metadata JSON NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_qb_question(question_id),INDEX idx_pro_qb_topic(topic),INDEX idx_pro_qb_status(status),CONSTRAINT fk_pro_qb_question FOREIGN KEY(question_id) REFERENCES new_questions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_qb_parent FOREIGN KEY(parent_item_id) REFERENCES pro_question_bank_items(id) ON DELETE SET NULL,CONSTRAINT fk_pro_qb_author FOREIGN KEY(author_person_id) REFERENCES people(id) ON DELETE SET NULL,CONSTRAINT fk_pro_qb_reviewer FOREIGN KEY(reviewer_person_id) REFERENCES people(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_question_collections (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NOT NULL,code VARCHAR(100) NOT NULL,name VARCHAR(255) NOT NULL,description TEXT NULL,status VARCHAR(30) NOT NULL DEFAULT 'active',created_by_person_id BIGINT UNSIGNED NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_collection(institution_id,code),CONSTRAINT fk_pro_collection_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_collection_creator FOREIGN KEY(created_by_person_id) REFERENCES people(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_question_collection_items (collection_id BIGINT UNSIGNED NOT NULL,bank_item_id BIGINT UNSIGNED NOT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(collection_id,bank_item_id),CONSTRAINT fk_pro_collection_item_collection FOREIGN KEY(collection_id) REFERENCES pro_question_collections(id) ON DELETE CASCADE,CONSTRAINT fk_pro_collection_item_item FOREIGN KEY(bank_item_id) REFERENCES pro_question_bank_items(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_blueprints (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NOT NULL,name VARCHAR(255) NOT NULL,description TEXT NULL,total_items INT UNSIGNED NOT NULL DEFAULT 0,status VARCHAR(30) NOT NULL DEFAULT 'draft',version_no INT UNSIGNED NOT NULL DEFAULT 1,created_by_person_id BIGINT UNSIGNED NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,CONSTRAINT fk_pro_blueprint_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_blueprint_creator FOREIGN KEY(created_by_person_id) REFERENCES people(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_blueprint_rules (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,blueprint_id BIGINT UNSIGNED NOT NULL,collection_id BIGINT UNSIGNED NULL,topic VARCHAR(180) NULL,difficulty VARCHAR(30) NULL,bloom_level VARCHAR(50) NULL,item_count INT UNSIGNED NOT NULL,marks_each DECIMAL(8,2) NULL,sort_order INT NOT NULL DEFAULT 0,metadata JSON NULL,CONSTRAINT fk_pro_rule_blueprint FOREIGN KEY(blueprint_id) REFERENCES pro_blueprints(id) ON DELETE CASCADE,CONSTRAINT fk_pro_rule_collection FOREIGN KEY(collection_id) REFERENCES pro_question_collections(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_blueprint_assemblies (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,blueprint_id BIGINT UNSIGNED NOT NULL,test_id INT NULL,seed VARCHAR(120) NULL,status VARCHAR(30) NOT NULL DEFAULT 'generated',generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,metadata JSON NULL,CONSTRAINT fk_pro_assembly_blueprint FOREIGN KEY(blueprint_id) REFERENCES pro_blueprints(id) ON DELETE CASCADE,CONSTRAINT fk_pro_assembly_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_blueprint_assembly_items (assembly_id BIGINT UNSIGNED NOT NULL,bank_item_id BIGINT UNSIGNED NOT NULL,sequence_no INT UNSIGNED NOT NULL,PRIMARY KEY(assembly_id,bank_item_id),UNIQUE KEY uq_pro_assembly_sequence(assembly_id,sequence_no),CONSTRAINT fk_pro_assembly_item_assembly FOREIGN KEY(assembly_id) REFERENCES pro_blueprint_assemblies(id) ON DELETE CASCADE,CONSTRAINT fk_pro_assembly_item_bank FOREIGN KEY(bank_item_id) REFERENCES pro_question_bank_items(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_item_analysis (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,question_id INT NOT NULL,sample_size INT UNSIGNED NOT NULL DEFAULT 0,difficulty_index DECIMAL(7,4) NULL,discrimination_index DECIMAL(7,4) NULL,facility_index DECIMAL(7,4) NULL,option_stats JSON NULL,reliability_contribution DECIMAL(7,4) NULL,recommendation VARCHAR(50) NULL,computed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_item_analysis(test_id,question_id),CONSTRAINT fk_pro_item_analysis_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE,CONSTRAINT fk_pro_item_analysis_question FOREIGN KEY(question_id) REFERENCES new_questions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_secure_exam_policies (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,fullscreen_required TINYINT(1) NOT NULL DEFAULT 1,block_copy_paste TINYINT(1) NOT NULL DEFAULT 1,block_context_menu TINYINT(1) NOT NULL DEFAULT 1,detect_focus_loss TINYINT(1) NOT NULL DEFAULT 1,detect_visibility_change TINYINT(1) NOT NULL DEFAULT 1,detect_multi_monitor TINYINT(1) NOT NULL DEFAULT 0,max_violations INT UNSIGNED NOT NULL DEFAULT 3,auto_pause_on_violation TINYINT(1) NOT NULL DEFAULT 0,terminate_on_threshold TINYINT(1) NOT NULL DEFAULT 0,notes TEXT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_secure_policy_test(test_id),CONSTRAINT fk_pro_secure_policy_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_exam_security_events (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,student_id INT NULL,attempt_id INT NULL,event_type VARCHAR(80) NOT NULL,severity VARCHAR(20) NOT NULL DEFAULT 'info',evidence JSON NULL,occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,reviewed TINYINT(1) NOT NULL DEFAULT 0,reviewed_by INT NULL,reviewed_at DATETIME NULL,review_decision VARCHAR(50) NULL,review_note TEXT NULL,INDEX idx_pro_security_test(test_id,occurred_at),CONSTRAINT fk_pro_security_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE,CONSTRAINT fk_pro_security_student FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE SET NULL,CONSTRAINT fk_pro_security_attempt FOREIGN KEY(attempt_id) REFERENCES exam_attempts(id) ON DELETE SET NULL,CONSTRAINT fk_pro_security_reviewer FOREIGN KEY(reviewed_by) REFERENCES admins(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_exam_sessions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,institution_id BIGINT UNSIGNED NOT NULL,campus_id BIGINT UNSIGNED NULL,room_name VARCHAR(180) NULL,session_code VARCHAR(100) NOT NULL,starts_at DATETIME NOT NULL,ends_at DATETIME NOT NULL,status VARCHAR(30) NOT NULL DEFAULT 'scheduled',capacity INT UNSIGNED NULL,notes TEXT NULL,created_by_admin_id INT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_exam_session_code(session_code),CONSTRAINT fk_pro_session_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE,CONSTRAINT fk_pro_session_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_session_creator FOREIGN KEY(created_by_admin_id) REFERENCES admins(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_exam_session_candidates (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,session_id BIGINT UNSIGNED NOT NULL,student_id INT NULL,person_id BIGINT UNSIGNED NULL,seat_no VARCHAR(50) NULL,checkin_at DATETIME NULL,checkout_at DATETIME NULL,status VARCHAR(30) NOT NULL DEFAULT 'registered',incident_count INT UNSIGNED NOT NULL DEFAULT 0,UNIQUE KEY uq_pro_session_candidate_student(session_id,student_id),CONSTRAINT fk_pro_candidate_session FOREIGN KEY(session_id) REFERENCES pro_exam_sessions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_candidate_student FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE SET NULL,CONSTRAINT fk_pro_candidate_person FOREIGN KEY(person_id) REFERENCES people(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_invigilators (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,session_id BIGINT UNSIGNED NOT NULL,person_id BIGINT UNSIGNED NULL,admin_id INT NULL,role_code VARCHAR(50) NOT NULL DEFAULT 'invigilator',checked_in_at DATETIME NULL,UNIQUE KEY uq_pro_invigilator(session_id,person_id,admin_id),CONSTRAINT fk_pro_invigilator_session FOREIGN KEY(session_id) REFERENCES pro_exam_sessions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_invigilator_person FOREIGN KEY(person_id) REFERENCES people(id) ON DELETE SET NULL,CONSTRAINT fk_pro_invigilator_admin FOREIGN KEY(admin_id) REFERENCES admins(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_session_incidents (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,session_id BIGINT UNSIGNED NOT NULL,candidate_id BIGINT UNSIGNED NULL,incident_type VARCHAR(80) NOT NULL,severity VARCHAR(20) NOT NULL DEFAULT 'medium',description TEXT NULL,action_taken VARCHAR(100) NULL,recorded_by_admin_id INT NULL,recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_pro_incident_session FOREIGN KEY(session_id) REFERENCES pro_exam_sessions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_incident_candidate FOREIGN KEY(candidate_id) REFERENCES pro_exam_session_candidates(id) ON DELETE SET NULL,CONSTRAINT fk_pro_incident_admin FOREIGN KEY(recorded_by_admin_id) REFERENCES admins(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_certificate_templates (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NOT NULL,name VARCHAR(180) NOT NULL,title VARCHAR(255) NOT NULL,body_template LONGTEXT NULL,logo_path VARCHAR(500) NULL,settings JSON NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_pro_cert_template_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_certificates (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NOT NULL,template_id BIGINT UNSIGNED NULL,student_id INT NULL,person_id BIGINT UNSIGNED NULL,test_id INT NULL,certificate_no VARCHAR(100) NOT NULL,recipient_name VARCHAR(255) NOT NULL,issued_at DATETIME NOT NULL,expires_at DATETIME NULL,status VARCHAR(30) NOT NULL DEFAULT 'issued',verification_token CHAR(64) NOT NULL,metadata JSON NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_certificate_no(certificate_no),UNIQUE KEY uq_pro_certificate_token(verification_token),CONSTRAINT fk_pro_certificate_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_certificate_template FOREIGN KEY(template_id) REFERENCES pro_certificate_templates(id) ON DELETE SET NULL,CONSTRAINT fk_pro_certificate_student FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE SET NULL,CONSTRAINT fk_pro_certificate_person FOREIGN KEY(person_id) REFERENCES people(id) ON DELETE SET NULL,CONSTRAINT fk_pro_certificate_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_campuses (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NOT NULL,organizational_unit_id BIGINT UNSIGNED NULL,code VARCHAR(100) NOT NULL,name VARCHAR(255) NOT NULL,address TEXT NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_campus_code(institution_id,code),CONSTRAINT fk_pro_campus_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_campus_unit FOREIGN KEY(organizational_unit_id) REFERENCES organizational_units(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_campus_memberships (campus_id BIGINT UNSIGNED NOT NULL,person_id BIGINT UNSIGNED NOT NULL,role_code VARCHAR(50) NOT NULL DEFAULT 'member',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(campus_id,person_id,role_code),CONSTRAINT fk_pro_campus_member_campus FOREIGN KEY(campus_id) REFERENCES pro_campuses(id) ON DELETE CASCADE,CONSTRAINT fk_pro_campus_member_person FOREIGN KEY(person_id) REFERENCES people(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_ai_assessment_jobs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NOT NULL,test_id INT NULL,job_type VARCHAR(50) NOT NULL,model_name VARCHAR(150) NOT NULL DEFAULT 'qwen3:1.7b',prompt_version VARCHAR(50) NOT NULL DEFAULT 'v1',input_text LONGTEXT NOT NULL,output_json LONGTEXT NULL,status VARCHAR(30) NOT NULL DEFAULT 'pending',requires_approval TINYINT(1) NOT NULL DEFAULT 1,approved_by INT NULL,approved_at DATETIME NULL,error_message TEXT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,completed_at DATETIME NULL,CONSTRAINT fk_pro_ai_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_ai_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE SET NULL,CONSTRAINT fk_pro_ai_approver FOREIGN KEY(approved_by) REFERENCES admins(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_examiner_assignments (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,examiner_person_id BIGINT UNSIGNED NULL,examiner_admin_id INT NULL,scope_type VARCHAR(40) NOT NULL DEFAULT 'test',scope_id BIGINT UNSIGNED NULL,status VARCHAR(30) NOT NULL DEFAULT 'assigned',assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,completed_at DATETIME NULL,CONSTRAINT fk_pro_examiner_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE,CONSTRAINT fk_pro_examiner_person FOREIGN KEY(examiner_person_id) REFERENCES people(id) ON DELETE SET NULL,CONSTRAINT fk_pro_examiner_admin FOREIGN KEY(examiner_admin_id) REFERENCES admins(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_moderation_reviews (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,student_id INT NULL,answer_ref VARCHAR(120) NULL,primary_examiner_id BIGINT UNSIGNED NULL,moderator_id BIGINT UNSIGNED NULL,original_mark DECIMAL(10,2) NULL,moderated_mark DECIMAL(10,2) NULL,decision VARCHAR(40) NOT NULL DEFAULT 'pending',reason TEXT NULL,reviewed_at DATETIME NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_pro_moderation_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE,CONSTRAINT fk_pro_moderation_student FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE SET NULL,CONSTRAINT fk_pro_moderation_examiner FOREIGN KEY(primary_examiner_id) REFERENCES people(id) ON DELETE SET NULL,CONSTRAINT fk_pro_moderation_moderator FOREIGN KEY(moderator_id) REFERENCES people(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_mark_appeals (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT NOT NULL,student_id INT NULL,moderation_review_id BIGINT UNSIGNED NULL,reason TEXT NOT NULL,status VARCHAR(30) NOT NULL DEFAULT 'submitted',decision TEXT NULL,decided_by INT NULL,decided_at DATETIME NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_pro_appeal_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE,CONSTRAINT fk_pro_appeal_student FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE SET NULL,CONSTRAINT fk_pro_appeal_review FOREIGN KEY(moderation_review_id) REFERENCES pro_moderation_reviews(id) ON DELETE SET NULL,CONSTRAINT fk_pro_appeal_decider FOREIGN KEY(decided_by) REFERENCES admins(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_corporate_assessments (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,institution_id BIGINT UNSIGNED NOT NULL,test_id INT NULL,assessment_code VARCHAR(100) NOT NULL,name VARCHAR(255) NOT NULL,assessment_type VARCHAR(60) NOT NULL DEFAULT 'recruitment',department VARCHAR(180) NULL,role_title VARCHAR(180) NULL,pass_score DECIMAL(6,2) NULL,ranking_enabled TINYINT(1) NOT NULL DEFAULT 1,status VARCHAR(30) NOT NULL DEFAULT 'draft',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_corp_code(institution_id,assessment_code),CONSTRAINT fk_pro_corp_institution FOREIGN KEY(institution_id) REFERENCES institutions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_corp_test FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_corporate_candidates (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,corporate_assessment_id BIGINT UNSIGNED NOT NULL,person_id BIGINT UNSIGNED NULL,external_ref VARCHAR(150) NULL,application_status VARCHAR(50) NOT NULL DEFAULT 'invited',score DECIMAL(10,2) NULL,percentile DECIMAL(7,3) NULL,outcome VARCHAR(50) NULL,invited_at DATETIME NULL,completed_at DATETIME NULL,metadata JSON NULL,CONSTRAINT fk_pro_corp_candidate_assessment FOREIGN KEY(corporate_assessment_id) REFERENCES pro_corporate_assessments(id) ON DELETE CASCADE,CONSTRAINT fk_pro_corp_candidate_person FOREIGN KEY(person_id) REFERENCES people(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_coding_questions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,question_id INT NOT NULL,language_set JSON NOT NULL,starter_code LONGTEXT NULL,time_limit_ms INT UNSIGNED NOT NULL DEFAULT 3000,memory_limit_mb INT UNSIGNED NOT NULL DEFAULT 256,scoring_mode VARCHAR(30) NOT NULL DEFAULT 'test_cases',created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_coding_question(question_id),CONSTRAINT fk_pro_coding_question FOREIGN KEY(question_id) REFERENCES new_questions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_coding_test_cases (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,coding_question_id BIGINT UNSIGNED NOT NULL,input_data LONGTEXT NULL,expected_output LONGTEXT NOT NULL,hidden TINYINT(1) NOT NULL DEFAULT 1,points DECIMAL(8,2) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,CONSTRAINT fk_pro_coding_case_question FOREIGN KEY(coding_question_id) REFERENCES pro_coding_questions(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_coding_submissions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,coding_question_id BIGINT UNSIGNED NOT NULL,student_id INT NULL,attempt_id INT NULL,language VARCHAR(50) NOT NULL,source_code LONGTEXT NOT NULL,status VARCHAR(30) NOT NULL DEFAULT 'queued',score DECIMAL(10,2) NOT NULL DEFAULT 0,max_score DECIMAL(10,2) NOT NULL DEFAULT 0,runtime_ms INT NULL,memory_kb INT NULL,output_text LONGTEXT NULL,error_text LONGTEXT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,completed_at DATETIME NULL,CONSTRAINT fk_pro_coding_submission_question FOREIGN KEY(coding_question_id) REFERENCES pro_coding_questions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_coding_submission_student FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE SET NULL,CONSTRAINT fk_pro_coding_submission_attempt FOREIGN KEY(attempt_id) REFERENCES exam_attempts(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pro_coding_test_results (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,submission_id BIGINT UNSIGNED NOT NULL,test_case_id BIGINT UNSIGNED NOT NULL,passed TINYINT(1) NOT NULL DEFAULT 0,actual_output LONGTEXT NULL,runtime_ms INT NULL,error_text TEXT NULL,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_pro_coding_case_result(submission_id,test_case_id),CONSTRAINT fk_pro_coding_result_submission FOREIGN KEY(submission_id) REFERENCES pro_coding_submissions(id) ON DELETE CASCADE,CONSTRAINT fk_pro_coding_result_case FOREIGN KEY(test_case_id) REFERENCES pro_coding_test_cases(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO pro_feature_catalog(feature_code,name,description) VALUES
+('question_bank_pro','Advanced Question Bank','Reusable governed question bank with metadata, versioning and review.'),
+('assessment_blueprints','Assessment Blueprinting','Blueprint rules and paper assembly.'),
+('assessment_analytics','Advanced Analytics & Item Analysis','Question, cohort and reliability statistics.'),
+('secure_exam_mode','Secure Exam Mode','Fullscreen, focus, clipboard and integrity controls.'),
+('exam_sessions','Exam Session & Invigilation','Sessions, rooms, candidates, invigilators and incidents.'),
+('certificates','Certificates & Verification','Issued certificates with verification tokens.'),
+('multi_campus','Multi-Campus Administration','Central administration across campuses.'),
+('ai_assessment','AI Assessment Suite','Offline AI authoring and assessment assistance.'),
+('examiner_moderation','Examiner & Moderation','Examiner assignment, moderation and appeals.'),
+('corporate_assessment','Corporate Assessment','Recruitment, competency and employee assessments.'),
+('coding_assessment','Coding Assessments','Programming questions and controlled local runners.');
+-- Examcenter system-audit hardening migration.
+-- Repairs schema contracts that the Universal/Pro PHP layer already expects.
+-- Safe for installations that have already applied 0001-0003.
+
+ALTER TABLE tests
+    ADD COLUMN IF NOT EXISTS institution_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS organizational_unit_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS programme_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS programme_level_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS academic_period_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS course_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS assessment_group_id BIGINT UNSIGNED NULL;
+
+ALTER TABLE courses
+    ADD COLUMN IF NOT EXISTS legacy_subject_id INT NULL;
+
+ALTER TABLE academic_periods
+    ADD COLUMN IF NOT EXISTS legacy_academic_year_id INT NULL;
+
+ALTER TABLE exam_attempts
+    ADD COLUMN IF NOT EXISTS institution_membership_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS assessment_assignment_id BIGINT UNSIGNED NULL;
+
+ALTER TABLE results
+    ADD COLUMN IF NOT EXISTS institution_membership_id BIGINT UNSIGNED NULL,
+    ADD COLUMN IF NOT EXISTS academic_period_id BIGINT UNSIGNED NULL;
+
+CREATE TABLE IF NOT EXISTS assessment_assignments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    assessment_group_id BIGINT UNSIGNED NOT NULL,
+    institution_membership_id BIGINT UNSIGNED NULL,
+    organizational_unit_id BIGINT UNSIGNED NULL,
+    programme_level_id BIGINT UNSIGNED NULL,
+    course_id BIGINT UNSIGNED NULL,
+    assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    due_at DATETIME NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'assigned',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_assessment_assignment_group (assessment_group_id),
+    INDEX idx_assessment_assignment_member (institution_membership_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS exam_attempt_sessions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    test_id INT NOT NULL,
+    attempt_no INT UNSIGNED NOT NULL DEFAULT 1,
+    institution_membership_id BIGINT UNSIGNED NULL,
+    started_at DATETIME NOT NULL,
+    last_activity_at DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL,
+    submitted_at DATETIME NULL,
+    current_index INT UNSIGNED NOT NULL DEFAULT 0,
+    status VARCHAR(30) NOT NULL DEFAULT 'in_progress',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_exam_attempt_session (user_id, test_id, attempt_no),
+    INDEX idx_exam_attempt_session_status (test_id, status),
+    INDEX idx_exam_attempt_session_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS exam_attempt_events (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    attempt_session_id BIGINT UNSIGNED NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    question_id INT NULL,
+    metadata JSON NULL,
+    occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_exam_attempt_events_session (attempt_session_id, occurred_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS core_feature_catalog (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    feature_code VARCHAR(100) NOT NULL UNIQUE,
+    feature_name VARCHAR(180) NOT NULL,
+    description TEXT NULL,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO core_feature_catalog(feature_code, feature_name, description) VALUES
+('institution_setup','Institution Setup','Configure the assessment organisation.'),
+('academic_structure','Academic/Organisational Structure','Classes, units, programmes, levels and periods.'),
+('identity_access','Identity and Access','Administrators, teachers and candidates.'),
+('question_authoring','Question Authoring','Create and manage assessment questions.'),
+('assessment_authoring','Assessment Authoring','Create, configure and publish tests.'),
+('assessment_scheduling','Assessment Scheduling','Schedule and reschedule examinations.'),
+('exam_delivery','Exam Delivery','Offline candidate examination workflow.'),
+('exam_recovery','Exam Recovery','Persist answers and recover interrupted attempts.'),
+('objective_marking','Objective Marking','Automatic objective-question marking.'),
+('theory_assessment','Theory Assessment','Written answers and manual/AI-assisted marking.'),
+('results','Results','Calculate, store and view assessment results.'),
+('basic_reporting','Basic Reporting','Essential candidate and assessment reports.'),
+('offline_operation','Offline Operation','Core assessment lifecycle without Internet.'),
+('basic_security','Basic Security','Authentication, access control and exam integrity.');
+
+
+SET FOREIGN_KEY_CHECKS = 1;
