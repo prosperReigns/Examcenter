@@ -49,12 +49,12 @@ $joins = "
 
 if ($universal_available) {
     $select .= ",
-        ou.unit_name,
-        co.course_code,
-        co.course_name,
+        ou.name,
+        co.code,
+        co.name,
         p.programme_name,
         pl.level_name AS programme_level_name,
-        ap.period_name,
+        ap.name,
         ap.period_type";
     $joins .= "
         LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
