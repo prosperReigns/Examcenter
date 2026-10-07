@@ -121,9 +121,9 @@ try {
     $student_class_select = 'c.class_name AS student_class';
     $class_condition = 'c.class_name = ?';
     if ($universal_reporting_available) {
-        $student_class_select = 'COALESCE(ou.unit_name, c.class_name, s.class) AS student_class';
-        $class_condition = 'COALESCE(ou.unit_name, c.class_name, s.class) = ?';
-        $universal_select = ", ccourse.course_name, ap.period_name, t.organizational_unit_id,
+        $student_class_select = 'COALESCE(ou.name, c.class_name, s.class) AS student_class';
+        $class_condition = 'COALESCE(ou.name, c.class_name, s.class) = ?';
+        $universal_select = ", ccourse.name, ap.name, t.organizational_unit_id,
             t.course_id, t.academic_period_id";
         $universal_joins = "
             LEFT JOIN organizational_units ou
@@ -132,20 +132,20 @@ try {
                 ON ccourse.id = t.course_id
             LEFT JOIN academic_periods ap
                 ON ap.id = COALESCE(r.academic_period_id, t.academic_period_id)";
-        $universal_select = str_replace('c.course_name', 'ccourse.course_name', $universal_select);
+        $universal_select = str_replace('c.course_name', 'ccourse.name', $universal_select);
         if (examcenterUniversalColumnExists($conn, 'tests', 'institution_id')) {
             $universal_scope_condition = ' AND t.institution_id = ?';
         }
     }
 
     if ($universal_reporting_available) {
-        $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+        $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY unit_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+        $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY course_name");
         $stmt->bind_param('i', $active_institution_id);
         $stmt->execute();
         $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
