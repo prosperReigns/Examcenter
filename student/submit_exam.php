@@ -9,6 +9,17 @@ if (!isset($_SESSION['student_id']) || !isset($_SESSION['exam_questions']) || !i
     exit();
 }
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    exit('Method not allowed.');
+}
+
+$csrf = (string)($_POST['csrf_token'] ?? '');
+if ($csrf === '' || !hash_equals((string)($_SESSION['csrf_token'] ?? ''), $csrf)) {
+    http_response_code(403);
+    exit('Invalid request token.');
+}
+
 $conn = Database::getInstance()->getConnection();
 $student_id = $_SESSION['student_id'];
 $test_id = (int)$_SESSION['current_test_id'];
