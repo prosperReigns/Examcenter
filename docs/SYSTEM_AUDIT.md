@@ -116,8 +116,9 @@ Migration `20261007_0004_system_audit_hardening.sql` adds/repairs:
 
 These were identified but are intentionally not disguised as "implemented" by this audit:
 
-1. A complete Universal UI still needs to replace legacy JSS/SS/PRIMARY assumptions in setup/registration screens.
-2. Several existing Universal-facing pages still use legacy column aliases such as `unit_name`, `course_name`, `period_name`, etc.; these need to be migrated to one canonical schema rather than maintaining two competing naming systems.
+1. Remaining legacy administrative screens still expose compatibility-only JSS/SS/PRIMARY workflows; these are now isolated from the authoritative Universal setup and candidate registration flows.
+2. Universal runtime pages now use canonical database columns (`name`, `code`, `is_active`, `parent_id`, etc.). UI result aliases such as `course_name` or `unit_name` are presentation aliases only.
+3. Migration `20261007_0005_legacy_universal_reconciliation.php` upgrades databases created from the earlier Universal draft naming convention.
 3. Advanced Pro capabilities still requiring full implementation include:
    - cloud backup/synchronisation
    - student/parent portals
