@@ -110,7 +110,7 @@ foreach ($questions as $question) {
             $stmt->bind_param("i", $question_id);
             $stmt->execute();
             $result = $stmt->get_result();
-            if ($row = $result->fetch_assoc() && isset($submitted_answers[$question_id])) {
+            if (($row = $result->fetch_assoc()) && isset($submitted_answers[$question_id])) {
                 $correct_array = explode(',', $row['correct_answers']);
                 $submitted_array = is_array($submitted_answers[$question_id]) ? $submitted_answers[$question_id] : [$submitted_answers[$question_id]];
                 sort($correct_array);
@@ -127,8 +127,8 @@ foreach ($questions as $question) {
             $stmt->bind_param("i", $question_id);
             $stmt->execute();
             $result = $stmt->get_result();
-            if ($row = $result->fetch_assoc() && isset($submitted_answers[$question_id])) {
-                if (trim(strtolower($submitted_answers[$question_id])) == trim(strtolower($row['correct_answer']))) {
+            if (($row = $result->fetch_assoc()) && isset($submitted_answers[$question_id])) {
+                if (trim(strtolower((string)$submitted_answers[$question_id])) === trim(strtolower((string)$row['correct_answer']))) {
                     $score++;
                 }
             }
@@ -141,8 +141,8 @@ foreach ($questions as $question) {
             $stmt->bind_param("i", $question_id);
             $stmt->execute();
             $result = $stmt->get_result();
-            if ($row = $result->fetch_assoc() && isset($submitted_answers[$question_id])) {
-                if (trim(strtolower($submitted_answers[$question_id])) == trim(strtolower($row['correct_answer']))) {
+            if (($row = $result->fetch_assoc()) && isset($submitted_answers[$question_id])) {
+                if (trim(strtolower((string)$submitted_answers[$question_id])) === trim(strtolower((string)$row['correct_answer']))) {
                     $score++;
                 }
             }
@@ -150,37 +150,59 @@ foreach ($questions as $question) {
     }
 }
 
-// Store result in database with test_id
-$sql = "INSERT INTO results (user_id, test_id, score, total_questions, created_at) 
-        VALUES (?, ?, ?, ?, NOW())";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("iiii", $student_id, $test_id, $score, $total_questions);
-$stmt->execute();
-$stmt->close();
+// Finalize the result atomically so a partial submission cannot leave
+// the database in an inconsistent state.
+$conn->begin_transaction();
+try {
+    $sql = "INSERT INTO results
+                (user_id, test_id, score, total_questions, created_at, status, reattempt_approved)
+            VALUES (?, ?, ?, ?, NOW(), 'completed', 0)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("iiii", $student_id, $test_id, $score, $total_questions);
+    if (!$stmt->execute()) {
+        throw new RuntimeException('Unable to store examination result.');
+    }
+    $stmt->close();
 
-// =====================================
-// STEP 3: RESET REATTEMPT APPROVAL
-// =====================================
-$stmt = $conn->prepare("
-    UPDATE results
-    SET 
-        reattempt_approved = 0,
-        status = 'completed'
-    WHERE user_id = ? 
-      AND test_id = ?
-      AND reattempt_approved = 1
-");
-$stmt->bind_param("ii", $student_id, $test_id);
-$stmt->execute();
-$stmt->close();
+    // A previous approved reattempt is consumed by this submission.
+    $stmt = $conn->prepare("
+        UPDATE results
+        SET reattempt_approved = 0,
+            status = 'completed'
+        WHERE user_id = ?
+          AND test_id = ?
+          AND reattempt_approved = 1
+    ");
+    $stmt->bind_param("ii", $student_id, $test_id);
+    $stmt->execute();
+    $stmt->close();
 
-$stmt = $conn->prepare("
-    DELETE FROM exam_attempts 
-    WHERE user_id = ? AND test_id = ?
-");
-$stmt->bind_param("ii", $student_id, $test_id);
-$stmt->execute();
-$stmt->close();
+    $stmt = $conn->prepare("
+        UPDATE exam_attempt_sessions
+        SET status = 'submitted',
+            submitted_at = NOW(),
+            updated_at = NOW()
+        WHERE user_id = ? AND test_id = ? AND status = 'in_progress'
+    ");
+    $stmt->bind_param("ii", $student_id, $test_id);
+    $stmt->execute();
+    $stmt->close();
+
+    $stmt = $conn->prepare("
+        DELETE FROM exam_attempts
+        WHERE user_id = ? AND test_id = ?
+    ");
+    $stmt->bind_param("ii", $student_id, $test_id);
+    $stmt->execute();
+    $stmt->close();
+
+    $conn->commit();
+} catch (Throwable $e) {
+    $conn->rollback();
+    error_log('Exam submission failed: ' . $e->getMessage());
+    http_response_code(500);
+    exit('Unable to finalize examination result.');
+}
 
 // Store score in session for result page
 $_SESSION['exam_score'] = $score;
