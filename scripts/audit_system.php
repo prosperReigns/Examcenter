@@ -111,6 +111,12 @@ if (str_contains($universal, 'period_code')) {
     auditFail('Universal period helper still assumes academic_periods.period_code.');
 }
 
+$phpFiles = array_values(array_filter(
+    $files,
+    static fn(string $p): bool => str_ends_with($p, '.php')
+        && !str_contains($p, '/vendor/')
+));
+
 // Every explicit require_pro('feature') code must be registered in ProFeatures.
 $featureFile = file_get_contents($root . '/includes/pro_features.php') ?: '';
 preg_match_all("/='([a-z0-9_]+)'/", $featureFile, $featureMatches);
@@ -142,11 +148,6 @@ foreach ($hardcodedUniversal as $path) {
     }
 }
 
-$phpFiles = array_values(array_filter(
-    $files,
-    static fn(string $p): bool => str_ends_with($p, '.php')
-        && !str_contains($p, '/vendor/')
-));
 foreach ($phpFiles as $path) {
     $output = [];
     $code = 0;
