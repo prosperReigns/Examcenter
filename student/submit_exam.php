@@ -81,11 +81,20 @@ foreach ($questions as $question) {
 
                     // Map index to actual option value
                     switch ($selected_option) {
-                        case 1: $submitted_value = $row['option1']; break;
-                        case 2: $submitted_value = $row['option2']; break;
-                        case 3: $submitted_value = $row['option3']; break;
-                        case 4: $submitted_value = $row['option4']; break;
-                        default: $submitted_value = null;
+                        case 1:
+                            $submitted_value = $row['option1'];
+                            break;
+                        case 2:
+                            $submitted_value = $row['option2'];
+                            break;
+                        case 3:
+                            $submitted_value = $row['option3'];
+                            break;
+                        case 4:
+                            $submitted_value = $row['option4'];
+                            break;
+                        default:
+                            $submitted_value = null;
                     }
 
                     if (trim(strtolower($submitted_value)) == trim(strtolower($correct_answer))) {
@@ -183,4 +192,3 @@ unset($_SESSION['current_test_id']);
 
 header("Location: result.php");
 exit();
-?>

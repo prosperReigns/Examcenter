@@ -1,2 +1,39 @@
 <?php
-declare(strict_types=1);session_start();require_once __DIR__.'/../includes/pro.php';require_pro('ai_assessment');require_once __DIR__.'/../ai/OllamaAssessmentAssistant.php';$out=null;$err=null;if($_SERVER['REQUEST_METHOD']==='POST'){try{$ai=new OllamaAssessmentAssistant(getenv('EXAMCENTER_THEORY_MODEL')?:'qwen3:1.7b');$out=$_POST['action']==='review'?$ai->reviewQuestion($_POST['question']):$ai->generateQuestions($_POST['topic'],max(1,min(20,(int)$_POST['count'])),$_POST['level']);}catch(Throwable $e){$err=$e->getMessage();}}?><!doctype html><html><head><meta charset="utf-8"><title>AI Assessment</title><link rel="stylesheet" href="../css/sidebar.css"><link rel="stylesheet" href="../css/bootstrap.min.css"></head><body><?php $teacher=$_SESSION['teacher']??[];$admin=$_SESSION['admin']??[];$user=$_SESSION['user']??[];require __DIR__.'/sidebar.php';?><main class="main-content"><h2>Offline AI Assessment Suite</h2><p class="text-muted">Local Ollama only. AI output is a draft and requires teacher approval.</p><?php if($err):?><div class="alert alert-danger"><?=htmlspecialchars($err)?></div><?php endif;?><?php if($out):?><pre class="card p-3"><?=htmlspecialchars(json_encode($out,JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE))?></pre><?php endif;?><form method="post" class="card p-3 mb-3"><input type="hidden" name="action" value="generate"><input name="topic" class="form-control mb-2" placeholder="Topic" required><input name="count" type="number" value="5" min="1" max="20" class="form-control mb-2"><input name="level" value="medium" class="form-control mb-2"><button class="btn btn-primary">Generate draft questions</button></form><form method="post" class="card p-3"><input type="hidden" name="action" value="review"><textarea name="question" class="form-control mb-2" placeholder="Question to review" required></textarea><button class="btn btn-secondary">Review question</button></form></main></body></html>
+
+declare(strict_types=1);
+session_start();
+require_once __DIR__ . '/../includes/pro.php';
+require_pro('ai_assessment');
+require_once __DIR__ . '/../ai/OllamaAssessmentAssistant.php';
+$out = null;
+$err = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $ai = new OllamaAssessmentAssistant(getenv('EXAMCENTER_THEORY_MODEL') ?: 'qwen3:1.7b');
+        $out = $_POST['action'] === 'review' ? $ai->reviewQuestion($_POST['question']) : $ai->generateQuestions($_POST['topic'], max(1, min(20, (int)$_POST['count'])), $_POST['level']);
+    } catch (Throwable $e) {
+        $err = $e->getMessage();
+    }
+} ?>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>AI Assessment</title>
+    <link rel="stylesheet" href="../css/sidebar.css">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+</head>
+
+<body><?php $teacher = $_SESSION['teacher'] ?? [];
+        $admin = $_SESSION['admin'] ?? [];
+        $user = $_SESSION['user'] ?? [];
+        require __DIR__ . '/sidebar.php'; ?><main class="main-content">
+        <h2>Offline AI Assessment Suite</h2>
+        <p class="text-muted">Local Ollama only. AI output is a draft and requires teacher approval.</p><?php if ($err): ?><div class="alert alert-danger"><?= htmlspecialchars($err) ?></div><?php endif; ?><?php if ($out): ?>
+            <pre class="card p-3"><?= htmlspecialchars(json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) ?></pre><?php endif; ?><form method="post" class="card p-3 mb-3"><input type="hidden" name="action" value="generate"><input name="topic" class="form-control mb-2" placeholder="Topic" required><input name="count" type="number" value="5" min="1" max="20" class="form-control mb-2"><input name="level" value="medium" class="form-control mb-2"><button class="btn btn-primary">Generate draft questions</button></form>
+        <form method="post" class="card p-3"><input type="hidden" name="action" value="review"><textarea name="question" class="form-control mb-2" placeholder="Question to review" required></textarea><button class="btn btn-secondary">Review question</button></form>
+    </main>
+</body>
+
+</html>

@@ -2,8 +2,8 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
-require_once __DIR__ . '/../license/license_guard.php';
-require_once __DIR__ . '/../includes/pro.php';
+//require_once __DIR__ . '/../license/license_guard.php';
+//require_once __DIR__ . '/../includes/pro.php';
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);
@@ -242,15 +242,15 @@ while ($row = $questions_result->fetch_assoc()) {
 
         if ($type === 'multiple_choice_single' && !empty($detail['image_path'])) {
             $relative_path = str_replace('\\', '/', $detail['image_path']);
-        
+
             $file_path = $_SERVER['DOCUMENT_ROOT'] . '/' . $relative_path;
 
             $image_url = $base_url . '/' . $relative_path;
-        
+
             error_log("DOCUMENT_ROOT = " . $_SERVER['DOCUMENT_ROOT']);
             error_log("Relative path = " . $relative_path);
             error_log("Checking file at: $file_path");
-        
+
             if (file_exists($file_path)) {
                 $image_html = "<div class='question-image mb-3'>
                     <img src='$image_url' class='img-fluid zoomable' alt='Question Image'
@@ -263,8 +263,7 @@ while ($row = $questions_result->fetch_assoc()) {
                     <img src='/images/fallback.jpg' class='img-fluid' alt='Image not found'>
                 </div>";
             }
-        }        
-        
+        }
     }
 
     $answer_stmt = $conn->prepare("SELECT answer, is_flagged FROM exam_attempts WHERE user_id = ? AND test_id = ? AND question_id = ?");
@@ -307,6 +306,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -317,6 +317,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     <link rel="stylesheet" href="../css/take_exam.css">
     <script src="https://cdn.jsdelivr.net/npm/mathjs@10.6.4/lib/browser/math.js"></script>
 </head>
+
 <body>
     <!-- Full screen warning (unchanged) -->
     <div class="full-screen-warning" id="fullscreenWarning">
@@ -372,9 +373,9 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                         <div class="card-body">
                             <div class="question-boxes" id="questionBoxes">
                                 <?php foreach ($questions as $index => $question): ?>
-                                    <div class="question-box <?php echo $index === $current_index ? 'current' : ''; ?> <?php echo $question['saved_answer'] ? 'answered' : ''; ?> <?php echo $question['is_flagged'] ? 'flagged' : ''; ?>" 
-                                         data-index="<?php echo $index; ?>" 
-                                         onclick="goToQuestion(<?php echo $index; ?>)">
+                                    <div class="question-box <?php echo $index === $current_index ? 'current' : ''; ?> <?php echo $question['saved_answer'] ? 'answered' : ''; ?> <?php echo $question['is_flagged'] ? 'flagged' : ''; ?>"
+                                        data-index="<?php echo $index; ?>"
+                                        onclick="goToQuestion(<?php echo $index; ?>)">
                                         <?php echo $index + 1; ?>
                                     </div>
                                 <?php endforeach; ?>
@@ -415,8 +416,8 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                         <input type="hidden" name="user_id" value="<?php echo $user_id; ?>">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <?php foreach ($questions as $index => $question): ?>
-                            <div class="question-container <?php echo $index === $current_index ? 'active' : ''; ?>" 
-                                 data-index="<?php echo $index; ?>" id="question-<?php echo $index; ?>">
+                            <div class="question-container <?php echo $index === $current_index ? 'active' : ''; ?>"
+                                data-index="<?php echo $index; ?>" id="question-<?php echo $index; ?>">
                                 <div class="question-card card mb-4">
                                     <div class="card-body">
                                         <h5 class="card-title">Question <?php echo $index + 1; ?> (<?php echo ucfirst(str_replace('_', ' ', $question['question_type'])); ?>)</h5>
@@ -429,11 +430,11 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                                                     <?php if (!empty($question["option$i"])): ?>
                                                         <label class="option-label">
                                                             <input class="option-input" type="radio"
-                                                                   name="answers[<?php echo $question['id']; ?>]"
-                                                                   id="q<?php echo $question['id']; ?>_opt<?php echo $i; ?>"
-                                                                   value="<?php echo $i; ?>"
-                                                                   <?php echo $question['saved_answer'] == $i ? 'checked' : ''; ?>
-                                                                   onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
+                                                                name="answers[<?php echo $question['id']; ?>]"
+                                                                id="q<?php echo $question['id']; ?>_opt<?php echo $i; ?>"
+                                                                value="<?php echo $i; ?>"
+                                                                <?php echo $question['saved_answer'] == $i ? 'checked' : ''; ?>
+                                                                onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                             <?php echo htmlspecialchars($question["option$i"]); ?>
                                                         </label>
                                                     <?php endif; ?>
@@ -445,11 +446,11 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                                                     <?php if (!empty($question["option$i"])): ?>
                                                         <label class="option-label">
                                                             <input class="option-input" type="checkbox"
-                                                                   name="answers[<?php echo $question['id']; ?>][]"
-                                                                   id="q<?php echo $question['id']; ?>_opt<?php echo $i; ?>"
-                                                                   value="<?php echo $i; ?>"
-                                                                   <?php echo in_array($i, json_decode($question['saved_answer'] ?? '[]', true)) ? 'checked' : ''; ?>
-                                                                   onchange="saveAnswer(<?php echo $question['id']; ?>, getCheckboxValues(<?php echo $question['id']; ?>), '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
+                                                                name="answers[<?php echo $question['id']; ?>][]"
+                                                                id="q<?php echo $question['id']; ?>_opt<?php echo $i; ?>"
+                                                                value="<?php echo $i; ?>"
+                                                                <?php echo in_array($i, json_decode($question['saved_answer'] ?? '[]', true)) ? 'checked' : ''; ?>
+                                                                onchange="saveAnswer(<?php echo $question['id']; ?>, getCheckboxValues(<?php echo $question['id']; ?>), '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                             <?php echo htmlspecialchars($question["option$i"]); ?>
                                                         </label>
                                                     <?php endif; ?>
@@ -459,36 +460,36 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                                             <div class="options-container">
                                                 <label class="option-label">
                                                     <input class="option-input" type="radio"
-                                                           name="answers[<?php echo $question['id']; ?>]"
-                                                           id="q<?php echo $question['id']; ?>_true"
-                                                           value="True"
-                                                           <?php echo $question['saved_answer'] === 'True' ? 'checked' : ''; ?>
-                                                           onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
+                                                        name="answers[<?php echo $question['id']; ?>]"
+                                                        id="q<?php echo $question['id']; ?>_true"
+                                                        value="True"
+                                                        <?php echo $question['saved_answer'] === 'True' ? 'checked' : ''; ?>
+                                                        onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                     True
                                                 </label>
                                                 <label class="option-label">
                                                     <input class="option-input" type="radio"
-                                                           name="answers[<?php echo $question['id']; ?>]"
-                                                           id="q<?php echo $question['id']; ?>_false"
-                                                           value="False"
-                                                           <?php echo $question['saved_answer'] === 'False' ? 'checked' : ''; ?>
-                                                           onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
+                                                        name="answers[<?php echo $question['id']; ?>]"
+                                                        id="q<?php echo $question['id']; ?>_false"
+                                                        value="False"
+                                                        <?php echo $question['saved_answer'] === 'False' ? 'checked' : ''; ?>
+                                                        onchange="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                                     False
                                                 </label>
                                             </div>
                                         <?php elseif ($question['question_type'] === 'fill_blank'): ?>
                                             <div class="form-group">
                                                 <input type="text" class="form-control"
-                                                       name="answers[<?php echo $question['id']; ?>]"
-                                                       id="q<?php echo $question['id']; ?>_answer"
-                                                       placeholder="Type your answer here"
-                                                       value="<?php echo htmlspecialchars($question['saved_answer'] ?? ''); ?>"
-                                                       oninput="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
+                                                    name="answers[<?php echo $question['id']; ?>]"
+                                                    id="q<?php echo $question['id']; ?>_answer"
+                                                    placeholder="Type your answer here"
+                                                    value="<?php echo htmlspecialchars($question['saved_answer'] ?? ''); ?>"
+                                                    oninput="saveAnswer(<?php echo $question['id']; ?>, this.value, '<?php echo $question['question_type']; ?>', <?php echo $index; ?>)">
                                             </div>
                                         <?php endif; ?>
 
                                         <button type="button" class="btn btn-warning btn-sm mt-2"
-                                                onclick="flagQuestion(<?php echo $question['id']; ?>, <?php echo $index; ?>, <?php echo $question['is_flagged'] ? 0 : 1; ?>)">
+                                            onclick="flagQuestion(<?php echo $question['id']; ?>, <?php echo $index; ?>, <?php echo $question['is_flagged'] ? 0 : 1; ?>)">
                                             <i class="bi bi-flag-fill"></i> <?php echo $question['is_flagged'] ? 'Unflag' : 'Flag for Review'; ?>
                                         </button>
                                     </div>
@@ -573,7 +574,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         let currentIndex = <?php echo $current_index; ?>;
         const totalQuestions = <?php echo count($questions); ?>;
         const proSecureEnabled = <?php echo $proSecureEnabled ? 'true' : 'false'; ?>;
-        const securePolicy = <?php echo json_encode($securePolicy, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
+        const securePolicy = <?php echo json_encode($securePolicy, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
         const containers = document.querySelectorAll('.question-container');
         const questionBoxes = document.querySelectorAll('.question-box');
         const timerEl = document.getElementById('examTimer');
@@ -586,10 +587,20 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         let timerDanger = false;
         let tabSwitchCount = 0;
         const maxSecureViolations = Number(securePolicy.max_violations || 3);
-        function logSecureEvent(type, severity='medium', evidence={}) {
+
+        function logSecureEvent(type, severity = 'medium', evidence = {}) {
             if (!proSecureEnabled) return;
-            const data = new FormData(); data.append('test_id', '<?php echo $test_id; ?>'); data.append('student_id', '<?php echo $user_id; ?>'); data.append('event_type', type); data.append('severity', severity); data.append('evidence', JSON.stringify(evidence)); data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
-            fetch('pro_security_event.php',{method:'POST',body:data}).catch(()=>{});
+            const data = new FormData();
+            data.append('test_id', '<?php echo $test_id; ?>');
+            data.append('student_id', '<?php echo $user_id; ?>');
+            data.append('event_type', type);
+            data.append('severity', severity);
+            data.append('evidence', JSON.stringify(evidence));
+            data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
+            fetch('pro_security_event.php', {
+                method: 'POST',
+                body: data
+            }).catch(() => {});
         }
 
         // Timer
@@ -608,7 +619,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 const minutes = Math.floor((timeLeft % 3600) / 60);
                 const seconds = timeLeft % 60;
                 timerEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                
+
                 if (timeLeft <= 300 && !timerWarning) {
                     timerEl.classList.add('warning');
                     timerWarning = true;
@@ -631,14 +642,17 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             containers[index].style.display = 'block';
             questionBoxes.forEach(b => b.classList.remove('current'));
             questionBoxes[index].classList.add('current');
-            
+
             prevBtn.style.display = index === 0 ? 'none' : 'inline-block';
             nextBtn.style.display = index === totalQuestions - 1 ? 'none' : 'inline-block';
             submitBtn.style.display = index === totalQuestions - 1 ? 'inline-block' : 'none';
-            
+
             currentIndex = index;
             saveState();
-            window.scrollTo({ top: document.getElementById(`question-${index}`).offsetTop - 100, behavior: 'smooth' });
+            window.scrollTo({
+                top: document.getElementById(`question-${index}`).offsetTop - 100,
+                behavior: 'smooth'
+            });
         }
 
         function nextQuestion() {
@@ -672,8 +686,8 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                 questionBoxes[index].classList.add('flagged');
             } else {
                 questionBoxes[index].classList.remove('flagged');
-                if (document.querySelector(`input[name="answers[${questionId}]"]:checked`) || 
-                    document.querySelector(`input[name="answers[${questionId}][]"]:checked`) || 
+                if (document.querySelector(`input[name="answers[${questionId}]"]:checked`) ||
+                    document.querySelector(`input[name="answers[${questionId}][]"]:checked`) ||
                     document.querySelector(`#q${questionId}_answer`)?.value) {
                     questionBoxes[index].classList.add('answered');
                 }
@@ -697,14 +711,14 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
 
             fetch('save_answer.php', {
-                method: 'POST',
-                body: data
-            }).then(response => response.json())
-              .then(result => {
-                  if (!result.success) {
-                      console.error('Save answer failed:', result.message);
-                  }
-              }).catch(error => console.error('Save answer error:', error));
+                    method: 'POST',
+                    body: data
+                }).then(response => response.json())
+                .then(result => {
+                    if (!result.success) {
+                        console.error('Save answer failed:', result.message);
+                    }
+                }).catch(error => console.error('Save answer error:', error));
         }
 
         function saveFlag(questionId, flag) {
@@ -716,14 +730,14 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             data.append('csrf_token', '<?php echo $_SESSION['csrf_token']; ?>');
 
             fetch('save_flag.php', {
-                method: 'POST',
-                body: data
-            }).then(response => response.json())
-              .then(result => {
-                  if (!result.success) {
-                      console.error('Save flag failed:', result.message);
-                  }
-              }).catch(error => console.error('Save flag error:', error));
+                    method: 'POST',
+                    body: data
+                }).then(response => response.json())
+                .then(result => {
+                    if (!result.success) {
+                        console.error('Save flag failed:', result.message);
+                    }
+                }).catch(error => console.error('Save flag error:', error));
         }
 
         function saveState() {
@@ -759,6 +773,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
         // Calculator Functions (unchanged)
         let calcExpression = '';
+
         function calcAppend(char) {
             try {
                 if (char === 'pi') char = 'π';
@@ -915,4 +930,5 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
     </script>
 </body>
+
 </html>

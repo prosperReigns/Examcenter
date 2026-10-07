@@ -1,7 +1,71 @@
 <?php
+
 declare(strict_types=1);
-session_start(); require_once __DIR__.'/../includes/pro.php'; require_pro('exam_sessions');
-require_once __DIR__.'/../db.php'; $db=Database::connection(); $message='';
-if($_SERVER['REQUEST_METHOD']==='POST'){ $test=(int)($_POST['test_id']??0);$inst=(int)($_POST['institution_id']??0);$code=trim($_POST['session_code']??'');$start=$_POST['starts_at']??'';$end=$_POST['ends_at']??'';$room=trim($_POST['room_name']??''); if($test&&$inst&&$code&&$start&&$end){$s=$db->prepare("INSERT INTO pro_exam_sessions(test_id,institution_id,session_code,starts_at,ends_at,room_name,created_by_admin_id) VALUES(?,?,?,?,?,?,?)");$aid=$_SESSION['admin_id']??null;$s->bind_param('iissssi',$test,$inst,$code,$start,$end,$room,$aid);$s->execute();$s->close();$message='Session created.';}}
-$tests=$db->query("SELECT id,title FROM tests ORDER BY id DESC LIMIT 100")->fetch_all(MYSQLI_ASSOC);$sessions=$db->query("SELECT s.*,t.title FROM pro_exam_sessions s JOIN tests t ON t.id=s.test_id ORDER BY s.starts_at DESC")->fetch_all(MYSQLI_ASSOC);
-?><!doctype html><html><head><meta charset="utf-8"><title>Pro Exam Sessions</title><link rel="stylesheet" href="../css/sidebar.css"><link rel="stylesheet" href="../css/bootstrap.min.css"></head><body><?php $admin=$_SESSION['admin']??[];$user=$_SESSION['user']??[];require __DIR__.'/sidebar.php';?><main class="main-content"><h2>Exam Sessions & Invigilation</h2><?php if($message):?><div class="alert alert-success"><?=$message?></div><?php endif;?><form method="post" class="card p-3 mb-4"><div class="row g-2"><div class="col-md-3"><label>Test</label><select name="test_id" class="form-control" required><?php foreach($tests as $t):?><option value="<?=$t['id']?>"><?=htmlspecialchars($t['title'])?></option><?php endforeach;?></select></div><div class="col-md-2"><label>Institution ID</label><input name="institution_id" type="number" class="form-control" required></div><div class="col-md-2"><label>Session Code</label><input name="session_code" class="form-control" required></div><div class="col-md-2"><label>Room</label><input name="room_name" class="form-control"></div><div class="col-md-3"><label>Start / End</label><div class="d-flex gap-1"><input name="starts_at" type="datetime-local" class="form-control" required><input name="ends_at" type="datetime-local" class="form-control" required></div></div></div><button class="btn btn-primary mt-3">Create session</button></form><table class="table table-striped"><tr><th>Code</th><th>Test</th><th>Room</th><th>Start</th><th>Status</th></tr><?php foreach($sessions as $s):?><tr><td><?=$s['session_code']?></td><td><?=htmlspecialchars($s['title'])?></td><td><?=htmlspecialchars((string)$s['room_name'])?></td><td><?=$s['starts_at']?></td><td><?=$s['status']?></td></tr><?php endforeach;?></table></main></body></html>
+session_start();
+require_once __DIR__ . '/../includes/pro.php';
+require_pro('exam_sessions');
+require_once __DIR__ . '/../db.php';
+$db = Database::connection();
+$message = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $test = (int)($_POST['test_id'] ?? 0);
+    $inst = (int)($_POST['institution_id'] ?? 0);
+    $code = trim($_POST['session_code'] ?? '');
+    $start = $_POST['starts_at'] ?? '';
+    $end = $_POST['ends_at'] ?? '';
+    $room = trim($_POST['room_name'] ?? '');
+    if ($test && $inst && $code && $start && $end) {
+        $s = $db->prepare("INSERT INTO pro_exam_sessions(test_id,institution_id,session_code,starts_at,ends_at,room_name,created_by_admin_id) VALUES(?,?,?,?,?,?,?)");
+        $aid = $_SESSION['admin_id'] ?? null;
+        $s->bind_param('iissssi', $test, $inst, $code, $start, $end, $room, $aid);
+        $s->execute();
+        $s->close();
+        $message = 'Session created.';
+    }
+}
+$tests = $db->query("SELECT id,title FROM tests ORDER BY id DESC LIMIT 100")->fetch_all(MYSQLI_ASSOC);
+$sessions = $db->query("SELECT s.*,t.title FROM pro_exam_sessions s JOIN tests t ON t.id=s.test_id ORDER BY s.starts_at DESC")->fetch_all(MYSQLI_ASSOC);
+?>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Pro Exam Sessions</title>
+    <link rel="stylesheet" href="../css/sidebar.css">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+</head>
+
+<body><?php $admin = $_SESSION['admin'] ?? [];
+        $user = $_SESSION['user'] ?? [];
+        require __DIR__ . '/sidebar.php'; ?><main class="main-content">
+        <h2>Exam Sessions & Invigilation</h2><?php if ($message): ?><div class="alert alert-success"><?= $message ?></div><?php endif; ?><form method="post" class="card p-3 mb-4">
+            <div class="row g-2">
+                <div class="col-md-3"><label>Test</label><select name="test_id" class="form-control" required><?php foreach ($tests as $t): ?><option value="<?= $t['id'] ?>"><?= htmlspecialchars($t['title']) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-2"><label>Institution ID</label><input name="institution_id" type="number" class="form-control" required></div>
+                <div class="col-md-2"><label>Session Code</label><input name="session_code" class="form-control" required></div>
+                <div class="col-md-2"><label>Room</label><input name="room_name" class="form-control"></div>
+                <div class="col-md-3"><label>Start / End</label>
+                    <div class="d-flex gap-1"><input name="starts_at" type="datetime-local" class="form-control" required><input name="ends_at" type="datetime-local" class="form-control" required></div>
+                </div>
+            </div><button class="btn btn-primary mt-3">Create session</button>
+        </form>
+        <table class="table table-striped">
+            <tr>
+                <th>Code</th>
+                <th>Test</th>
+                <th>Room</th>
+                <th>Start</th>
+                <th>Status</th>
+            </tr><?php foreach ($sessions as $s): ?><tr>
+                    <td><?= $s['session_code'] ?></td>
+                    <td><?= htmlspecialchars($s['title']) ?></td>
+                    <td><?= htmlspecialchars((string)$s['room_name']) ?></td>
+                    <td><?= $s['starts_at'] ?></td>
+                    <td><?= $s['status'] ?></td>
+                </tr><?php endforeach; ?>
+        </table>
+    </main>
+</body>
+
+</html>

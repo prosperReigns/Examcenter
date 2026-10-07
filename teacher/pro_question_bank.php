@@ -1,5 +1,63 @@
 <?php
-declare(strict_types=1);session_start();require_once __DIR__.'/../includes/pro.php';require_pro('question_bank_pro');require_once __DIR__.'/../db.php';$db=Database::connection();$msg='';
-if($_SERVER['REQUEST_METHOD']==='POST'){$qid=(int)$_POST['question_id'];$s=$db->prepare("INSERT INTO pro_question_bank_items(question_id,topic,subtopic,difficulty,bloom_level,learning_objective,status) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE topic=VALUES(topic),subtopic=VALUES(subtopic),difficulty=VALUES(difficulty),bloom_level=VALUES(bloom_level),learning_objective=VALUES(learning_objective)");$status=$_POST['status']??'draft';$s->bind_param('issssss',$qid,$_POST['topic'],$_POST['subtopic'],$_POST['difficulty'],$_POST['bloom_level'],$_POST['learning_objective'],$status);$s->execute();$s->close();$msg='Question bank metadata saved.';}
-$rows=$db->query("SELECT p.*,q.question_text FROM pro_question_bank_items p JOIN new_questions q ON q.id=p.question_id ORDER BY p.id DESC LIMIT 200")->fetch_all(MYSQLI_ASSOC);
-?><!doctype html><html><head><meta charset="utf-8"><title>Pro Question Bank</title><link rel="stylesheet" href="../css/sidebar.css"><link rel="stylesheet" href="../css/bootstrap.min.css"></head><body><?php $teacher=$_SESSION['teacher']??[];$admin=$_SESSION['admin']??[];$user=$_SESSION['user']??[];require __DIR__.'/../teacher/sidebar.php';?><main class="main-content"><h2>Advanced Question Bank</h2><?php if($msg):?><div class="alert alert-success"><?=$msg?></div><?php endif;?><form method="post" class="card p-3 mb-3"><div class="row g-2"><input name="question_id" type="number" class="form-control" placeholder="Existing question ID" required><input name="topic" class="form-control" placeholder="Topic"><input name="subtopic" class="form-control" placeholder="Subtopic"><input name="difficulty" class="form-control" placeholder="Easy / Medium / Hard"><input name="bloom_level" class="form-control" placeholder="Bloom level"><input name="learning_objective" class="form-control" placeholder="Learning objective"><select name="status" class="form-control"><option>draft</option><option>review</option><option>approved</option><option>retired</option></select><button class="btn btn-primary mt-2">Save metadata</button></div></form><table class="table table-striped"><tr><th>ID</th><th>Question</th><th>Topic</th><th>Difficulty</th><th>Bloom</th><th>Status</th></tr><?php foreach($rows as $r):?><tr><td><?=$r['question_id']?></td><td><?=htmlspecialchars(mb_strimwidth((string)$r['question_text'],0,100,'…'))?></td><td><?=htmlspecialchars((string)$r['topic'])?></td><td><?=$r['difficulty']?></td><td><?=$r['bloom_level']?></td><td><?=$r['status']?></td></tr><?php endforeach;?></table></main></body></html>
+
+declare(strict_types=1);
+session_start();
+require_once __DIR__ . '/../includes/pro.php';
+require_pro('question_bank_pro');
+require_once __DIR__ . '/../db.php';
+$db = Database::connection();
+$msg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $qid = (int)$_POST['question_id'];
+    $s = $db->prepare("INSERT INTO pro_question_bank_items(question_id,topic,subtopic,difficulty,bloom_level,learning_objective,status) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE topic=VALUES(topic),subtopic=VALUES(subtopic),difficulty=VALUES(difficulty),bloom_level=VALUES(bloom_level),learning_objective=VALUES(learning_objective)");
+    $status = $_POST['status'] ?? 'draft';
+    $s->bind_param('issssss', $qid, $_POST['topic'], $_POST['subtopic'], $_POST['difficulty'], $_POST['bloom_level'], $_POST['learning_objective'], $status);
+    $s->execute();
+    $s->close();
+    $msg = 'Question bank metadata saved.';
+}
+$rows = $db->query("SELECT p.*,q.question_text FROM pro_question_bank_items p JOIN new_questions q ON q.id=p.question_id ORDER BY p.id DESC LIMIT 200")->fetch_all(MYSQLI_ASSOC);
+?>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Pro Question Bank</title>
+    <link rel="stylesheet" href="../css/sidebar.css">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+</head>
+
+<body><?php $teacher = $_SESSION['teacher'] ?? [];
+        $admin = $_SESSION['admin'] ?? [];
+        $user = $_SESSION['user'] ?? [];
+        require __DIR__ . '/../teacher/sidebar.php'; ?><main class="main-content">
+        <h2>Advanced Question Bank</h2><?php if ($msg): ?><div class="alert alert-success"><?= $msg ?></div><?php endif; ?><form method="post" class="card p-3 mb-3">
+            <div class="row g-2"><input name="question_id" type="number" class="form-control" placeholder="Existing question ID" required><input name="topic" class="form-control" placeholder="Topic"><input name="subtopic" class="form-control" placeholder="Subtopic"><input name="difficulty" class="form-control" placeholder="Easy / Medium / Hard"><input name="bloom_level" class="form-control" placeholder="Bloom level"><input name="learning_objective" class="form-control" placeholder="Learning objective"><select name="status" class="form-control">
+                    <option>draft</option>
+                    <option>review</option>
+                    <option>approved</option>
+                    <option>retired</option>
+                </select><button class="btn btn-primary mt-2">Save metadata</button></div>
+        </form>
+        <table class="table table-striped">
+            <tr>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Topic</th>
+                <th>Difficulty</th>
+                <th>Bloom</th>
+                <th>Status</th>
+            </tr><?php foreach ($rows as $r): ?><tr>
+                    <td><?= $r['question_id'] ?></td>
+                    <td><?= htmlspecialchars(mb_strimwidth((string)$r['question_text'], 0, 100, '…')) ?></td>
+                    <td><?= htmlspecialchars((string)$r['topic']) ?></td>
+                    <td><?= $r['difficulty'] ?></td>
+                    <td><?= $r['bloom_level'] ?></td>
+                    <td><?= $r['status'] ?></td>
+                </tr><?php endforeach; ?>
+        </table>
+    </main>
+</body>
+
+</html>

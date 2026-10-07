@@ -4,7 +4,7 @@ session_start();
 require_once '../db.php';
 require_once '../theory/TheoryGradingService.php';
 require_once '../theory/OllamaTheoryGrader.php';
-require_once '../license/license_guard.php';
+//require_once '../license/license_guard.php';
 
 if(!isset($_SESSION['student_id'])){http_response_code(403);exit('Unauthorized');}
 $db=Database::connection();$submissionId=(int)($_POST['submission_id']??$_GET['submission_id']??0);

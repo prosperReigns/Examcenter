@@ -1,4 +1,61 @@
 <?php
-declare(strict_types=1);session_start();require_once __DIR__.'/../includes/pro.php';require_pro('secure_exam_mode');require_once __DIR__.'/../db.php';$db=Database::connection();$msg='';
-if($_SERVER['REQUEST_METHOD']==='POST'){$test=(int)$_POST['test_id'];$vals=[];foreach(['fullscreen_required','block_copy_paste','block_context_menu','detect_focus_loss','detect_visibility_change','detect_multi_monitor','auto_pause_on_violation','terminate_on_threshold'] as $k)$vals[$k]=isset($_POST[$k])?1:0;$max=max(1,(int)$_POST['max_violations']);$s=$db->prepare("INSERT INTO pro_secure_exam_policies(test_id,fullscreen_required,block_copy_paste,block_context_menu,detect_focus_loss,detect_visibility_change,detect_multi_monitor,max_violations,auto_pause_on_violation,terminate_on_threshold,notes) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE fullscreen_required=VALUES(fullscreen_required),block_copy_paste=VALUES(block_copy_paste),block_context_menu=VALUES(block_context_menu),detect_focus_loss=VALUES(detect_focus_loss),detect_visibility_change=VALUES(detect_visibility_change),detect_multi_monitor=VALUES(detect_multi_monitor),max_violations=VALUES(max_violations),auto_pause_on_violation=VALUES(auto_pause_on_violation),terminate_on_threshold=VALUES(terminate_on_threshold),notes=VALUES(notes)");$s->bind_param('iiiiiiiiiiis',$test,$vals['fullscreen_required'],$vals['block_copy_paste'],$vals['block_context_menu'],$vals['detect_focus_loss'],$vals['detect_visibility_change'],$vals['detect_multi_monitor'],$max,$vals['auto_pause_on_violation'],$vals['terminate_on_threshold'],$_POST['notes']);$s->execute();$s->close();$msg='Security policy saved.';}$rows=$db->query("SELECT p.*,t.title FROM pro_secure_exam_policies p JOIN tests t ON t.id=p.test_id ORDER BY p.id DESC")->fetch_all(MYSQLI_ASSOC);
-?><!doctype html><html><head><meta charset="utf-8"><title>Secure Exam Mode</title><link rel="stylesheet" href="../css/sidebar.css"><link rel="stylesheet" href="../css/bootstrap.min.css"></head><body><?php $admin=$_SESSION['admin']??[];$user=$_SESSION['user']??[];require __DIR__.'/sidebar.php';?><main class="main-content"><h2>Secure Exam Mode</h2><p class="text-muted">Browser-level integrity controls and offline evidence logging. OS-level lockdown still requires a managed kiosk/device environment.</p><?php if($msg):?><div class="alert alert-success"><?=$msg?></div><?php endif;?><form method="post" class="card p-3 mb-4"><div class="row g-2"><div class="col-md-3"><input name="test_id" type="number" class="form-control" placeholder="Test ID" required></div><div class="col-md-2"><input name="max_violations" type="number" min="1" value="3" class="form-control" placeholder="Max violations"></div><?php foreach(['fullscreen_required'=>'Fullscreen','block_copy_paste'=>'Block copy/paste','block_context_menu'=>'Block context menu','detect_focus_loss'=>'Detect focus loss','detect_visibility_change'=>'Detect visibility','detect_multi_monitor'=>'Detect multi-monitor','auto_pause_on_violation'=>'Auto-pause','terminate_on_threshold'=>'Terminate at threshold'] as $k=>$label):?><div class="col-md-3"><label><input type="checkbox" name="<?=$k?>" checked> <?=htmlspecialchars($label)?></label></div><?php endforeach;?><div class="col-12"><textarea name="notes" class="form-control" placeholder="Policy notes"></textarea></div></div><button class="btn btn-primary mt-3">Save policy</button></form><table class="table"><tr><th>Test</th><th>Fullscreen</th><th>Copy/Paste</th><th>Max violations</th><th>Terminate</th></tr><?php foreach($rows as $r):?><tr><td><?=htmlspecialchars($r['title'])?></td><td><?=$r['fullscreen_required']?'Yes':'No'?></td><td><?=$r['block_copy_paste']?'Yes':'No'?></td><td><?=$r['max_violations']?></td><td><?=$r['terminate_on_threshold']?'Yes':'No'?></td></tr><?php endforeach;?></table></main></body></html>
+
+declare(strict_types=1);
+session_start();
+require_once __DIR__ . '/../includes/pro.php';
+require_pro('secure_exam_mode');
+require_once __DIR__ . '/../db.php';
+$db = Database::connection();
+$msg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $test = (int)$_POST['test_id'];
+    $vals = [];
+    foreach (['fullscreen_required', 'block_copy_paste', 'block_context_menu', 'detect_focus_loss', 'detect_visibility_change', 'detect_multi_monitor', 'auto_pause_on_violation', 'terminate_on_threshold'] as $k) $vals[$k] = isset($_POST[$k]) ? 1 : 0;
+    $max = max(1, (int)$_POST['max_violations']);
+    $s = $db->prepare("INSERT INTO pro_secure_exam_policies(test_id,fullscreen_required,block_copy_paste,block_context_menu,detect_focus_loss,detect_visibility_change,detect_multi_monitor,max_violations,auto_pause_on_violation,terminate_on_threshold,notes) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE fullscreen_required=VALUES(fullscreen_required),block_copy_paste=VALUES(block_copy_paste),block_context_menu=VALUES(block_context_menu),detect_focus_loss=VALUES(detect_focus_loss),detect_visibility_change=VALUES(detect_visibility_change),detect_multi_monitor=VALUES(detect_multi_monitor),max_violations=VALUES(max_violations),auto_pause_on_violation=VALUES(auto_pause_on_violation),terminate_on_threshold=VALUES(terminate_on_threshold),notes=VALUES(notes)");
+    $s->bind_param('iiiiiiiiiiis', $test, $vals['fullscreen_required'], $vals['block_copy_paste'], $vals['block_context_menu'], $vals['detect_focus_loss'], $vals['detect_visibility_change'], $vals['detect_multi_monitor'], $max, $vals['auto_pause_on_violation'], $vals['terminate_on_threshold'], $_POST['notes']);
+    $s->execute();
+    $s->close();
+    $msg = 'Security policy saved.';
+}
+$rows = $db->query("SELECT p.*,t.title FROM pro_secure_exam_policies p JOIN tests t ON t.id=p.test_id ORDER BY p.id DESC")->fetch_all(MYSQLI_ASSOC);
+?>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Secure Exam Mode</title>
+    <link rel="stylesheet" href="../css/sidebar.css">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+</head>
+
+<body><?php $admin = $_SESSION['admin'] ?? [];
+        $user = $_SESSION['user'] ?? [];
+        require __DIR__ . '/sidebar.php'; ?><main class="main-content">
+        <h2>Secure Exam Mode</h2>
+        <p class="text-muted">Browser-level integrity controls and offline evidence logging. OS-level lockdown still requires a managed kiosk/device environment.</p><?php if ($msg): ?><div class="alert alert-success"><?= $msg ?></div><?php endif; ?><form method="post" class="card p-3 mb-4">
+            <div class="row g-2">
+                <div class="col-md-3"><input name="test_id" type="number" class="form-control" placeholder="Test ID" required></div>
+                <div class="col-md-2"><input name="max_violations" type="number" min="1" value="3" class="form-control" placeholder="Max violations"></div><?php foreach (['fullscreen_required' => 'Fullscreen', 'block_copy_paste' => 'Block copy/paste', 'block_context_menu' => 'Block context menu', 'detect_focus_loss' => 'Detect focus loss', 'detect_visibility_change' => 'Detect visibility', 'detect_multi_monitor' => 'Detect multi-monitor', 'auto_pause_on_violation' => 'Auto-pause', 'terminate_on_threshold' => 'Terminate at threshold'] as $k => $label): ?><div class="col-md-3"><label><input type="checkbox" name="<?= $k ?>" checked> <?= htmlspecialchars($label) ?></label></div><?php endforeach; ?><div class="col-12"><textarea name="notes" class="form-control" placeholder="Policy notes"></textarea></div>
+            </div><button class="btn btn-primary mt-3">Save policy</button>
+        </form>
+        <table class="table">
+            <tr>
+                <th>Test</th>
+                <th>Fullscreen</th>
+                <th>Copy/Paste</th>
+                <th>Max violations</th>
+                <th>Terminate</th>
+            </tr><?php foreach ($rows as $r): ?><tr>
+                    <td><?= htmlspecialchars($r['title']) ?></td>
+                    <td><?= $r['fullscreen_required'] ? 'Yes' : 'No' ?></td>
+                    <td><?= $r['block_copy_paste'] ? 'Yes' : 'No' ?></td>
+                    <td><?= $r['max_violations'] ?></td>
+                    <td><?= $r['terminate_on_threshold'] ? 'Yes' : 'No' ?></td>
+                </tr><?php endforeach; ?>
+        </table>
+    </main>
+</body>
+
+</html>

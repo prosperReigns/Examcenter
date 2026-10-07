@@ -1,2 +1,55 @@
 <?php
-declare(strict_types=1);session_start();require_once __DIR__.'/../includes/pro.php';require_pro('multi_campus');require_once __DIR__.'/../db.php';$db=Database::connection();$msg='';if($_SERVER['REQUEST_METHOD']==='POST'){ $s=$db->prepare("INSERT INTO pro_campuses(institution_id,code,name,address) VALUES(?,?,?,?)");$s->bind_param('isss',$_POST['institution_id'],$_POST['code'],$_POST['name'],$_POST['address']);$s->execute();$s->close();$msg='Campus added.';}$rows=$db->query("SELECT * FROM pro_campuses ORDER BY id DESC")->fetch_all(MYSQLI_ASSOC);?><!doctype html><html><head><meta charset="utf-8"><title>Multi-Campus</title><link rel="stylesheet" href="../css/sidebar.css"><link rel="stylesheet" href="../css/bootstrap.min.css"></head><body><?php $admin=$_SESSION['admin']??[];$user=$_SESSION['user']??[];require __DIR__.'/sidebar.php';?><main class="main-content"><h2>Multi-Campus Administration</h2><?php if($msg):?><div class="alert alert-success"><?=$msg?></div><?php endif;?><form method="post" class="card p-3 mb-3"><div class="row g-2"><div class="col-md-2"><input name="institution_id" type="number" class="form-control" placeholder="Institution ID" required></div><div class="col-md-2"><input name="code" class="form-control" placeholder="Code" required></div><div class="col-md-3"><input name="name" class="form-control" placeholder="Campus name" required></div><div class="col-md-5"><input name="address" class="form-control" placeholder="Address"></div></div><button class="btn btn-primary mt-2">Add campus</button></form><table class="table"><tr><th>Code</th><th>Name</th><th>Address</th><th>Active</th></tr><?php foreach($rows as $r):?><tr><td><?=$r['code']?></td><td><?=htmlspecialchars($r['name'])?></td><td><?=htmlspecialchars((string)$r['address'])?></td><td><?=$r['active']?'Yes':'No'?></td></tr><?php endforeach;?></table></main></body></html>
+
+declare(strict_types=1);
+session_start();
+require_once __DIR__ . '/../includes/pro.php';
+require_pro('multi_campus');
+require_once __DIR__ . '/../db.php';
+$db = Database::connection();
+$msg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $s = $db->prepare("INSERT INTO pro_campuses(institution_id,code,name,address) VALUES(?,?,?,?)");
+    $s->bind_param('isss', $_POST['institution_id'], $_POST['code'], $_POST['name'], $_POST['address']);
+    $s->execute();
+    $s->close();
+    $msg = 'Campus added.';
+}
+$rows = $db->query("SELECT * FROM pro_campuses ORDER BY id DESC")->fetch_all(MYSQLI_ASSOC); ?>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Multi-Campus</title>
+    <link rel="stylesheet" href="../css/sidebar.css">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+</head>
+
+<body><?php $admin = $_SESSION['admin'] ?? [];
+        $user = $_SESSION['user'] ?? [];
+        require __DIR__ . '/sidebar.php'; ?><main class="main-content">
+        <h2>Multi-Campus Administration</h2><?php if ($msg): ?><div class="alert alert-success"><?= $msg ?></div><?php endif; ?><form method="post" class="card p-3 mb-3">
+            <div class="row g-2">
+                <div class="col-md-2"><input name="institution_id" type="number" class="form-control" placeholder="Institution ID" required></div>
+                <div class="col-md-2"><input name="code" class="form-control" placeholder="Code" required></div>
+                <div class="col-md-3"><input name="name" class="form-control" placeholder="Campus name" required></div>
+                <div class="col-md-5"><input name="address" class="form-control" placeholder="Address"></div>
+            </div><button class="btn btn-primary mt-2">Add campus</button>
+        </form>
+        <table class="table">
+            <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Active</th>
+            </tr><?php foreach ($rows as $r): ?><tr>
+                    <td><?= $r['code'] ?></td>
+                    <td><?= htmlspecialchars($r['name']) ?></td>
+                    <td><?= htmlspecialchars((string)$r['address']) ?></td>
+                    <td><?= $r['active'] ? 'Yes' : 'No' ?></td>
+                </tr><?php endforeach; ?>
+        </table>
+    </main>
+</body>
+
+</html>

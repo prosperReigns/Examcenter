@@ -1,5 +1,55 @@
 <?php
-declare(strict_types=1);session_start();require_once __DIR__.'/../includes/pro.php';require_pro('assessment_blueprints');require_once __DIR__.'/../db.php';$db=Database::connection();$msg='';
-if($_SERVER['REQUEST_METHOD']==='POST'){$s=$db->prepare("INSERT INTO pro_blueprints(institution_id,name,description,total_items) VALUES(?,?,?,?)");$s->bind_param('issi',$_POST['institution_id'],$_POST['name'],$_POST['description'],$_POST['total_items']);$s->execute();$s->close();$msg='Blueprint created.';}
-$rows=$db->query("SELECT * FROM pro_blueprints ORDER BY id DESC")->fetch_all(MYSQLI_ASSOC);
-?><!doctype html><html><head><meta charset="utf-8"><title>Blueprints</title><link rel="stylesheet" href="../css/sidebar.css"><link rel="stylesheet" href="../css/bootstrap.min.css"></head><body><?php $teacher=$_SESSION['teacher']??[];$admin=$_SESSION['admin']??[];$user=$_SESSION['user']??[];require __DIR__.'/../teacher/sidebar.php';?><main class="main-content"><h2>Assessment Blueprinting</h2><p class="text-muted">Create repeatable coverage rules, then assemble papers from approved bank items.</p><?php if($msg):?><div class="alert alert-success"><?=$msg?></div><?php endif;?><form method="post" class="card p-3 mb-3"><div class="row g-2"><input name="institution_id" type="number" class="form-control" placeholder="Institution ID" required><input name="name" class="form-control" placeholder="Blueprint name" required><input name="description" class="form-control" placeholder="Description"><input name="total_items" type="number" class="form-control" placeholder="Total items" required><button class="btn btn-primary mt-2">Create blueprint</button></div></form><table class="table"><tr><th>ID</th><th>Name</th><th>Items</th><th>Status</th><th>Version</th></tr><?php foreach($rows as $r):?><tr><td><?=$r['id']?></td><td><?=htmlspecialchars($r['name'])?></td><td><?=$r['total_items']?></td><td><?=$r['status']?></td><td><?=$r['version_no']?></td></tr><?php endforeach;?></table></main></body></html>
+
+declare(strict_types=1);
+session_start();
+require_once __DIR__ . '/../includes/pro.php';
+require_pro('assessment_blueprints');
+require_once __DIR__ . '/../db.php';
+$db = Database::connection();
+$msg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $s = $db->prepare("INSERT INTO pro_blueprints(institution_id,name,description,total_items) VALUES(?,?,?,?)");
+    $s->bind_param('issi', $_POST['institution_id'], $_POST['name'], $_POST['description'], $_POST['total_items']);
+    $s->execute();
+    $s->close();
+    $msg = 'Blueprint created.';
+}
+$rows = $db->query("SELECT * FROM pro_blueprints ORDER BY id DESC")->fetch_all(MYSQLI_ASSOC);
+?>
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Blueprints</title>
+    <link rel="stylesheet" href="../css/sidebar.css">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+</head>
+
+<body><?php $teacher = $_SESSION['teacher'] ?? [];
+        $admin = $_SESSION['admin'] ?? [];
+        $user = $_SESSION['user'] ?? [];
+        require __DIR__ . '/../teacher/sidebar.php'; ?><main class="main-content">
+        <h2>Assessment Blueprinting</h2>
+        <p class="text-muted">Create repeatable coverage rules, then assemble papers from approved bank items.</p><?php if ($msg): ?><div class="alert alert-success"><?= $msg ?></div><?php endif; ?><form method="post" class="card p-3 mb-3">
+            <div class="row g-2"><input name="institution_id" type="number" class="form-control" placeholder="Institution ID" required><input name="name" class="form-control" placeholder="Blueprint name" required><input name="description" class="form-control" placeholder="Description"><input name="total_items" type="number" class="form-control" placeholder="Total items" required><button class="btn btn-primary mt-2">Create blueprint</button></div>
+        </form>
+        <table class="table">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Items</th>
+                <th>Status</th>
+                <th>Version</th>
+            </tr><?php foreach ($rows as $r): ?><tr>
+                    <td><?= $r['id'] ?></td>
+                    <td><?= htmlspecialchars($r['name']) ?></td>
+                    <td><?= $r['total_items'] ?></td>
+                    <td><?= $r['status'] ?></td>
+                    <td><?= $r['version_no'] ?></td>
+                </tr><?php endforeach; ?>
+        </table>
+    </main>
+</body>
+
+</html>
