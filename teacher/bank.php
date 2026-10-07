@@ -191,7 +191,7 @@ try {
         );
 
         $universal_test_select = $universal_test_scope
-            ? ', ou.name, co.name, ap.name'
+            ? ', ou.name AS unit_name, co.name AS course_name, ap.name AS period_name'
             : '';
         $universal_test_joins = $universal_test_scope
             ? ' LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
