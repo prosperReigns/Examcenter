@@ -95,7 +95,7 @@ try {
                 } else {
                     $type_id = (int)$type['id'];
                 }
-                $stmt = $conn->prepare("INSERT INTO organizational_units (institution_id, unit_type_id, parent_unit_id, unit_code, unit_name) VALUES (?, ?, NULLIF(?, 0), NULLIF(?, ''), ?)");
+                $stmt = $conn->prepare("INSERT INTO organizational_units (institution_id, unit_type_id, parent_id, code, name) VALUES (?, ?, NULLIF(?, 0), NULLIF(?, ''), ?)");
                 $stmt->bind_param('iiiss', $institution_id, $type_id, $parent_id, $code, $name);
                 $stmt->execute();
                 $stmt->close();
@@ -164,7 +164,7 @@ try {
         $stmt->bind_param('i', $id);
         $stmt->execute();
         $stmt->close();
-        $success = 'Class status updated.';
+        $success = 'Class is_active updated.';
     }
 } catch (Throwable $e) {
     @$conn->rollback();
@@ -178,9 +178,9 @@ if ($result) {
 }
 
 if ($universal_schema_available) {
-    $result = $conn->query("SELECT ou.id, ou.name, ou.code, ou.is_active, COALESCE(ut.name, 'Unit') AS type_name, p.name AS parent_name FROM organizational_units ou JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id LEFT JOIN organizational_units p ON p.id = ou.parent_unit_id WHERE ou.institution_id = " . (int)$institution_id . " ORDER BY ou.name");
+    $result = $conn->query("SELECT ou.id, ou.name, ou.code, ou.is_active, COALESCE(ut.name, 'Unit') AS type_name, p.name AS parent_name FROM organizational_units ou JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id LEFT JOIN organizational_units p ON p.id = ou.parent_id WHERE ou.institution_id = " . (int)$institution_id . " ORDER BY ou.name");
     if ($result) while ($row = $result->fetch_assoc()) $units[] = $row;
-    $result = $conn->query("SELECT id, course_code, course_name, course_type, status FROM courses WHERE institution_id = " . (int)$institution_id . " ORDER BY course_name");
+    $result = $conn->query("SELECT id, course_code, course_name, course_type, is_active FROM courses WHERE institution_id = " . (int)$institution_id . " ORDER BY course_name");
     if ($result) while ($row = $result->fetch_assoc()) $courses[] = $row;
     $result = $conn->query("SELECT DISTINCT type_code, type_name FROM organizational_unit_types ORDER BY type_name");
     if ($result) while ($row = $result->fetch_assoc()) $unit_types[] = $row;
@@ -330,8 +330,8 @@ if ($universal_schema_available) {
                         <form method="post">
                             <input type="hidden" name="action" value="universal_unit">
                             <div class="mb-3">
-                                <label class="form-label" for="unit_name">Name</label>
-                                <input class="form-control" id="unit_name" name="name" required>
+                                <label class="form-label" for="name">Name</label>
+                                <input class="form-control" id="name" name="name" required>
                             </div>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -344,8 +344,8 @@ if ($universal_schema_available) {
                                     </datalist>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label" for="unit_code">Code</label>
-                                    <input class="form-control" id="unit_code" name="code" placeholder="Optional">
+                                    <label class="form-label" for="code">Code</label>
+                                    <input class="form-control" id="code" name="code" placeholder="Optional">
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -394,11 +394,11 @@ if ($universal_schema_available) {
                                 <tbody>
                                 <?php foreach ($units as $unit): ?>
                                     <tr>
-                                        <td><?= htmlspecialchars($unit['unit_name']) ?></td>
+                                        <td><?= htmlspecialchars($unit['name']) ?></td>
                                         <td><?= htmlspecialchars($unit['type_name']) ?></td>
-                                        <td><?= htmlspecialchars($unit['unit_code'] ?: '-') ?></td>
+                                        <td><?= htmlspecialchars($unit['code'] ?: '-') ?></td>
                                         <td><?= htmlspecialchars($unit['parent_name'] ?: 'Top level') ?></td>
-                                        <td><?= htmlspecialchars($unit['status']) ?></td>
+                                        <td><?= htmlspecialchars($unit['is_active']) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                                 <?php if (!$units): ?><tr><td colspan="5" class="text-muted">No organizational units found.</td></tr><?php endif; ?>
@@ -481,7 +481,7 @@ if ($universal_schema_available) {
 
                                 <a href="?toggle=<?= $c['id'] ?>"
                                 class="btn btn-sm <?= $c['is_active'] ? 'btn-outline-danger' : 'btn-outline-success' ?>"
-                                onclick="return confirm('Change class status?')">
+                                onclick="return confirm('Change class is_active?')">
                                 <i class="fas <?= $c['is_active'] ? 'fa-ban' : 'fa-check' ?>"></i><?= $c['is_active'] ? ' Disable' : ' Enable' ?>
                                 </a>
                             </td>
