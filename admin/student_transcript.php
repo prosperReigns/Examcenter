@@ -197,7 +197,7 @@ $universal_student_context = null;
 
 if ($universal_transcript_available && examcenterUniversalTableExists($conn, 'institution_memberships')) {
     $stmt = $conn->prepare(
-        "SELECT ou.name, ou.code
+        "SELECT ou.name AS unit_name, ou.code
          FROM institution_memberships im
          INNER JOIN unit_memberships um
              ON um.institution_membership_id = im.id
@@ -206,7 +206,7 @@ if ($universal_transcript_available && examcenterUniversalTableExists($conn, 'in
          WHERE im.legacy_student_id = ?
            AND im.status = 'active'
            AND um.status = 'active'
-         ORDER BY ou.name
+         ORDER BY ou.name AS unit_name
          LIMIT 1"
     );
     $stmt->bind_param('i', $studentId);
@@ -237,12 +237,12 @@ $sql = "
 
 if ($universal_transcript_available) {
     $sql .= ",
-        ou.name,
+        ou.name AS unit_name,
         co.code,
-        co.name,
+        co.name AS course_name,
         p.programme_name,
         pl.level_name AS programme_level_name,
-        ap.name,
+        ap.name AS period_name,
         ap.period_type";
 }
 
