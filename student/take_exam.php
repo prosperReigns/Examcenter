@@ -44,6 +44,7 @@ $universal_exam_available = $universal_exam_available
 // Resolve the active assessment from the session. Universal mode does not
 // require a legacy class/academic-level record.
 $user_id = (int)$_SESSION['student_id'];
+$institution_membership_id = (int)($_SESSION['institution_membership_id'] ?? 0);
 $subject = (string)$_SESSION['student_subject'];
 $test_title = (string)$_SESSION['test_title'];
 $test_id_from_session = (int)($_SESSION['current_test_id'] ?? 0);
@@ -355,7 +356,6 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Take Exam | Examcenter</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../css/all.min.css">
     <link rel="stylesheet" href="../css/take_exam.css">
     <script src="../js/math.min.js"></script>
