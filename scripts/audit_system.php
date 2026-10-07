@@ -66,6 +66,7 @@ $required = [
     'student/take_exam.php',
     'student/save_answer.php',
     'student/submit_exam.php',
+    'scripts/integration_mariadb.php',
 ];
 
 foreach ($required as $path) {
