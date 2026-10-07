@@ -8,7 +8,7 @@ require_once '../theory/TheoryGradingService.php';
 require_once '../theory/OllamaTheoryGrader.php';
 
 if(!isset($_SESSION['user_id'])||strtolower((string)($_SESSION['user_role']??''))!=='teacher'){http_response_code(403);exit('Unauthorized');}
-require_pro('ai_theory','Offline AI theory grading is an Examcenter Pro feature.');
+require_pro('ai_assessment','Offline AI theory grading is an Examcenter Pro feature.');
 
 $db=Database::connection();$testId=(int)($_GET['test_id']??0);
 $stmt=$db->prepare("SELECT ta.id,t.title FROM theory_assessments ta JOIN tests t ON t.id=ta.test_id WHERE ta.test_id=? LIMIT 1");$stmt->bind_param('i',$testId);$stmt->execute();$assessment=$stmt->get_result()->fetch_assoc();$stmt->close();if(!$assessment)exit('Assessment not found.');
