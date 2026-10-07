@@ -613,21 +613,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $membership_id = (int)$membership['id'];
                         $stmt = $conn->prepare(
                             "UPDATE people
-                             SET first_name = ?, last_name = ?, full_name = ?,
-                                 email = ?, phone = ?, status = 'active'
+                             SET first_name = ?, last_name = ?, display_name = ?,
+                                 email = ?, phone = ?, is_active = 1
                              WHERE id = ?"
                         );
                         $stmt->bind_param('sssssi', $first_name, $last_name, $display_name, $email, $phone, $person_id);
                         $stmt->execute();
                         $stmt->close();
                     } else {
-                        $person_code = 'teacher:' . $active_institution_id . ':' . $teacher_id;
+                        $external_ref = 'teacher:' . $active_institution_id . ':' . $teacher_id;
                         $stmt = $conn->prepare(
                             "INSERT INTO people
-                             (person_code, first_name, last_name, full_name, email, phone)
-                             VALUES (?, ?, ?, ?, ?, ?)"
+                             (institution_id, external_ref, first_name, last_name, display_name, email, phone)
+                             VALUES (?, ?, ?, ?, ?, ?, ?)"
                         );
-                        $stmt->bind_param('issssss', $active_institution_id, $person_code, $first_name, $last_name, $display_name, $email, $phone);
+                        $stmt->bind_param('issssss', $active_institution_id, $external_ref, $first_name, $last_name, $display_name, $email, $phone);
                         $stmt->execute();
                         $person_id = $stmt->insert_id;
                         $stmt->close();
@@ -671,7 +671,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $membership_role = 'teacher';
                         $stmt = $conn->prepare(
                             "INSERT IGNORE INTO unit_memberships
-                             (institution_membership_id, organizational_unit_id, membership_role)
+                             (unit_id, person_id, membership_role)
                              VALUES (?, ?, ?)"
                         );
                         $stmt->bind_param('iis', $unit_id, $person_id, $membership_role);
