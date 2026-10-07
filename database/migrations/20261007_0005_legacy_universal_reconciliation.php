@@ -54,7 +54,8 @@ function copyColumn(mysqli $db, string $table, string $target, string $source): 
     }
 }
 
-if (!$db = $GLOBALS['db'] ?? null) {
+$db = $GLOBALS['db'] ?? null;
+if (!$db instanceof mysqli) {
     throw new RuntimeException('Reconciliation migration requires the active database connection.');
 }
 
@@ -203,7 +204,6 @@ if (tableExists($db, 'unit_memberships')) {
              WHERE um.person_id IS NULL"
         );
     }
-    copyColumn($db, 'unit_memberships', 'membership_role', 'membership_role');
     if (columnExists($db, 'unit_memberships', 'start_date')) {
         $db->query("UPDATE unit_memberships SET starts_at=CAST(start_date AS DATETIME) WHERE starts_at IS NULL AND start_date IS NOT NULL");
     }
