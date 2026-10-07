@@ -261,19 +261,19 @@ $universal_questions_available = $active_institution_id !== null
     && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
 
 if ($universal_questions_available) {
-    $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY unit_name");
+    $stmt = $conn->prepare("SELECT id, name AS unit_name, code AS unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT id, code AS course_code, name AS course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY course_name");
+    $stmt = $conn->prepare("SELECT id, code AS course_code, name AS course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT id, period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY period_name");
+    $stmt = $conn->prepare("SELECT id, name AS period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
