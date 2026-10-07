@@ -290,7 +290,7 @@ try {
         );
 
         $universal_select = $universal_tests_available
-            ? ', ou.name, co.code, co.name, ap.name'
+            ? ', ou.name AS unit_name, co.code, co.name AS course_name, ap.name AS period_name'
             : '';
         $universal_joins = $universal_tests_available
             ? "
