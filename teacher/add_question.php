@@ -142,7 +142,7 @@ try {
         $stmt = $conn->prepare(
             "SELECT id, course_code, course_name, course_type
              FROM courses
-             WHERE institution_id = ? AND status = 'active'
+             WHERE institution_id = ? AND is_active = 1
              ORDER BY course_name"
         );
         $stmt->bind_param('i', $institutionId);
@@ -151,11 +151,11 @@ try {
         $stmt->close();
 
         $stmt = $conn->prepare(
-            "SELECT ou.id, ou.unit_name, ou.unit_code, ut.type_name
+            "SELECT ou.id, ou.name, ou.code, ut.type_name
              FROM organizational_units ou
              INNER JOIN organizational_unit_types ut ON ut.id = ou.unit_type_id
-             WHERE ou.institution_id = ? AND ou.status = 'active'
-             ORDER BY ut.type_name, ou.unit_name"
+             WHERE ou.institution_id = ? AND ou.is_active = 'active'
+             ORDER BY ut.type_name, ou.name"
         );
         $stmt->bind_param('i', $institutionId);
         $stmt->execute();
@@ -276,7 +276,7 @@ try {
     $universal_test_columns = $universal_context_available
         ? ", t.institution_id, t.organizational_unit_id, t.programme_id,
              t.programme_level_id, t.academic_period_id, t.course_id,
-             t.assessment_group_id, ou.unit_name, c.course_name, ap.period_name"
+             t.assessment_group_id, ou.name, c.course_name, ap.name"
         : '';
     $universal_test_joins = $universal_context_available
         ? " LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
