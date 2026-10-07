@@ -44,10 +44,10 @@ $course_schema_available = examcenterUniversalTableExists($conn, 'courses')
 
 if ($course_schema_available) {
     $result = $conn->query(
-        "SELECT id, institution_name
+        "SELECT id, name
          FROM institutions
-         WHERE status = 'active'
-         ORDER BY institution_name"
+         WHERE is_active = 1
+         ORDER BY name"
     );
     if ($result) {
         while ($row = $result->fetch_assoc()) {
@@ -182,11 +182,11 @@ if ($result) {
 if ($course_schema_available) {
     $result = $conn->query(
         "SELECT c.id, c.course_code, c.course_name, c.course_type, c.description,
-                c.status, i.institution_name, s.subject_name
+                c.status, i.name, s.subject_name
          FROM courses c
          INNER JOIN institutions i ON i.id = c.institution_id
          LEFT JOIN subjects s ON s.id = c.legacy_subject_id
-         ORDER BY i.institution_name, c.course_name"
+         ORDER BY i.name, c.course_name"
     );
     if ($result) {
         while ($row = $result->fetch_assoc()) {
