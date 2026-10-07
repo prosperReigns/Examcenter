@@ -140,7 +140,7 @@ try {
         $institutionId = (int)$universal_institution_id;
 
         $stmt = $conn->prepare(
-            "SELECT id, course_code, course_name, course_type
+            "SELECT id, code AS course_code, name AS course_name, course_type
              FROM courses
              WHERE institution_id = ? AND is_active = 1
              ORDER BY course_name"
@@ -236,7 +236,7 @@ try {
     $result = $conn->query("
         SELECT CONCAT_WS(' ', session, exam_title) AS title
         FROM academic_years
-        WHERE status = 'active'
+        WHERE is_active = 1
           AND session IS NOT NULL
           AND exam_title IS NOT NULL
         ORDER BY id DESC
