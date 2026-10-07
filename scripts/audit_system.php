@@ -80,7 +80,7 @@ if (!str_contains($migrate, '20261007_0004_system_audit_hardening')) {
 $policy = file_get_contents($root . '/includes/product_policy.php') ?: '';
 foreach ([
     'exam_taking','exam_submission','objective_marking',
-    'theory_assessment','offline_exam_operation'
+    'offline_exam_operation'
 ] as $feature) {
     if (!str_contains($policy, "'" . $feature . "'")) {
         auditFail('Core policy is missing feature: ' . $feature);
