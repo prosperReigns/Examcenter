@@ -148,13 +148,13 @@ $universal_schedule_available = $active_institution_id !== null
     && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
 
 if ($universal_schedule_available) {
-    $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND status = 'active' ORDER BY unit_name");
+    $stmt = $conn->prepare("SELECT id, unit_name, unit_code FROM organizational_units WHERE institution_id = ? AND is_active = 1 ORDER BY unit_name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $organizational_units = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND status = 'active' ORDER BY course_name");
+    $stmt = $conn->prepare("SELECT id, course_code, course_name FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY course_name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
