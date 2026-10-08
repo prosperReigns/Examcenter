@@ -1632,5 +1632,56 @@ CREATE TABLE IF NOT EXISTS core_feature_catalog (
     is_enabled TINYINT(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT IGNORE INTO institution_types (code, name) VALUES 
+('primary_school', 'Primary School'),
+('secondary_school', 'Secondary School'),
+('tertiary_institution', 'Tertiary Institution'),
+('vocational_institution', 'Vocational / Training Institution'),
+('corporate', 'Corporate / Organisation'),
+('assessment_centre', 'Assessment Centre'),
+('other', 'Other');
+
+INSERT IGNORE INTO organizational_unit_types (code, name) VALUES 
+('campus', 'Campus'), 
+('faculty', 'Faculty'), 
+('department', 'Department'), 
+('school', 'School / College'), 
+('grade', 'Grade / Year'), 
+('class', 'Class / Stream'), 
+('cohort', 'Cohort'), 
+('programme', 'Programme'), 
+('division', 'Division'), 
+('team', 'Team'), 
+('custom', 'Custom'); 
+
+INSERT IGNORE INTO pro_feature_catalog(feature_code,name,description) VALUES 
+('question_bank_pro','Advanced Question Bank','Reusable governed question bank with metadata, versioning and review.'), 
+('assessment_blueprints','Assessment Blueprinting','Blueprint rules and paper assembly.'), 
+('assessment_analytics','Advanced Analytics & Item Analysis','Question, cohort and reliability statistics.'), 
+('secure_exam_mode','Secure Exam Mode','Fullscreen, focus, clipboard and integrity controls.'), 
+('exam_sessions','Exam Session & Invigilation','Sessions, rooms, candidates, invigilators and incidents.'), 
+('certificates','Certificates & Verification','Issued certificates with verification tokens.'), 
+('multi_campus','Multi-Campus Administration','Central administration across campuses.'), 
+('ai_assessment','AI Assessment Suite','Offline AI authoring and assessment assistance.'), 
+('examiner_moderation','Examiner & Moderation','Examiner assignment, moderation and appeals.'), 
+('corporate_assessment','Corporate Assessment','Recruitment, competency and employee assessments.'), 
+('coding_assessment','Coding Assessments','Programming questions and controlled local runners.');
+
+INSERT IGNORE INTO core_feature_catalog(feature_code, feature_name, description) VALUES
+('institution_setup','Institution Setup','Configure the assessment organisation.'),
+('academic_structure','Academic/Organisational Structure','Classes, units, programmes, levels and periods.'),
+('identity_access','Identity and Access','Administrators, teachers and candidates.'),
+('question_authoring','Question Authoring','Create and manage assessment questions.'),
+('assessment_authoring','Assessment Authoring','Create, configure and publish tests.'),
+('assessment_scheduling','Assessment Scheduling','Schedule and reschedule examinations.'),
+('exam_delivery','Exam Delivery','Offline candidate examination workflow.'),
+('exam_recovery','Exam Recovery','Persist answers and recover interrupted attempts.'),
+('objective_marking','Objective Marking','Automatic objective-question marking.'),
+('theory_assessment','Theory Assessment','Written answers and manual/AI-assisted marking.'),
+('results','Results','Calculate, store and view assessment results.'),
+('basic_reporting','Basic Reporting','Essential candidate and assessment reports.'),
+('offline_operation','Offline Operation','Core assessment lifecycle without Internet.'),
+('basic_security','Basic Security','Authentication, access control and exam integrity.');
+
 
 SET FOREIGN_KEY_CHECKS = 1;
