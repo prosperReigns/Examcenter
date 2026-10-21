@@ -5,6 +5,13 @@ require_once __DIR__ . '/../license/ProEntitlementVerifier.php';
 
 function pro_enabled(string $feature = 'pro'): bool
 {
+    if (
+        defined('EXAMCENTER_PRO_GATES_DISABLED_FOR_DEVELOPMENT')
+        && EXAMCENTER_PRO_GATES_DISABLED_FOR_DEVELOPMENT
+    ) {
+        return true;
+    }
+
     return ProEntitlementVerifier::hasFeature($feature);
 }
 
