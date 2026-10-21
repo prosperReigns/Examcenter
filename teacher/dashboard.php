@@ -474,6 +474,11 @@ $navigation = [
                 'url' => 'add_question.php'
             ],
             [
+                'label' => 'Theory Questions',
+                'icon' => 'fa-pen-to-square',
+                'url' => 'add_question.php#theory-assessment'
+            ],
+            [
                 'label' => 'Question Bank',
                 'icon' => 'fa-database',
                 'url' => 'bank.php'
