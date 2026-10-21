@@ -14,8 +14,12 @@ require_pro('ai_assessment', 'Offline AI theory assessment is an Examcenter Pro 
 
 $db = Database::connection();
 $teacherId = (int)$_SESSION['user_id'];
-$testId = (int)($_GET['test_id'] ?? $_POST['test_id'] ?? 0);
-if ($testId <= 0) die('A valid test is required.');
+$testId = (int)($_GET['test_id'] ?? $_POST['test_id'] ?? $_SESSION['current_test_id'] ?? 0);
+if ($testId <= 0) {
+    header('Location: add_question.php#theory-assessment');
+    exit;
+}
+$_SESSION['current_test_id'] = $testId;
 
 $stmt = $db->prepare("SELECT t.id,t.title,t.subject,t.year FROM tests t WHERE t.id=? LIMIT 1");
 $stmt->bind_param('i', $testId);
