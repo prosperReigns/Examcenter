@@ -11,24 +11,41 @@ error_reporting(E_ALL);
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../login.php?error=Unauthorized");
+    header("Location: ../login.php?error=Not logged in");
     exit();
 }
 
+
+                    $super_admin = null;
 $database = Database::getInstance();
 $conn = $database->getConnection();
 
-// Fetch admin info
-$admin_id = (int)$_SESSION['user_id'];
-$stmt = $conn->prepare("SELECT username, role FROM super_admins WHERE id=?");
-$stmt->bind_param("i", $admin_id);
-$stmt->execute();
-$admin = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+                    $stmt = $conn->prepare("
+        SELECT username, role
+        FROM super_admins
+        WHERE id = ?
+        LIMIT 1
+    ");
 
-if (!$admin || strtolower($admin['role']) !== 'super
-_admin') {
-    session_destroy();
+                    if (!$stmt) {
+                        throw new Exception("Failed to prepare super admin query: " . $conn->error);
+                    }
+
+                    $stmt->bind_param("i", $user_id);
+                    $stmt->execute();
+
+                    $result = $stmt->get_result();
+                    $super_admin = $result->fetch_assoc();
+
+                    $stmt->close();
+
+                    if (
+                        !$super_admin ||
+                        !isset($super_admin['role']) ||
+                        strtolower($super_admin['role']) !== 'super_admin'
+                    ) {
+                        session_destroy();
+
     header("Location: ../login.php?error=Unauthorized");
     exit();
 }

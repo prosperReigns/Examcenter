@@ -7,6 +7,7 @@ require_once "cleanup_backups.php";
 
 
 $conn = Database::connection();
+ensureBackupSettingsTable($conn);
 
 // Fetch admin profile
 $admin_id = (int)$_SESSION['user_id'];

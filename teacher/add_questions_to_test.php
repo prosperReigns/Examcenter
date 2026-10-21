@@ -55,6 +55,12 @@ $universal_test_scope = examcenterUniversalTableExists($conn, 'institutions')
 $active_institution_id = $universal_test_scope
     ? examcenterActiveInstitutionId($conn)
     : null;
+$institution_profile = examcenterInstitutionProfile($conn);
+$is_school_institution = $active_institution_id === null || in_array(
+    $institution_profile['category'],
+    ['primary_school', 'secondary_school'],
+    true
+);
 
 /*
  * Fetch the subjects this teacher is assigned to, so we can
@@ -67,6 +73,20 @@ $stmt->bind_param("i", $teacher_id);
 $stmt->execute();
 $assigned_subjects = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'subject');
 $stmt->close();
+$assigned_courses = (!$is_school_institution && $active_institution_id)
+    ? examcenterTeacherCourseAssignments($conn, $teacher_id, $active_institution_id)
+    : [];
+if (!$is_school_institution) {
+    $assigned_subjects = array_values(array_unique(array_map(
+        static fn($assignment) => trim((string)$assignment['course_name']),
+        $assigned_courses
+    )));
+}
+$teacher_test_values = $is_school_institution
+    ? $assigned_subjects
+    : array_values(array_unique(array_map(static fn($assignment) => (int)$assignment['course_id'], $assigned_courses)));
+$teacher_test_column = $is_school_institution ? 'subject' : 'course_id';
+$teacher_test_types = str_repeat($is_school_institution ? 's' : 'i', count($teacher_test_values));
 
 $conn->begin_transaction();
 
@@ -81,7 +101,8 @@ try {
         throw new Exception("You are not assigned to any subjects.");
     }
 
-    $placeholders = implode(',', array_fill(0, count($assigned_subjects), '?'));
+    if (empty($teacher_test_values)) throw new Exception('You are not assigned to any eligible subjects or courses.');
+    $placeholders = implode(',', array_fill(0, count($teacher_test_values), '?'));
 
     $test_context_select = $universal_test_scope
         ? ", institution_id, organizational_unit_id, course_id, academic_period_id"
@@ -94,12 +115,12 @@ try {
         SELECT academic_level_id, subject{$test_context_select}
         FROM tests
         WHERE id = ?
-        AND subject IN ($placeholders)
+        AND {$teacher_test_column} IN ($placeholders)
         {$test_scope_condition}
     ");
 
-    $types = 'i' . str_repeat('s', count($assigned_subjects));
-    $params = array_merge([$test_id], $assigned_subjects);
+    $types = 'i' . $teacher_test_types;
+    $params = array_merge([$test_id], $teacher_test_values);
     if ($universal_test_scope) {
         if ($active_institution_id === null) {
             throw new Exception("No active institution is configured.");
@@ -118,6 +139,17 @@ try {
         throw new Exception("Invalid test, or you don't have access to it.");
     }
 
+    $question_context_available = $active_institution_id !== null
+        && examcenterUniversalTableExists($conn, 'courses')
+        && examcenterUniversalTableExists($conn, 'organizational_units')
+        && examcenterUniversalTableExists($conn, 'academic_periods')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'course_id')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'organizational_unit_id')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'academic_period_id');
+    if (!$is_school_institution && !$question_context_available) {
+        throw new Exception('Apply the ADDED question-bank migration in help.txt before copying universal bank questions.');
+    }
+
     // Remember this as the active test for subsequent visits.
     $_SESSION['current_test_id'] = $test_id;
 
@@ -131,6 +163,9 @@ try {
          * private bank questions into their own test.
          */
 
+        $question_context_select = $question_context_available
+            ? ', course_id, organizational_unit_id, academic_period_id'
+            : '';
         $stmt = $conn->prepare("
             SELECT
                 id,
@@ -138,6 +173,7 @@ try {
                 class,
                 subject,
                 question_type
+                {$question_context_select}
             FROM new_questions
             WHERE id = ?
             AND test_id IS NULL
@@ -155,10 +191,21 @@ try {
             Continue;
         }
 
+        if (!$is_school_institution && (int)($question['course_id'] ?? 0) !== (int)($test['course_id'] ?? 0)) {
+            continue;
+        }
+
         /*
          * Insert into new_questions
          */
 
+        if ($question_context_available && $universal_test_scope) {
+            $course_id = (int)($test['course_id'] ?? 0) ?: null;
+            $unit_id = (int)($test['organizational_unit_id'] ?? 0) ?: null;
+            $period_id = (int)($test['academic_period_id'] ?? 0) ?: null;
+            $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, teacher_id, class, subject, course_id, organizational_unit_id, academic_period_id, question_type, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param('sissiiis', $question['question_text'], $test_id, $question['class'], $test['subject'], $course_id, $unit_id, $period_id, $question['question_type']);
+        } else {
         $stmt = $conn->prepare("
             INSERT INTO new_questions
             (
@@ -183,6 +230,7 @@ try {
             $test['subject'],
             $question['question_type']
         );
+        }
 
         $stmt->execute();
 

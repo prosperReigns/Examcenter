@@ -35,7 +35,16 @@ if (!$admin || strtolower($admin['role']) !== 'admin') {
 
 $error = '';
 $success = '';
-$class_groups = ['PRIMARY', 'JSS', 'SS'];
+$institution_profile = examcenterInstitutionProfile($conn);
+$institution_category = $institution_profile['category'];
+$institution_type_configured = $institution_profile['type_id'] !== null;
+$is_school = !$institution_type_configured
+    || in_array($institution_category, ['primary_school', 'secondary_school'], true);
+$class_groups = !$institution_type_configured
+    ? ['PRIMARY', 'JSS', 'SS']
+    : ($institution_category === 'primary_school'
+        ? ['PRIMARY']
+        : ($institution_category === 'secondary_school' ? ['JSS', 'SS'] : []));
 $universal_schema_available = false;
 $institution_id = null;
 $unit_types = [];
@@ -55,16 +64,27 @@ try {
         }
     }
 
+    if (!$universal_schema_available && $institution_type_configured && !$is_school) {
+        $is_school = true;
+        $class_groups = ['PRIMARY', 'JSS', 'SS'];
+    }
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? 'legacy_class';
 
         if ($action === 'universal_unit' || $action === 'course') {
+            if ($is_school) {
+                throw new InvalidArgumentException('Universal units and courses are available for non-school institutions.');
+            }
             if (!$universal_schema_available) {
                 throw new RuntimeException('Universal structure tables are not installed. Apply the approved schema migration first.');
             }
 
             $name = trim($_POST['name'] ?? '');
             $code = strtoupper(trim($_POST['code'] ?? ''));
+            if ($action === 'course' && $code === '') {
+                $code = strtoupper(substr(preg_replace('/[^A-Z0-9]+/i', '-', $name), 0, 80));
+            }
             if ($name === '') {
                 throw new InvalidArgumentException('A name is required.');
             }
@@ -72,7 +92,7 @@ try {
             $conn->begin_transaction();
             if ($action === 'course') {
                 $course_type = trim($_POST['course_type'] ?? 'course') ?: 'course';
-                $stmt = $conn->prepare("INSERT INTO courses (institution_id, code, name, course_type) VALUES (?, NULLIF(?, ''), ?, ?)");
+                $stmt = $conn->prepare("INSERT INTO courses (institution_id, code, name, course_type) VALUES (?, ?, ?, ?)");
                 $stmt->bind_param('isss', $institution_id, $code, $name, $course_type);
                 $stmt->execute();
                 $stmt->close();
@@ -80,6 +100,14 @@ try {
             } else {
                 $type_code = strtoupper(trim($_POST['unit_type'] ?? 'DEPARTMENT'));
                 $parent_id = (int)($_POST['parent_id'] ?? 0);
+                if ($parent_id > 0) {
+                    $parent_check = $conn->prepare("SELECT id FROM organizational_units WHERE id = ? AND institution_id = ? AND is_active = 1 LIMIT 1");
+                    $parent_check->bind_param('ii', $parent_id, $institution_id);
+                    $parent_check->execute();
+                    $valid_parent = $parent_check->get_result()->fetch_assoc();
+                    $parent_check->close();
+                    if (!$valid_parent) throw new InvalidArgumentException('Parent unit must be active and belong to this institution.');
+                }
                 $stmt = $conn->prepare("SELECT id FROM organizational_unit_types WHERE code = ? LIMIT 1");
                 $stmt->bind_param('s', $type_code);
                 $stmt->execute();
@@ -103,6 +131,9 @@ try {
             }
             $conn->commit();
         } elseif ($action === 'legacy_class') {
+            if (!$is_school) {
+                throw new InvalidArgumentException('School classes cannot be added for this institution type.');
+            }
             $class_id = $_POST['class_id'] ?? null;
             $class_group = strtoupper(trim($_POST['class_group'] ?? ''));
             $level_code = strtoupper(trim($_POST['level_code'] ?? ''));
@@ -115,6 +146,9 @@ try {
                 || ($class_group === 'PRIMARY' && str_starts_with($level_code, 'PRY'));
             if (!$valid) {
                 throw new InvalidArgumentException("Level Code '$level_code' does not match Class Group '$class_group'.");
+            }
+            if (!in_array($class_group, $class_groups, true)) {
+                throw new InvalidArgumentException('The selected class group is not available for this school type.');
             }
             $conn->begin_transaction();
             $stmt = $conn->prepare("SELECT id FROM academic_levels WHERE level_code=? AND class_group=?");
@@ -172,7 +206,10 @@ try {
 }
 
 $classes = [];
-$result = $conn->query("SELECT c.id, c.is_active, c.class_name, al.level_code, s.stream_name FROM classes c JOIN academic_levels al ON c.academic_level_id = al.id JOIN streams s ON c.stream_id = s.id ORDER BY al.level_code, s.stream_name");
+$classLevelFilter = $is_school && $class_groups
+    ? " WHERE al.class_group IN ('" . implode("','", $class_groups) . "')"
+    : ($is_school ? '' : ' WHERE 1 = 0');
+$result = $conn->query("SELECT c.id, c.is_active, c.class_name, al.level_code, s.stream_name FROM classes c JOIN academic_levels al ON c.academic_level_id = al.id JOIN streams s ON c.stream_id = s.id" . $classLevelFilter . " ORDER BY al.level_code, s.stream_name");
 if ($result) {
     while ($row = $result->fetch_assoc()) $classes[] = $row;
 }
@@ -234,7 +271,7 @@ if ($universal_schema_available) {
     <?php if ($error): ?>
         <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
     <?php endif; ?>
-        <div class="row mb-4">
+        <?php if ($is_school): ?><div class="row mb-4">
 
         <div class="col-md-4">
             <div class="card shadow-sm border-0">
@@ -263,12 +300,12 @@ if ($universal_schema_available) {
             </div>
         </div>
 
-    </div>
+    </div><?php endif; ?>
     <?php if ($success): ?>
         <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
     <?php endif; ?>
 
-    <div class="card mb-4">
+        <?php if ($is_school): ?><div class="card mb-4">
         <div class="card-header bg-primary text-white"><i class="fas fa-school me-2"></i>Add / Edit Class</div>
         <div class="card-body">
             <form method="post">
@@ -310,9 +347,9 @@ if ($universal_schema_available) {
                 <button type="reset" class="btn btn-outline-secondary px-4 mt-3" onclick="resetForm()"><i class="fas fa-times me-2"></i>Cancel</button>
             </form>
         </div>
-    </div>
+    </div><?php endif; ?>
 
-    <div class="card mb-4">
+    <?php if (!$is_school): ?><div class="card mb-4">
         <div class="card-header bg-success text-white">
             <i class="fas fa-sitemap me-2"></i>Universal Structure
         </div>
@@ -380,9 +417,9 @@ if ($universal_schema_available) {
                 </div>
             <?php endif; ?>
         </div>
-    </div>
+    </div><?php endif; ?>
 
-    <?php if ($universal_schema_available): ?>
+    <?php if (!$is_school && $universal_schema_available): ?>
         <div class="row g-4 mb-4">
             <div class="col-lg-7">
                 <div class="card h-100">
@@ -433,7 +470,7 @@ if ($universal_schema_available) {
         </div>
     <?php endif; ?>
 
-    <div class="card">
+    <?php if ($is_school): ?><div class="card">
         <div class="card-header bg-dark text-white d-flex justify-content-between">
             <span>
                 <i class="fas fa-list me-2"></i>
@@ -491,7 +528,7 @@ if ($universal_schema_available) {
                 </tbody>
             </table>
         </div>
-    </div>
+    </div><?php endif; ?>
 
 </div>
     <script src="../js/jquery-3.7.0.min.js"></script>

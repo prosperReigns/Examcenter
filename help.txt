@@ -68,9 +68,13 @@ CREATE TABLE IF NOT EXISTS academic_levels (
     level_code VARCHAR(10)
         CHARACTER SET utf8mb4
         COLLATE utf8mb4_unicode_ci UNIQUE,
-    class_group ENUM('JSS','SS') NOT NULL
+    -- ADDED: PRIMARY supports primary-school institution profiles.
+    class_group ENUM('PRIMARY','JSS','SS') NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+-- ADDED MIGRATION for existing databases that support primary-school profiles:
+-- ALTER TABLE academic_levels MODIFY class_group ENUM('PRIMARY','JSS','SS') NOT NULL;
 
 -- 1. 
 CREATE TABLE IF NOT EXISTS classes (
@@ -257,13 +261,30 @@ CREATE TABLE IF NOT EXISTS new_questions (
     teacher_id INT NULL,
     class VARCHAR(20),
     subject VARCHAR(100),
+    -- ADDED: Universal context for reusable non-school question-bank entries.
+    -- Values reference courses.id, organizational_units.id and academic_periods.id.
+    course_id INT NULL,
+    organizational_unit_id INT NULL,
+    academic_period_id INT NULL,
     question_type VARCHAR(50),
     created_at DATETIME,
+    INDEX idx_new_questions_course (course_id),
+    INDEX idx_new_questions_unit (organizational_unit_id),
+    INDEX idx_new_questions_period (academic_period_id),
     FOREIGN KEY (test_id)
         REFERENCES tests(id)
         ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+-- ADDED MIGRATION for databases created before the universal question-bank fields:
+-- Run once against the existing database. These nullable fields preserve old rows.
+-- ALTER TABLE new_questions ADD COLUMN course_id INT NULL AFTER subject;
+-- ALTER TABLE new_questions ADD COLUMN organizational_unit_id INT NULL AFTER course_id;
+-- ALTER TABLE new_questions ADD COLUMN academic_period_id INT NULL AFTER organizational_unit_id;
+-- CREATE INDEX idx_new_questions_course ON new_questions (course_id);
+-- CREATE INDEX idx_new_questions_unit ON new_questions (organizational_unit_id);
+-- CREATE INDEX idx_new_questions_period ON new_questions (academic_period_id);
 
 -- 1. 
 CREATE TABLE IF NOT EXISTS fill_blank_questions (
@@ -575,6 +596,25 @@ CREATE TABLE IF NOT EXISTS backups (
     restored_at DATETIME NULL,
     FOREIGN KEY (created_by)
         REFERENCES admins(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+-- Audit trail used by the admin audit log and audit service.
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NULL,
+    username VARCHAR(150) NOT NULL DEFAULT 'Unknown',
+    module VARCHAR(100) NOT NULL DEFAULT 'System',
+    action VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
+    description TEXT NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    computer_name VARCHAR(255) NULL,
+    user_agent TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_audit_logs_created_at (created_at),
+    INDEX idx_audit_logs_admin_id (admin_id),
+    INDEX idx_audit_logs_module (module),
+    INDEX idx_audit_logs_action (action)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 

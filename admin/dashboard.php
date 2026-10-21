@@ -348,17 +348,17 @@ try {
     if ($universal_dashboard_available) {
         $universal_institutions = (int)getScalar(
             $conn,
-            "SELECT COUNT(*) FROM institutions WHERE status = 'active'",
+            "SELECT COUNT(*) FROM institutions WHERE is_active = 1",
             0
         );
         $universal_units = (int)getScalar(
             $conn,
-            "SELECT COUNT(*) FROM organizational_units WHERE status = 'active'",
+            "SELECT COUNT(*) FROM organizational_units WHERE is_active = 1",
             0
         );
         $universal_courses = (int)getScalar(
             $conn,
-            "SELECT COUNT(*) FROM courses WHERE status = 'active'",
+            "SELECT COUNT(*) FROM courses WHERE is_active = 1",
             0
         );
         $universal_periods = (int)getScalar(

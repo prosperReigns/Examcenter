@@ -88,23 +88,27 @@ try {
     $activity =
         "Admin {$admin['username']} accessed exam scheduling page.";
 
-    $stmt = $conn->prepare(
-        "INSERT INTO activities_log
-        (activity, admin_id, ip_address, user_agent, created_at)
-        VALUES (?, ?, ?, ?, NOW())"
-    );
+    if (examcenterUniversalTableExists($conn, 'activities_log')) {
+        try {
+            $stmt = $conn->prepare(
+                "INSERT INTO activities_log
+                (activity, admin_id, ip_address, user_agent, created_at)
+                VALUES (?, ?, ?, ?, NOW())"
+            );
 
-    if ($stmt) {
-        $stmt->bind_param(
-            "siss",
-            $activity,
-            $admin_id,
-            $ip_address,
-            $user_agent
-        );
+            $stmt->bind_param(
+                "siss",
+                $activity,
+                $admin_id,
+                $ip_address,
+                $user_agent
+            );
 
-        $stmt->execute();
-        $stmt->close();
+            $stmt->execute();
+            $stmt->close();
+        } catch (Throwable $logError) {
+            error_log("Exam scheduling activity log failed: " . $logError->getMessage());
+        }
     }
 
 } catch (Exception $e) {
@@ -355,24 +359,27 @@ if (
                 "{$exam_date}: " .
                 implode(', ', $valid_subjects);
 
-            $stmt = $conn->prepare(
-                "INSERT INTO activities_log
-                (activity, admin_id, ip_address, user_agent, created_at)
-                VALUES (?, ?, ?, ?, NOW())"
-            );
+            if (examcenterUniversalTableExists($conn, 'activities_log')) {
+                try {
+                    $stmt = $conn->prepare(
+                        "INSERT INTO activities_log
+                        (activity, admin_id, ip_address, user_agent, created_at)
+                        VALUES (?, ?, ?, ?, NOW())"
+                    );
 
-            if ($stmt) {
+                    $stmt->bind_param(
+                        "siss",
+                        $activity,
+                        $admin_id,
+                        $ip_address,
+                        $user_agent
+                    );
 
-                $stmt->bind_param(
-                    "siss",
-                    $activity,
-                    $admin_id,
-                    $ip_address,
-                    $user_agent
-                );
-
-                $stmt->execute();
-                $stmt->close();
+                    $stmt->execute();
+                    $stmt->close();
+                } catch (Throwable $logError) {
+                    error_log("Exam schedule update activity log failed: " . $logError->getMessage());
+                }
             }
 
             $success =

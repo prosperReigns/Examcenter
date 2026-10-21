@@ -73,7 +73,6 @@ try {
     $admin = $stmt->get_result()->fetch_assoc();
 
     $stmt->close();
-
 } catch (Throwable $e) {
 
     error_log("Manage session page error: " . $e->getMessage());
@@ -156,8 +155,8 @@ if (isset($_GET['action'])) {
 
             $yearStatus =
                 ($row && (int)$row['active_count'] > 0)
-                    ? 'active'
-                    : 'inactive';
+                ? 'active'
+                : 'inactive';
 
 
             echo json_encode([
@@ -165,7 +164,6 @@ if (isset($_GET['action'])) {
                 'sessions' => $sessions,
                 'year_status' => $yearStatus
             ]);
-
         } catch (Throwable $e) {
 
             error_log("get_sessions error: " . $e->getMessage());
@@ -234,7 +232,6 @@ if (isset($_GET['action'])) {
                 'success' => true,
                 'exams' => $exams
             ]);
-
         } catch (Throwable $e) {
 
             error_log("get_exams error: " . $e->getMessage());
@@ -344,7 +341,6 @@ if (isset($_GET['action'])) {
                     'success' => true,
                     'message' => 'Session added successfully.'
                 ]);
-
             } else {
 
                 echo json_encode([
@@ -352,7 +348,6 @@ if (isset($_GET['action'])) {
                     'message' => 'Could not add session.'
                 ]);
             }
-
         } catch (Throwable $e) {
 
             error_log("add_session error: " . $e->getMessage());
@@ -465,7 +460,6 @@ if (isset($_GET['action'])) {
                     'success' => true,
                     'message' => 'Exam title added successfully.'
                 ]);
-
             } else {
 
                 echo json_encode([
@@ -473,7 +467,6 @@ if (isset($_GET['action'])) {
                     'message' => 'Could not add exam title.'
                 ]);
             }
-
         } catch (Throwable $e) {
 
             error_log("add_exam error: " . $e->getMessage());
@@ -599,11 +592,10 @@ if (isset($_GET['action'])) {
                     'status' => $newStatus,
                     'affected_rows' => $affected,
                     'message' =>
-                        $newStatus === 'active'
-                            ? 'Academic year activated successfully.'
-                            : 'Academic year deactivated successfully.'
+                    $newStatus === 'active'
+                        ? 'Academic year activated successfully.'
+                        : 'Academic year deactivated successfully.'
                 ]);
-
             } else {
 
                 echo json_encode([
@@ -611,7 +603,6 @@ if (isset($_GET['action'])) {
                     'message' => 'Could not update academic year status.'
                 ]);
             }
-
         } catch (Throwable $e) {
 
             error_log("toggle_year error: " . $e->getMessage());
@@ -669,7 +660,6 @@ if (isset($_GET['action'])) {
                     'success' => true,
                     'message' => 'Academic year deleted successfully.'
                 ]);
-
             } else {
 
                 echo json_encode([
@@ -677,7 +667,6 @@ if (isset($_GET['action'])) {
                     'message' => 'Could not delete academic year.'
                 ]);
             }
-
         } catch (Throwable $e) {
 
             error_log("delete_year error: " . $e->getMessage());
@@ -729,7 +718,7 @@ if (isset($_GET['action'])) {
             echo json_encode([
                 'success' => false,
                 'message' =>
-                    'Year, session, and exam title are required.'
+                'Year, session, and exam title are required.'
             ]);
 
             exit();
@@ -795,7 +784,7 @@ if (isset($_GET['action'])) {
                 echo json_encode([
                     'success' => false,
                     'message' =>
-                        'The selected academic year is not active. Activate the academic year before saving the selection.'
+                    'The selected academic year is not active. Activate the academic year before saving the selection.'
                 ]);
 
                 exit();
@@ -860,11 +849,10 @@ if (isset($_GET['action'])) {
             echo json_encode([
                 'success' => true,
                 'message' =>
-                    'Academic session saved successfully.',
+                'Academic session saved successfully.',
                 'id' => $activeId,
                 'affected_rows' => $affectedRows
             ]);
-
         } catch (Throwable $e) {
 
             try {
@@ -875,13 +863,13 @@ if (isset($_GET['action'])) {
 
             error_log(
                 "save_selection error: " .
-                $e->getMessage()
+                    $e->getMessage()
             );
 
             echo json_encode([
                 'success' => false,
                 'message' =>
-                    'Unable to save the academic session.'
+                'Unable to save the academic session.'
             ]);
         }
 
@@ -920,7 +908,6 @@ if (
     if ($newYear === '') {
 
         $errorMsg = "Academic year cannot be empty.";
-
     } else {
 
         try {
@@ -962,7 +949,6 @@ if (
 
                 $errorMsg =
                     "This academic year has already been added.";
-
             } else {
 
                 // ------------------------------------------------
@@ -991,7 +977,6 @@ if (
 
                     $success =
                         "Academic year added successfully.";
-
                 } else {
 
                     $errorMsg =
@@ -1000,12 +985,11 @@ if (
 
                 $stmt->close();
             }
-
         } catch (Throwable $e) {
 
             error_log(
                 "Add academic year error: " .
-                $e->getMessage()
+                    $e->getMessage()
             );
 
             $errorMsg =
@@ -1044,10 +1028,9 @@ while ($row = $result->fetch_assoc()) {
 
     $years[] = [
         'year' => $row['year'],
-        'status' =>
-            ((int)$row['active_count'] > 0)
-                ? 'active'
-                : 'inactive'
+        'status' => ((int)$row['active_count'] > 0)
+            ? 'active'
+            : 'inactive'
     ];
 }
 
@@ -1091,1090 +1074,1589 @@ $stmt->close();
 
 <head>
 
-<meta charset="utf-8">
+    <meta charset="utf-8">
 
-<title>Manage Session | Admin</title>
+    <title>Manage Session | Admin</title>
 
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1"
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1">
 
->
+    <link
+        href="../css/bootstrap.min.css"
+        rel="stylesheet">
 
-<link
-    href="../css/bootstrap.min.css"
-    rel="stylesheet"
->
+    <link
+        rel="stylesheet"
+        href="../css/all.css">
 
-<link
-    rel="stylesheet"
-    href="../css/all.css"
->
+    <link
+        rel="stylesheet"
+        href="../css/sidebar.css">
 
-<link
-    rel="stylesheet"
-    href="../css/sidebar.css"
->
+    <link
+        rel="stylesheet"
+        href="../css/dataTables.bootstrap5.min.css">
 
-<link
-    rel="stylesheet"
-    href="../css/dataTables.bootstrap5.min.css"
->
+    <style>
+        :root {
 
-<style>
+            --ms-primary: #0d6efd;
+            --ms-primary-soft: #eaf2ff;
 
-:root {
+            --ms-success: #198754;
+            --ms-success-soft: #e8f6ee;
 
-    --ms-primary: #0d6efd;
-    --ms-primary-soft: #eaf2ff;
+            --ms-warning: #ffc107;
+            --ms-danger: #dc3545;
 
-    --ms-success: #198754;
-    --ms-success-soft: #e8f6ee;
+            --ms-ink: #1f2430;
+            --ms-muted: #6b7280;
 
-    --ms-warning: #ffc107;
-    --ms-danger: #dc3545;
+            --ms-border: #e7e9ee;
+            --ms-bg: #f5f7fb;
 
-    --ms-ink: #1f2430;
-    --ms-muted: #6b7280;
-
-    --ms-border: #e7e9ee;
-    --ms-bg: #f5f7fb;
-
-    --ms-radius: 14px;
-}
+            --ms-radius: 14px;
+        }
 
 
-body {
-    background: var(--ms-bg);
-}
+        body {
+            background: var(--ms-bg);
+        }
 
 
-/* ==============================================================
+        /* ==============================================================
    PAGE HEADER
    ============================================================== */
 
-.page-header {
+        .page-header {
 
-    display: flex;
+            display: flex;
 
-    justify-content: space-between;
+            justify-content: space-between;
 
-    align-items: flex-start;
+            align-items: flex-start;
 
-    gap: 1rem;
+            gap: 1rem;
 
-    margin-bottom: 1.5rem;
-}
-
-
-.page-header h2 {
-
-    font-weight: 700;
-
-    color: var(--ms-ink);
-
-    margin-bottom: .25rem;
-}
+            margin-bottom: 1.5rem;
+        }
 
 
-.page-header p {
+        .page-header h2 {
 
-    color: var(--ms-muted);
+            font-weight: 700;
 
-    margin-bottom: 0;
+            color: var(--ms-ink);
 
-    font-size: .95rem;
-}
-
-
-#sidebarToggle {
-
-    border-radius: 10px;
-
-    width: 42px;
-
-    height: 42px;
-
-    display: inline-flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    flex-shrink: 0;
-}
+            margin-bottom: .25rem;
+        }
 
 
-/* ==============================================================
+        .page-header p {
+
+            color: var(--ms-muted);
+
+            margin-bottom: 0;
+
+            font-size: .95rem;
+        }
+
+
+        #sidebarToggle {
+
+            border-radius: 10px;
+
+            width: 42px;
+
+            height: 42px;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            flex-shrink: 0;
+        }
+
+
+        /* ==============================================================
    CARDS
    ============================================================== */
 
-.ms-card {
+        .ms-card {
 
-    background: #fff;
+            background: #fff;
 
-    border: 1px solid var(--ms-border);
+            border: 1px solid var(--ms-border);
 
-    border-radius: var(--ms-radius);
+            border-radius: var(--ms-radius);
 
-    box-shadow:
-        0 1px 2px rgba(16, 24, 40, .04);
-}
-
-
-.ms-card-body {
-
-    padding: 1.25rem;
-}
+            box-shadow:
+                0 1px 2px rgba(16, 24, 40, .04);
+        }
 
 
-.ms-card-header {
+        .ms-card-body {
 
-    padding: 1rem 1.25rem;
-
-    border-bottom: 1px solid var(--ms-border);
-
-    display: flex;
-
-    align-items: center;
-
-    gap: .6rem;
-}
+            padding: 1.25rem;
+        }
 
 
-.ms-card-header .ms-icon {
+        .ms-card-header {
 
-    width: 34px;
+            padding: 1rem 1.25rem;
 
-    height: 34px;
+            border-bottom: 1px solid var(--ms-border);
 
-    border-radius: 9px;
+            display: flex;
 
-    background: var(--ms-primary-soft);
+            align-items: center;
 
-    color: var(--ms-primary);
-
-    display: inline-flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    font-size: .95rem;
-
-    flex-shrink: 0;
-}
+            gap: .6rem;
+        }
 
 
-.ms-card-header h5,
-.ms-card-header h6 {
+        .ms-card-header .ms-icon {
 
-    margin: 0;
+            width: 34px;
 
-    font-weight: 700;
+            height: 34px;
 
-    font-size: 1rem;
+            border-radius: 9px;
 
-    color: var(--ms-ink);
-}
+            background: var(--ms-primary-soft);
+
+            color: var(--ms-primary);
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-size: .95rem;
+
+            flex-shrink: 0;
+        }
 
 
-/* ==============================================================
+        .ms-card-header h5,
+        .ms-card-header h6 {
+
+            margin: 0;
+
+            font-weight: 700;
+
+            font-size: 1rem;
+
+            color: var(--ms-ink);
+        }
+
+
+        /* ==============================================================
    LAYOUT
    ============================================================== */
 
-.page-wrap {
+        .page-wrap {
 
-    display: flex;
+            display: flex;
 
-    align-items: flex-start;
+            align-items: flex-start;
 
-    gap: 1.25rem;
+            gap: 1.25rem;
 
-    flex-wrap: wrap;
-}
-
-
-.left-col {
-
-    width: 300px;
-
-    flex-shrink: 0;
-}
+            flex-wrap: wrap;
+        }
 
 
-.left-col > .ms-card + .ms-card {
+        .left-col {
 
-    margin-top: 1.25rem;
-}
+            width: 300px;
 
-
-.right-col {
-
-    flex: 1 1 480px;
-
-    min-width: 0;
-}
+            flex-shrink: 0;
+        }
 
 
-@media (max-width: 991.98px) {
+        .left-col>.ms-card+.ms-card {
 
-    .left-col {
-
-        width: 100%;
-    }
-}
+            margin-top: 1.25rem;
+        }
 
 
-.moveable-content.sidebar-active {
+        .right-col {
 
-    margin-left: 250px;
+            flex: 1 1 480px;
 
-    transition: margin-left .3s ease;
-}
+            min-width: 0;
+        }
 
 
-/* ==============================================================
+        @media (max-width: 991.98px) {
+
+            .left-col {
+
+                width: 100%;
+            }
+        }
+
+
+        .moveable-content.sidebar-active {
+
+            margin-left: 250px;
+
+            transition: margin-left .3s ease;
+        }
+
+
+        /* ==============================================================
    ADD YEAR
    ============================================================== */
 
-#addYearForm .input-group .form-control {
+        #addYearForm .input-group .form-control {
 
-    border-radius: 10px 0 0 10px;
-}
-
-
-#addYearForm .input-group .btn {
-
-    border-radius: 0 10px 10px 0;
-}
+            border-radius: 10px 0 0 10px;
+        }
 
 
-/* ==============================================================
+        #addYearForm .input-group .btn {
+
+            border-radius: 0 10px 10px 0;
+        }
+
+
+        /* ==============================================================
    YEAR LIST
    ============================================================== */
 
-.year-list {
+        .year-list {
 
-    max-height: 60vh;
+            max-height: 60vh;
 
-    overflow: auto;
+            overflow: auto;
 
-    padding-right: 2px;
-}
+            padding-right: 2px;
+        }
 
 
-.year-list::-webkit-scrollbar {
+        .year-list::-webkit-scrollbar {
 
-    width: 6px;
-}
+            width: 6px;
+        }
 
 
-.year-list::-webkit-scrollbar-thumb {
+        .year-list::-webkit-scrollbar-thumb {
 
-    background: #d7dbe3;
+            background: #d7dbe3;
 
-    border-radius: 10px;
-}
+            border-radius: 10px;
+        }
 
 
-.year-item {
+        .year-item {
 
-    display: flex;
+            display: flex;
 
-    align-items: center;
+            align-items: center;
 
-    justify-content: space-between;
+            justify-content: space-between;
 
-    gap: .5rem;
+            gap: .5rem;
 
-    padding: .65rem .75rem;
+            padding: .65rem .75rem;
 
-    border: 1px solid var(--ms-border);
+            border: 1px solid var(--ms-border);
 
-    border-radius: 10px;
+            border-radius: 10px;
 
-    margin-bottom: .6rem;
+            margin-bottom: .6rem;
 
-    transition:
-        border-color .15s ease,
-        background .15s ease;
-}
+            transition:
+                border-color .15s ease,
+                background .15s ease;
+        }
 
 
-.year-item:hover {
+        .year-item:hover {
 
-    border-color: #cfd8e8;
-}
+            border-color: #cfd8e8;
+        }
 
 
-.year-item.is-selected {
+        .year-item.is-selected {
 
-    border-color: var(--ms-primary);
+            border-color: var(--ms-primary);
 
-    background: var(--ms-primary-soft);
-}
+            background: var(--ms-primary-soft);
+        }
 
 
-.year-item .year-main {
+        .year-item .year-main {
 
-    display: flex;
+            display: flex;
 
-    align-items: center;
+            align-items: center;
 
-    gap: .55rem;
+            gap: .55rem;
 
-    min-width: 0;
+            min-width: 0;
 
-    flex: 1;
-}
+            flex: 1;
+        }
 
 
-.year-item .year-dot {
+        .year-item .year-dot {
 
-    width: 8px;
+            width: 8px;
 
-    height: 8px;
+            height: 8px;
 
-    border-radius: 50%;
+            border-radius: 50%;
 
-    background: var(--ms-success);
+            background: var(--ms-success);
 
-    flex-shrink: 0;
-}
+            flex-shrink: 0;
+        }
 
 
-.year-item.is-inactive .year-dot {
+        .year-item.is-inactive .year-dot {
 
-    background: #c7cbd4;
-}
+            background: #c7cbd4;
+        }
 
 
-.select-year-btn {
+        .select-year-btn {
 
-    border: none;
+            border: none;
 
-    background: transparent;
+            background: transparent;
 
-    font-weight: 600;
+            font-weight: 600;
 
-    color: var(--ms-ink);
+            color: var(--ms-ink);
 
-    padding: 0;
+            padding: 0;
 
-    text-align: left;
+            text-align: left;
 
-    white-space: nowrap;
+            white-space: nowrap;
 
-    overflow: hidden;
+            overflow: hidden;
 
-    text-overflow: ellipsis;
+            text-overflow: ellipsis;
 
-    cursor: pointer;
-}
+            cursor: pointer;
+        }
 
 
-.year-item .actions {
+        .year-item .actions {
 
-    display: flex;
+            display: flex;
 
-    align-items: center;
+            align-items: center;
 
-    gap: .3rem;
+            gap: .3rem;
 
-    flex-shrink: 0;
-}
+            flex-shrink: 0;
+        }
 
 
-.year-item .actions .btn {
+        .year-item .actions .btn {
 
-    width: 30px;
+            width: 30px;
 
-    height: 30px;
+            height: 30px;
 
-    padding: 0;
+            padding: 0;
 
-    border-radius: 8px;
+            border-radius: 8px;
 
-    display: inline-flex;
+            display: inline-flex;
 
-    align-items: center;
+            align-items: center;
 
-    justify-content: center;
+            justify-content: center;
 
-    font-size: .8rem;
-}
+            font-size: .8rem;
+        }
 
 
-.small-muted {
+        .small-muted {
 
-    font-size: .88rem;
+            font-size: .88rem;
 
-    color: var(--ms-muted);
-}
+            color: var(--ms-muted);
+        }
 
 
-/* ==============================================================
+        /* ==============================================================
    STEPPER
    ============================================================== */
 
-.ms-stepper {
+        .ms-stepper {
 
-    display: flex;
+            display: flex;
 
-    align-items: center;
+            align-items: center;
 
-    gap: .5rem;
+            gap: .5rem;
 
-    margin-bottom: 1.25rem;
+            margin-bottom: 1.25rem;
 
-    flex-wrap: wrap;
-}
-
-
-.ms-step {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: .5rem;
-
-    padding: .4rem .8rem .4rem .4rem;
-
-    border-radius: 999px;
-
-    background: #f0f2f6;
-
-    color: var(--ms-muted);
-
-    font-size: .85rem;
-
-    font-weight: 600;
-
-    transition:
-        background .2s ease,
-        color .2s ease;
-}
+            flex-wrap: wrap;
+        }
 
 
-.ms-step .num {
+        .ms-step {
 
-    width: 22px;
+            display: flex;
 
-    height: 22px;
+            align-items: center;
 
-    border-radius: 50%;
+            gap: .5rem;
 
-    background: #dfe3ea;
+            padding: .4rem .8rem .4rem .4rem;
 
-    color: #fff;
+            border-radius: 999px;
 
-    font-size: .75rem;
+            background: #f0f2f6;
 
-    display: inline-flex;
+            color: var(--ms-muted);
 
-    align-items: center;
+            font-size: .85rem;
 
-    justify-content: center;
+            font-weight: 600;
 
-    flex-shrink: 0;
-}
-
-
-.ms-step.is-done {
-
-    background: var(--ms-success-soft);
-
-    color: #166a3f;
-}
+            transition:
+                background .2s ease,
+                color .2s ease;
+        }
 
 
-.ms-step.is-done .num {
+        .ms-step .num {
 
-    background: var(--ms-success);
-}
+            width: 22px;
+
+            height: 22px;
+
+            border-radius: 50%;
+
+            background: #dfe3ea;
+
+            color: #fff;
+
+            font-size: .75rem;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            flex-shrink: 0;
+        }
 
 
-.ms-step-sep {
+        .ms-step.is-done {
 
-    width: 22px;
+            background: var(--ms-success-soft);
 
-    height: 1px;
-
-    background: var(--ms-border);
-
-    flex-shrink: 0;
-}
+            color: #166a3f;
+        }
 
 
-/* ==============================================================
+        .ms-step.is-done .num {
+
+            background: var(--ms-success);
+        }
+
+
+        .ms-step-sep {
+
+            width: 22px;
+
+            height: 1px;
+
+            background: var(--ms-border);
+
+            flex-shrink: 0;
+        }
+
+
+        /* ==============================================================
    RESULT BOX
    ============================================================== */
 
-.result-box {
+        .result-box {
 
-    display: flex;
+            display: flex;
 
-    flex-wrap: wrap;
+            flex-wrap: wrap;
 
-    gap: .75rem;
-}
-
-
-.result-pill {
-
-    flex: 1 1 160px;
-
-    border: 1px solid var(--ms-border);
-
-    border-radius: 12px;
-
-    padding: .75rem .9rem;
-
-    background: #fafbfd;
-}
+            gap: .75rem;
+        }
 
 
-.result-pill .label {
+        .result-pill {
 
-    display: block;
+            flex: 1 1 160px;
 
-    font-size: .72rem;
+            border: 1px solid var(--ms-border);
 
-    text-transform: uppercase;
+            border-radius: 12px;
 
-    letter-spacing: .04em;
+            padding: .75rem .9rem;
 
-    color: var(--ms-muted);
-
-    font-weight: 700;
-
-    margin-bottom: .2rem;
-}
+            background: #fafbfd;
+        }
 
 
-.result-pill .value {
+        .result-pill .label {
 
-    font-weight: 700;
+            display: block;
 
-    color: var(--ms-ink);
+            font-size: .72rem;
 
-    font-size: .98rem;
-}
+            text-transform: uppercase;
 
+            letter-spacing: .04em;
 
-.result-pill.is-filled {
+            color: var(--ms-muted);
 
-    border-color: #bfe3cc;
+            font-weight: 700;
 
-    background: var(--ms-success-soft);
-}
-
-
-.result-pill.is-filled .value {
-
-    color: #166a3f;
-}
+            margin-bottom: .2rem;
+        }
 
 
-/* ==============================================================
+        .result-pill .value {
+
+            font-weight: 700;
+
+            color: var(--ms-ink);
+
+            font-size: .98rem;
+        }
+
+
+        .result-pill.is-filled {
+
+            border-color: #bfe3cc;
+
+            background: var(--ms-success-soft);
+        }
+
+
+        .result-pill.is-filled .value {
+
+            color: #166a3f;
+        }
+
+
+        /* ==============================================================
    RADIO LIST
    ============================================================== */
 
-.radio-list {
+        .radio-list {
 
-    display: flex;
+            display: flex;
 
-    flex-wrap: wrap;
+            flex-wrap: wrap;
 
-    gap: .55rem;
-}
-
-
-.radio-list label {
-
-    position: relative;
-
-    border: 1px solid var(--ms-border);
-
-    border-radius: 10px;
-
-    padding: .5rem .9rem .5rem .5rem;
-
-    margin: 0;
-
-    cursor: pointer;
-
-    font-size: .9rem;
-
-    font-weight: 600;
-
-    color: var(--ms-ink);
-
-    background: #fff;
-
-    display: inline-flex;
-
-    align-items: center;
-
-    gap: .4rem;
-
-    transition:
-        border-color .15s ease,
-        background .15s ease,
-        color .15s ease;
-}
+            gap: .55rem;
+        }
 
 
-.radio-list label:hover {
+        .radio-list label {
 
-    border-color: #bcd4fb;
-}
+            position: relative;
+
+            border: 1px solid var(--ms-border);
+
+            border-radius: 10px;
+
+            padding: .5rem .9rem .5rem .5rem;
+
+            margin: 0;
+
+            cursor: pointer;
+
+            font-size: .9rem;
+
+            font-weight: 600;
+
+            color: var(--ms-ink);
+
+            background: #fff;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: .4rem;
+
+            transition:
+                border-color .15s ease,
+                background .15s ease,
+                color .15s ease;
+        }
 
 
-.radio-list label:has(input:checked) {
+        .radio-list label:hover {
 
-    border-color: var(--ms-primary);
-
-    background: var(--ms-primary-soft);
-
-    color: var(--ms-primary);
-}
+            border-color: #bcd4fb;
+        }
 
 
-.radio-list label:has(input:disabled) {
+        .radio-list label:has(input:checked) {
 
-    opacity: .55;
+            border-color: var(--ms-primary);
 
-    cursor: not-allowed;
-}
+            background: var(--ms-primary-soft);
 
-
-.radio-list input[type="radio"] {
-
-    accent-color: var(--ms-primary);
-}
+            color: var(--ms-primary);
+        }
 
 
-/* ==============================================================
+        .radio-list label:has(input:disabled) {
+
+            opacity: .55;
+
+            cursor: not-allowed;
+        }
+
+
+        .radio-list input[type="radio"] {
+
+            accent-color: var(--ms-primary);
+        }
+
+
+        /* ==============================================================
    SECTIONS
    ============================================================== */
 
-.section {
+        .section {
 
-    margin-bottom: 1.5rem;
-}
-
-
-.section:last-child {
-
-    margin-bottom: 0;
-}
+            margin-bottom: 1.5rem;
+        }
 
 
-.section-head {
+        .section:last-child {
 
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: .5rem;
-
-    margin-bottom: .65rem;
-
-    flex-wrap: wrap;
-}
+            margin-bottom: 0;
+        }
 
 
-.section-head h6 {
+        .section-head {
 
-    margin: 0;
+            display: flex;
 
-    font-weight: 700;
+            align-items: center;
 
-    color: var(--ms-ink);
+            justify-content: space-between;
 
-    display: flex;
+            gap: .5rem;
 
-    align-items: center;
+            margin-bottom: .65rem;
 
-    gap: .45rem;
-}
-
-
-.section-head h6 i {
-
-    color: var(--ms-primary);
-
-    font-size: .85rem;
-}
+            flex-wrap: wrap;
+        }
 
 
-/* ==============================================================
+        .section-head h6 {
+
+            margin: 0;
+
+            font-weight: 700;
+
+            color: var(--ms-ink);
+
+            display: flex;
+
+            align-items: center;
+
+            gap: .45rem;
+        }
+
+
+        .section-head h6 i {
+
+            color: var(--ms-primary);
+
+            font-size: .85rem;
+        }
+
+
+        /* ==============================================================
    ADD BUTTONS
    ============================================================== */
 
-.btn-add-dashed {
+        .btn-add-dashed {
 
-    border: 1.5px dashed #b9c2d4;
+            border: 1.5px dashed #b9c2d4;
 
-    background: #fff;
+            background: #fff;
 
-    color: var(--ms-primary);
+            color: var(--ms-primary);
 
-    font-weight: 600;
+            font-weight: 600;
 
-    border-radius: 10px;
-}
-
-
-.btn-add-dashed:hover {
-
-    border-color: var(--ms-primary);
-
-    background: var(--ms-primary-soft);
-
-    color: var(--ms-primary);
-}
+            border-radius: 10px;
+        }
 
 
-.btn-add-dashed:disabled {
+        .btn-add-dashed:hover {
 
-    color: var(--ms-muted);
+            border-color: var(--ms-primary);
 
-    border-color: var(--ms-border);
-}
+            background: var(--ms-primary-soft);
+
+            color: var(--ms-primary);
+        }
 
 
-/* ==============================================================
+        .btn-add-dashed:disabled {
+
+            color: var(--ms-muted);
+
+            border-color: var(--ms-border);
+        }
+
+
+        /* ==============================================================
    SAVE BAR
    ============================================================== */
 
-.save-bar {
+        .save-bar {
 
-    position: sticky;
+            position: sticky;
 
-    bottom: 1rem;
+            bottom: 1rem;
 
-    display: flex;
+            display: flex;
 
-    justify-content: flex-end;
+            justify-content: flex-end;
 
-    margin-top: 1.75rem;
-}
-
-
-#saveBtn {
-
-    border-radius: 12px;
-
-    padding: .7rem 1.75rem;
-
-    font-weight: 700;
-
-    box-shadow:
-        0 8px 20px rgba(25, 135, 84, .25);
-}
+            margin-top: 1.75rem;
+        }
 
 
-#saveBtn:disabled {
+        #saveBtn {
 
-    box-shadow: none;
-}
+            border-radius: 12px;
+
+            padding: .7rem 1.75rem;
+
+            font-weight: 700;
+
+            box-shadow:
+                0 8px 20px rgba(25, 135, 84, .25);
+        }
 
 
-/* ==============================================================
+        #saveBtn:disabled {
+
+            box-shadow: none;
+        }
+
+
+        /* ==============================================================
    MODALS
    ============================================================== */
 
-.modal-content {
+        .modal-content {
 
-    border-radius: 14px;
+            border-radius: 14px;
 
-    border: none;
+            border: none;
 
-    overflow: hidden;
-}
-
-
-.modal-header {
-
-    background: var(--ms-primary-soft);
-
-    border-bottom: none;
-}
+            overflow: hidden;
+        }
 
 
-.modal-header .modal-title {
+        .modal-header {
 
-    font-weight: 700;
+            background: var(--ms-primary-soft);
 
-    color: var(--ms-ink);
-
-    font-size: 1.02rem;
-}
+            border-bottom: none;
+        }
 
 
-.alert {
+        .modal-header .modal-title {
 
-    border-radius: 12px;
-}
+            font-weight: 700;
+
+            color: var(--ms-ink);
+
+            font-size: 1.02rem;
+        }
 
 
-@media (max-width: 575.98px) {
+        .alert {
 
-    .year-item {
+            border-radius: 12px;
+        }
 
-        align-items: flex-start;
-    }
 
-    .year-item .year-main {
+        @media (max-width: 575.98px) {
 
-        flex-wrap: wrap;
-    }
+            .year-item {
 
-    .year-item .actions {
+                align-items: flex-start;
+            }
 
-        flex-shrink: 0;
-    }
+            .year-item .year-main {
 
-    .save-bar {
+                flex-wrap: wrap;
+            }
 
-        position: static;
+            .year-item .actions {
 
-        justify-content: stretch;
-    }
+                flex-shrink: 0;
+            }
 
-    #saveBtn {
+            .save-bar {
 
-        width: 100%;
-    }
-}
+                position: static;
 
-</style>
+                justify-content: stretch;
+            }
+
+            #saveBtn {
+
+                width: 100%;
+            }
+        }
+    </style>
 
 </head>
 
 <body>
 
-<!-- ============================================================
+    <!-- ============================================================
      SIDEBAR
      ============================================================ -->
 
-<div class="sidebar">
+    <div class="sidebar">
 
-<div class="sidebar-brand">
+        <div class="sidebar-brand">
 
-    <h3>
-        <i class="fas fa-graduation-cap me-2"></i>
-        Examcenter
-    </h3>
+            <h3>
+                <i class="fas fa-graduation-cap me-2"></i>
+                Examcenter
+            </h3>
 
-    <div class="admin-info">
+            <div class="admin-info">
 
-        <small>Welcome back,</small>
+                <small>Welcome back,</small>
 
-        <h6>
-            <b>
-                <?php
-                echo htmlspecialchars(
-                    $admin['username']
-                );
-                ?>
-            </b>
-        </h6>
+                <h6>
+                    <b>
+                        <?php
+                        echo htmlspecialchars(
+                            $admin['username']
+                        );
+                        ?>
+                    </b>
+                </h6>
+
+            </div>
+
+        </div>
+
+
+        <div class="sidebar-menu mt-4">
+
+            <a href="dashboard.php">
+                <i class="fas fa-tachometer-alt"></i>
+                Dashboard
+            </a>
+
+            <a href="manage_classes.php">
+                <i class="fas fa-users"></i>
+                Manage Classes
+            </a>
+
+            <a
+                href="manage_session.php"
+                class="active">
+                <i class="fas fa-users"></i>
+                Manage Session
+            </a>
+
+            <a href="manage_subject.php">
+                <i class="fas fa-users"></i>
+                Manage Subject
+            </a>
+
+            <a href="index.php">
+                <i class="fas fa-key"></i>
+                License
+            </a>
+
+            <a href="audit_logs.php">
+                <i class="fas fa-shield-alt"></i>
+                Audit Logs
+            </a>
+
+            <a href="backup_list.php">
+                <i class="fas fa-database"></i>
+                Backup
+            </a>
+
+            <a href="settings.php">
+                <i class="fas fa-cog"></i>
+                Settings
+            </a>
+
+            <a
+                href="logout.php"
+                class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+
+        </div>
 
     </div>
 
-</div>
-
-
-<div class="sidebar-menu mt-4">
-
-    <a href="dashboard.php">
-        <i class="fas fa-tachometer-alt"></i>
-        Dashboard
-    </a>
-
-    <a href="manage_classes.php">
-        <i class="fas fa-users"></i>
-        Manage Classes
-    </a>
-
-    <a
-        href="manage_session.php"
-        class="active"
-    >
-        <i class="fas fa-users"></i>
-        Manage Session
-    </a>
-
-    <a href="manage_subject.php">
-        <i class="fas fa-users"></i>
-        Manage Subject
-    </a>
-
-    <a href="index.php">
-        <i class="fas fa-key"></i>
-        License
-    </a>
-
-    <a href="audit_logs.php">
-        <i class="fas fa-shield-alt"></i>
-        Audit Logs
-    </a>
-
-    <a href="backup_list.php">
-        <i class="fas fa-database"></i>
-        Backup
-    </a>
-
-    <a href="settings.php">
-        <i class="fas fa-cog"></i>
-        Settings
-    </a>
-
-    <a
-        href="../admin/logout.php"
-        class="logout-btn"
-    >
-        <i class="fas fa-sign-out-alt"></i>
-        Logout
-    </a>
-
-</div>
-
-</div>
-
-<!-- ============================================================
+    <!-- ============================================================
      MAIN CONTENT
      ============================================================ -->
 
-<div class="main-content">
+    <div class="main-content">
 
-<!-- PAGE HEADER -->
+        <!-- PAGE HEADER -->
 
-<div class="page-header">
+        <div class="page-header">
 
-    <div>
+            <div>
 
-        <h2>
-            Manage Academic Sessions
-        </h2>
+                <h2>
+                    Manage Academic Sessions
+                </h2>
 
-        <p>
-            Set up academic years, terms and exam titles,
-            then choose the one that's currently active.
-        </p>
-
-    </div>
-
-
-    <button
-        class="btn btn-primary d-lg-none"
-        id="sidebarToggle"
-        type="button"
-    >
-        <i class="fas fa-bars"></i>
-    </button>
-
-</div>
-
-
-<!-- ========================================================
-     SERVER MESSAGES
-     ======================================================== -->
-
-<?php if ($success): ?>
-
-    <div class="alert alert-success">
-
-        <i class="fas fa-check-circle me-2"></i>
-
-        <?php
-        echo htmlspecialchars($success);
-        ?>
-
-    </div>
-
-<?php endif; ?>
-
-
-<?php if ($errorMsg): ?>
-
-    <div class="alert alert-danger">
-
-        <i class="fas fa-triangle-exclamation me-2"></i>
-
-        <?php
-        echo htmlspecialchars($errorMsg);
-        ?>
-
-    </div>
-
-<?php endif; ?>
-
-
-<!-- ========================================================
-     PAGE WORKSPACE
-     ======================================================== -->
-
-<div class="page-wrap moveable-content">
-
-
-    <!-- ====================================================
-         LEFT COLUMN
-         ==================================================== -->
-
-    <div class="left-col">
-
-
-        <!-- ADD ACADEMIC YEAR -->
-
-        <div class="ms-card">
-
-            <div class="ms-card-header">
-
-                <span class="ms-icon">
-
-                    <i class="fas fa-calendar-plus"></i>
-
-                </span>
-
-                <h5>
-                    Add Academic Year
-                </h5>
+                <p>
+                    Set up academic years, terms and exam titles,
+                    then choose the one that's currently active.
+                </p>
 
             </div>
 
 
-            <div class="ms-card-body">
+            <button
+                class="btn btn-primary d-lg-none"
+                id="sidebarToggle"
+                type="button">
+                <i class="fas fa-bars"></i>
+            </button>
+
+        </div>
+
+
+        <!-- ========================================================
+     SERVER MESSAGES
+     ======================================================== -->
+
+        <?php if ($success): ?>
+
+            <div class="alert alert-success">
+
+                <i class="fas fa-check-circle me-2"></i>
+
+                <?php
+                echo htmlspecialchars($success);
+                ?>
+
+            </div>
+
+        <?php endif; ?>
+
+
+        <?php if ($errorMsg): ?>
+
+            <div class="alert alert-danger">
+
+                <i class="fas fa-triangle-exclamation me-2"></i>
+
+                <?php
+                echo htmlspecialchars($errorMsg);
+                ?>
+
+            </div>
+
+        <?php endif; ?>
+
+
+        <!-- ========================================================
+     PAGE WORKSPACE
+     ======================================================== -->
+
+        <div class="page-wrap moveable-content">
+
+
+            <!-- ====================================================
+         LEFT COLUMN
+         ==================================================== -->
+
+            <div class="left-col">
+
+
+                <!-- ADD ACADEMIC YEAR -->
+
+                <div class="ms-card">
+
+                    <div class="ms-card-header">
+
+                        <span class="ms-icon">
+
+                            <i class="fas fa-calendar-plus"></i>
+
+                        </span>
+
+                        <h5>
+                            Add Academic Year
+                        </h5>
+
+                    </div>
+
+
+                    <div class="ms-card-body">
+
+                        <form
+                            method="POST"
+                            id="addYearForm">
+
+                            <div class="input-group">
+
+                                <input
+                                    type="text"
+                                    name="new_year"
+                                    class="form-control"
+                                    placeholder="e.g. 2025/2026"
+                                    required>
+
+                                <button
+                                    class="btn btn-primary"
+                                    type="submit">
+
+                                    <i class="fas fa-plus"></i>
+
+                                </button>
+
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ACADEMIC YEARS -->
+
+                <div class="ms-card">
+
+                    <div class="ms-card-header">
+
+                        <span class="ms-icon">
+
+                            <i class="fas fa-calendar-days"></i>
+
+                        </span>
+
+                        <h6>
+                            Academic Years
+                        </h6>
+
+                    </div>
+
+
+                    <div class="ms-card-body">
+
+                        <div
+                            class="year-list"
+                            id="yearList">
+
+                            <?php foreach ($years as $y): ?>
+
+                                <div
+                                    class="year-item
+                            <?php
+                                echo $y['status'] === 'active'
+                                    ? ''
+                                    : 'is-inactive';
+                            ?>"
+                                    data-year="<?php
+                                                echo htmlspecialchars(
+                                                    $y['year']
+                                                );
+                                                ?>">
+
+
+                                    <div class="year-main">
+
+                                        <span class="year-dot"></span>
+
+
+                                        <button
+                                            type="button"
+                                            class="select-year-btn"
+                                            data-year="<?php
+                                                        echo htmlspecialchars(
+                                                            $y['year']
+                                                        );
+                                                        ?>"
+                                            title="View <?php
+                                                        echo htmlspecialchars(
+                                                            $y['year']
+                                                        );
+                                                        ?>">
+
+                                            <?php
+                                            echo htmlspecialchars(
+                                                $y['year']
+                                            );
+                                            ?>
+
+                                        </button>
+
+
+                                        <?php if (
+                                            $y['status'] === 'active'
+                                        ): ?>
+
+                                            <span class="badge bg-success">
+                                                Active
+                                            </span>
+
+                                        <?php else: ?>
+
+                                            <span class="badge bg-secondary">
+                                                Inactive
+                                            </span>
+
+                                        <?php endif; ?>
+
+                                    </div>
+
+
+                                    <div class="actions">
+
+
+                                        <!-- TOGGLE -->
+
+                                        <button
+                                            type="button"
+                                            class="btn btn-warning toggle-year-btn"
+                                            data-year="<?php
+                                                        echo htmlspecialchars(
+                                                            $y['year']
+                                                        );
+                                                        ?>"
+                                            title="<?php
+                                                    echo $y['status'] === 'active'
+                                                        ? 'Deactivate'
+                                                        : 'Activate';
+                                                    ?>">
+
+                                            <i
+                                                class="fas <?php
+                                                            echo $y['status'] === 'active'
+                                                                ? 'fa-pause'
+                                                                : 'fa-play';
+                                                            ?>"></i>
+
+                                        </button>
+
+
+                                        <!-- DELETE -->
+
+                                        <button
+                                            type="button"
+                                            class="btn btn-danger delete-year-btn"
+                                            data-year="<?php
+                                                        echo htmlspecialchars(
+                                                            $y['year']
+                                                        );
+                                                        ?>"
+                                            title="Delete">
+
+                                            <i class="fas fa-trash"></i>
+
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            <?php endforeach; ?>
+
+
+                            <?php if (empty($years)): ?>
+
+                                <div class="small-muted text-center py-3">
+
+                                    <i
+                                        class="fas fa-inbox mb-2 d-block fs-4 text-muted"></i>
+
+                                    No academic years yet.
+
+                                </div>
+
+                            <?php endif; ?>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ====================================================
+         RIGHT COLUMN
+         ==================================================== -->
+
+            <div class="right-col">
+
+                <div class="ms-card">
+
+                    <div class="ms-card-body">
+
+
+                        <!-- STEPPER -->
+
+                        <div
+                            class="ms-stepper"
+                            id="msStepper">
+
+                            <div
+                                class="ms-step"
+                                id="step-year">
+
+                                <span class="num">1</span>
+
+                                Year
+
+                            </div>
+
+
+                            <div class="ms-step-sep"></div>
+
+
+                            <div
+                                class="ms-step"
+                                id="step-session">
+
+                                <span class="num">2</span>
+
+                                Term
+
+                            </div>
+
+
+                            <div class="ms-step-sep"></div>
+
+
+                            <div
+                                class="ms-step"
+                                id="step-exam">
+
+                                <span class="num">3</span>
+
+                                Exam Title
+
+                            </div>
+
+
+                            <div class="ms-step-sep"></div>
+
+
+                            <div
+                                class="ms-step"
+                                id="step-save">
+
+                                <span class="num">4</span>
+
+                                Save
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- CURRENT SELECTION -->
+
+                        <div class="section selection-field">
+
+                            <div
+                                class="result-box"
+                                id="resultBox">
+
+
+                                <div
+                                    class="result-pill"
+                                    id="pillYear">
+
+                                    <span class="label">
+                                        Year
+                                    </span>
+
+                                    <span
+                                        class="value"
+                                        id="selectedYear">
+                                        —
+                                    </span>
+
+                                </div>
+
+
+                                <div
+                                    class="result-pill"
+                                    id="pillSession">
+
+                                    <span class="label">
+                                        Session
+                                    </span>
+
+                                    <span
+                                        class="value"
+                                        id="selectedSession">
+                                        —
+                                    </span>
+
+                                </div>
+
+
+                                <div
+                                    class="result-pill"
+                                    id="pillExam">
+
+                                    <span class="label">
+                                        Exam Title
+                                    </span>
+
+                                    <span
+                                        class="value"
+                                        id="selectedExam">
+                                        —
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <hr>
+
+
+                        <!-- ==================================================
+                     SESSIONS
+                     ================================================== -->
+
+                        <div class="section selection-field">
+
+                            <div class="section-head">
+
+                                <h6>
+
+                                    <i class="fas fa-layer-group"></i>
+
+                                    Sessions (Terms)
+
+                                </h6>
+
+
+                                <button
+                                    type="button"
+                                    id="openAddSessionBtn"
+                                    class="btn btn-sm btn-add-dashed"
+                                    disabled>
+
+                                    <i class="fas fa-plus me-1"></i>
+
+                                    Add Session
+
+                                </button>
+
+                            </div>
+
+
+                            <div id="sessionsArea">
+
+                                <div class="small-muted">
+
+                                    <i class="fas fa-arrow-up me-1"></i>
+
+                                    Select a year to load sessions.
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- ==================================================
+                     EXAM TITLES
+                     ================================================== -->
+
+                        <div class="section selection-field">
+
+                            <div class="section-head">
+
+                                <h6>
+
+                                    <i class="fas fa-file-lines"></i>
+
+                                    Exam Titles
+
+                                </h6>
+
+
+                                <button
+                                    type="button"
+                                    id="openAddExamBtn"
+                                    class="btn btn-sm btn-add-dashed"
+                                    disabled>
+
+                                    <i class="fas fa-plus me-1"></i>
+
+                                    Add Exam Title
+
+                                </button>
+
+                            </div>
+
+
+                            <div id="examsArea">
+
+                                <div class="small-muted">
+
+                                    <i class="fas fa-arrow-up me-1"></i>
+
+                                    Select a session to load exam titles.
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- ==================================================
+                     SAVE
+                     ================================================== -->
+
+                        <div class="save-bar">
+
+                            <button
+                                type="button"
+                                id="saveBtn"
+                                class="btn btn-success"
+                                disabled>
+
+                                <i class="fas fa-floppy-disk me-2"></i>
+
+                                Save Selection
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ============================================================
+     ADD SESSION MODAL
+     ============================================================ -->
+
+        <div
+            class="modal fade"
+            id="addSessionModal"
+            tabindex="-1"
+            aria-hidden="true">
+
+            <div class="modal-dialog modal-dialog-centered">
 
                 <form
-                    method="POST"
-                    id="addYearForm"
-                >
+                    id="addSessionForm"
+                    class="modal-content">
 
-                    <div class="input-group">
+                    <div class="modal-header">
 
-                        <input
-                            type="text"
-                            name="new_year"
-                            class="form-control"
-                            placeholder="e.g. 2025/2026"
-                            required
-                        >
+                        <h5 class="modal-title">
+
+                            <i class="fas fa-layer-group me-2"></i>
+
+                            Add Session for
+
+                            <span id="modalYearText"></span>
+
+                        </h5>
+
 
                         <button
-                            class="btn btn-primary"
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+
+                    </div>
+
+
+                    <div class="modal-body">
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Session Name
+                            </label>
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="session"
+                                placeholder="e.g. First Term"
+                                required>
+
+                        </div>
+
+
+                        <input
+                            type="hidden"
+                            name="year"
+                            id="modalYearInput">
+
+                    </div>
+
+
+                    <div class="modal-footer">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+
+
+                        <button
                             type="submit"
-                        >
-
-                            <i class="fas fa-plus"></i>
-
+                            class="btn btn-primary">
+                            Add Session
                         </button>
 
                     </div>
@@ -2186,1040 +2668,485 @@ body {
         </div>
 
 
-        <!-- ACADEMIC YEARS -->
-
-        <div class="ms-card">
-
-            <div class="ms-card-header">
-
-                <span class="ms-icon">
-
-                    <i class="fas fa-calendar-days"></i>
-
-                </span>
-
-                <h6>
-                    Academic Years
-                </h6>
-
-            </div>
-
-
-            <div class="ms-card-body">
-
-                <div
-                    class="year-list"
-                    id="yearList"
-                >
-
-                    <?php foreach ($years as $y): ?>
-
-                        <div
-                            class="year-item
-                            <?php
-                            echo $y['status'] === 'active'
-                                ? ''
-                                : 'is-inactive';
-                            ?>"
-                            data-year="<?php
-                                echo htmlspecialchars(
-                                    $y['year']
-                                );
-                            ?>"
-                        >
-
-
-                            <div class="year-main">
-
-                                <span class="year-dot"></span>
-
-
-                                <button
-                                    type="button"
-                                    class="select-year-btn"
-                                    data-year="<?php
-                                        echo htmlspecialchars(
-                                            $y['year']
-                                        );
-                                    ?>"
-                                    title="View <?php
-                                        echo htmlspecialchars(
-                                            $y['year']
-                                        );
-                                    ?>"
-                                >
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $y['year']
-                                    );
-                                    ?>
-
-                                </button>
-
-
-                                <?php if (
-                                    $y['status'] === 'active'
-                                ): ?>
-
-                                    <span class="badge bg-success">
-                                        Active
-                                    </span>
-
-                                <?php else: ?>
-
-                                    <span class="badge bg-secondary">
-                                        Inactive
-                                    </span>
-
-                                <?php endif; ?>
-
-                            </div>
-
-
-                            <div class="actions">
-
-
-                                <!-- TOGGLE -->
-
-                                <button
-                                    type="button"
-                                    class="btn btn-warning toggle-year-btn"
-                                    data-year="<?php
-                                        echo htmlspecialchars(
-                                            $y['year']
-                                        );
-                                    ?>"
-                                    title="<?php
-                                        echo $y['status'] === 'active'
-                                            ? 'Deactivate'
-                                            : 'Activate';
-                                    ?>"
-                                >
-
-                                    <i
-                                        class="fas <?php
-                                            echo $y['status'] === 'active'
-                                                ? 'fa-pause'
-                                                : 'fa-play';
-                                        ?>"
-                                    ></i>
-
-                                </button>
-
-
-                                <!-- DELETE -->
-
-                                <button
-                                    type="button"
-                                    class="btn btn-danger delete-year-btn"
-                                    data-year="<?php
-                                        echo htmlspecialchars(
-                                            $y['year']
-                                        );
-                                    ?>"
-                                    title="Delete"
-                                >
-
-                                    <i class="fas fa-trash"></i>
-
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                    <?php endforeach; ?>
-
-
-                    <?php if (empty($years)): ?>
-
-                        <div class="small-muted text-center py-3">
-
-                            <i
-                                class="fas fa-inbox mb-2 d-block fs-4 text-muted"
-                            ></i>
-
-                            No academic years yet.
-
-                        </div>
-
-                    <?php endif; ?>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- ====================================================
-         RIGHT COLUMN
-         ==================================================== -->
-
-    <div class="right-col">
-
-        <div class="ms-card">
-
-            <div class="ms-card-body">
-
-
-                <!-- STEPPER -->
-
-                <div
-                    class="ms-stepper"
-                    id="msStepper"
-                >
-
-                    <div
-                        class="ms-step"
-                        id="step-year"
-                    >
-
-                        <span class="num">1</span>
-
-                        Year
-
-                    </div>
-
-
-                    <div class="ms-step-sep"></div>
-
-
-                    <div
-                        class="ms-step"
-                        id="step-session"
-                    >
-
-                        <span class="num">2</span>
-
-                        Term
-
-                    </div>
-
-
-                    <div class="ms-step-sep"></div>
-
-
-                    <div
-                        class="ms-step"
-                        id="step-exam"
-                    >
-
-                        <span class="num">3</span>
-
-                        Exam Title
-
-                    </div>
-
-
-                    <div class="ms-step-sep"></div>
-
-
-                    <div
-                        class="ms-step"
-                        id="step-save"
-                    >
-
-                        <span class="num">4</span>
-
-                        Save
-
-                    </div>
-
-                </div>
-
-
-                <!-- CURRENT SELECTION -->
-
-                <div class="section selection-field">
-
-                    <div
-                        class="result-box"
-                        id="resultBox"
-                    >
-
-
-                        <div
-                            class="result-pill"
-                            id="pillYear"
-                        >
-
-                            <span class="label">
-                                Year
-                            </span>
-
-                            <span
-                                class="value"
-                                id="selectedYear"
-                            >
-                                —
-                            </span>
-
-                        </div>
-
-
-                        <div
-                            class="result-pill"
-                            id="pillSession"
-                        >
-
-                            <span class="label">
-                                Session
-                            </span>
-
-                            <span
-                                class="value"
-                                id="selectedSession"
-                            >
-                                —
-                            </span>
-
-                        </div>
-
-
-                        <div
-                            class="result-pill"
-                            id="pillExam"
-                        >
-
-                            <span class="label">
-                                Exam Title
-                            </span>
-
-                            <span
-                                class="value"
-                                id="selectedExam"
-                            >
-                                —
-                            </span>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <hr>
-
-
-                <!-- ==================================================
-                     SESSIONS
-                     ================================================== -->
-
-                <div class="section selection-field">
-
-                    <div class="section-head">
-
-                        <h6>
-
-                            <i class="fas fa-layer-group"></i>
-
-                            Sessions (Terms)
-
-                        </h6>
-
-
-                        <button
-                            type="button"
-                            id="openAddSessionBtn"
-                            class="btn btn-sm btn-add-dashed"
-                            disabled
-                        >
-
-                            <i class="fas fa-plus me-1"></i>
-
-                            Add Session
-
-                        </button>
-
-                    </div>
-
-
-                    <div id="sessionsArea">
-
-                        <div class="small-muted">
-
-                            <i class="fas fa-arrow-up me-1"></i>
-
-                            Select a year to load sessions.
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ==================================================
-                     EXAM TITLES
-                     ================================================== -->
-
-                <div class="section selection-field">
-
-                    <div class="section-head">
-
-                        <h6>
-
-                            <i class="fas fa-file-lines"></i>
-
-                            Exam Titles
-
-                        </h6>
-
-
-                        <button
-                            type="button"
-                            id="openAddExamBtn"
-                            class="btn btn-sm btn-add-dashed"
-                            disabled
-                        >
-
-                            <i class="fas fa-plus me-1"></i>
-
-                            Add Exam Title
-
-                        </button>
-
-                    </div>
-
-
-                    <div id="examsArea">
-
-                        <div class="small-muted">
-
-                            <i class="fas fa-arrow-up me-1"></i>
-
-                            Select a session to load exam titles.
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ==================================================
-                     SAVE
-                     ================================================== -->
-
-                <div class="save-bar">
-
-                    <button
-                        type="button"
-                        id="saveBtn"
-                        class="btn btn-success"
-                        disabled
-                    >
-
-                        <i class="fas fa-floppy-disk me-2"></i>
-
-                        Save Selection
-
-                    </button>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- ============================================================
-     ADD SESSION MODAL
-     ============================================================ -->
-
-<div
-    class="modal fade"
-    id="addSessionModal"
-    tabindex="-1"
-    aria-hidden="true"
->
-
-    <div class="modal-dialog modal-dialog-centered">
-
-        <form
-            id="addSessionForm"
-            class="modal-content"
-        >
-
-            <div class="modal-header">
-
-                <h5 class="modal-title">
-
-                    <i class="fas fa-layer-group me-2"></i>
-
-                    Add Session for
-
-                    <span id="modalYearText"></span>
-
-                </h5>
-
-
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="modal"
-                    aria-label="Close"
-                ></button>
-
-            </div>
-
-
-            <div class="modal-body">
-
-                <div class="mb-3">
-
-                    <label class="form-label">
-                        Session Name
-                    </label>
-
-                    <input
-                        type="text"
-                        class="form-control"
-                        name="session"
-                        placeholder="e.g. First Term"
-                        required
-                    >
-
-                </div>
-
-
-                <input
-                    type="hidden"
-                    name="year"
-                    id="modalYearInput"
-                >
-
-            </div>
-
-
-            <div class="modal-footer">
-
-                <button
-                    type="button"
-                    class="btn btn-secondary"
-                    data-bs-dismiss="modal"
-                >
-                    Cancel
-                </button>
-
-
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                >
-                    Add Session
-                </button>
-
-            </div>
-
-        </form>
-
-    </div>
-
-</div>
-
-
-<!-- ============================================================
+        <!-- ============================================================
      ADD EXAM MODAL
      ============================================================ -->
 
-<div
-    class="modal fade"
-    id="addExamModal"
-    tabindex="-1"
-    aria-hidden="true"
->
+        <div
+            class="modal fade"
+            id="addExamModal"
+            tabindex="-1"
+            aria-hidden="true">
 
-    <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered">
 
-        <form
-            id="addExamForm"
-            class="modal-content"
-        >
+                <form
+                    id="addExamForm"
+                    class="modal-content">
 
-            <div class="modal-header">
+                    <div class="modal-header">
 
-                <h5 class="modal-title">
+                        <h5 class="modal-title">
 
-                    <i class="fas fa-file-lines me-2"></i>
+                            <i class="fas fa-file-lines me-2"></i>
 
-                    Add Exam Title for
+                            Add Exam Title for
 
-                    <span id="modalExamYearText"></span>
+                            <span id="modalExamYearText"></span>
 
-                    —
+                            —
 
-                    <span id="modalExamSessionText"></span>
+                            <span id="modalExamSessionText"></span>
 
-                </h5>
+                        </h5>
 
 
-                <button
-                    type="button"
-                    class="btn-close"
-                    data-bs-dismiss="modal"
-                    aria-label="Close"
-                ></button>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
 
-            </div>
-
-
-            <div class="modal-body">
-
-                <div class="mb-3">
-
-                    <label class="form-label">
-                        Exam Title
-                    </label>
-
-                    <input
-                        type="text"
-                        class="form-control"
-                        name="exam"
-                        placeholder="e.g. Midterm Exam"
-                        required
-                    >
-
-                </div>
+                    </div>
 
 
-                <input
-                    type="hidden"
-                    name="year"
-                    id="modalExamYearInput"
-                >
+                    <div class="modal-body">
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Exam Title
+                            </label>
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                name="exam"
+                                placeholder="e.g. Midterm Exam"
+                                required>
+
+                        </div>
 
 
-                <input
-                    type="hidden"
-                    name="session"
-                    id="modalExamSessionInput"
-                >
-
-            </div>
+                        <input
+                            type="hidden"
+                            name="year"
+                            id="modalExamYearInput">
 
 
-            <div class="modal-footer">
+                        <input
+                            type="hidden"
+                            name="session"
+                            id="modalExamSessionInput">
 
-                <button
-                    type="button"
-                    class="btn btn-secondary"
-                    data-bs-dismiss="modal"
-                >
-                    Cancel
-                </button>
+                    </div>
 
 
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                >
-                    Add Exam Title
-                </button>
+                    <div class="modal-footer">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary">
+                            Add Exam Title
+                        </button>
+
+                    </div>
+
+                </form>
 
             </div>
 
-        </form>
+        </div>
 
     </div>
 
-</div>
-
-</div>
-
-<!-- ================================================================
+    <!-- ================================================================
      JAVASCRIPT DEPENDENCIES
      ================================================================ -->
 
-<script src="../js/jquery-3.7.0.min.js"></script>
+    <script src="../js/jquery-3.7.0.min.js"></script>
 
-<script src="../js/bootstrap.bundle.min.js"></script>
+    <script src="../js/bootstrap.bundle.min.js"></script>
 
-<script src="../js/dataTables.min.js"></script>
+    <script src="../js/dataTables.min.js"></script>
 
-<script src="../js/dataTables.bootstrap5.min.js"></script>
+    <script src="../js/dataTables.bootstrap5.min.js"></script>
 
-<script src="../js/jquery.validate.min.js"></script>
+    <script src="../js/jquery.validate.min.js"></script>
 
-<script>
+    <script>
+        // ================================================================
+        // SIDEBAR TOGGLE
+        // ================================================================
 
-// ================================================================
-// SIDEBAR TOGGLE
-// ================================================================
+        $(document).ready(function() {
 
-$(document).ready(function () {
+            $('#sidebarToggle').on('click', function() {
 
-    $('#sidebarToggle').on('click', function () {
+                $('.sidebar').toggleClass('active');
 
-        $('.sidebar').toggleClass('active');
+                $('.moveable-content')
+                    .toggleClass('sidebar-active');
 
-        $('.moveable-content')
-            .toggleClass('sidebar-active');
-
-    });
-
-});
-
-</script>
-
-<script>
-
-const ACTIVE_SESSION =
-    <?php
-    echo json_encode(
-        $activeSession,
-        JSON_UNESCAPED_UNICODE |
-        JSON_UNESCAPED_SLASHES
-    );
-    ?>;
-
-
-// ================================================================
-// DOM ELEMENTS
-// ================================================================
-
-const selectedYearEl =
-    document.getElementById('selectedYear');
-
-const selectedSessionEl =
-    document.getElementById('selectedSession');
-
-const selectedExamEl =
-    document.getElementById('selectedExam');
-
-const openAddSessionBtn =
-    document.getElementById('openAddSessionBtn');
-
-const openAddExamBtn =
-    document.getElementById('openAddExamBtn');
-
-const saveBtn =
-    document.getElementById('saveBtn');
-
-
-// ================================================================
-// CURRENT SELECTION
-// ================================================================
-
-let currentYear = null;
-
-let currentSession = null;
-
-let currentExam = null;
-
-
-// ================================================================
-// ESCAPE HTML
-// ================================================================
-
-function escapeHtml(value) {
-
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-
-// ================================================================
-// SET STEPPER STATE
-// ================================================================
-
-function setStepState(id, done) {
-
-    const element =
-        document.getElementById(id);
-
-    if (!element) {
-        return;
-    }
-
-    element.classList.toggle(
-        'is-done',
-        Boolean(done)
-    );
-}
-
-
-// ================================================================
-// HIGHLIGHT SELECTED YEAR
-// ================================================================
-
-function markSelectedYear(year) {
-
-    document
-        .querySelectorAll('.year-item')
-        .forEach(item => {
-
-            item.classList.toggle(
-                'is-selected',
-                item.dataset.year === year
-            );
+            });
 
         });
-}
+    </script>
+
+    <script>
+        const ACTIVE_SESSION =
+            <?php
+            echo json_encode(
+                $activeSession,
+                JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+            );
+            ?>;
 
 
-// ================================================================
-// UPDATE RESULT BOX
-// ================================================================
+        // ================================================================
+        // DOM ELEMENTS
+        // ================================================================
 
-function updateResultBox() {
+        const selectedYearEl =
+            document.getElementById('selectedYear');
 
-    selectedYearEl.textContent =
-        currentYear || '—';
+        const selectedSessionEl =
+            document.getElementById('selectedSession');
 
-    selectedSessionEl.textContent =
-        currentSession || '—';
+        const selectedExamEl =
+            document.getElementById('selectedExam');
 
-    selectedExamEl.textContent =
-        currentExam || '—';
+        const openAddSessionBtn =
+            document.getElementById('openAddSessionBtn');
 
+        const openAddExamBtn =
+            document.getElementById('openAddExamBtn');
 
-    const ready =
-        Boolean(
-            currentYear &&
-            currentSession &&
-            currentExam
-        );
-
-
-    saveBtn.disabled = !ready;
+        const saveBtn =
+            document.getElementById('saveBtn');
 
 
-    document
-        .getElementById('pillYear')
-        .classList.toggle(
-            'is-filled',
-            Boolean(currentYear)
-        );
+        // ================================================================
+        // CURRENT SELECTION
+        // ================================================================
+
+        let currentYear = null;
+
+        let currentSession = null;
+
+        let currentExam = null;
 
 
-    document
-        .getElementById('pillSession')
-        .classList.toggle(
-            'is-filled',
-            Boolean(currentSession)
-        );
+        // ================================================================
+        // ESCAPE HTML
+        // ================================================================
 
+        function escapeHtml(value) {
 
-    document
-        .getElementById('pillExam')
-        .classList.toggle(
-            'is-filled',
-            Boolean(currentExam)
-        );
-
-
-    setStepState(
-        'step-year',
-        Boolean(currentYear)
-    );
-
-    setStepState(
-        'step-session',
-        Boolean(currentSession)
-    );
-
-    setStepState(
-        'step-exam',
-        Boolean(currentExam)
-    );
-
-    setStepState(
-        'step-save',
-        ready
-    );
-
-
-    markSelectedYear(currentYear);
-}
-
-
-// ================================================================
-// LOAD SESSIONS
-// ================================================================
-
-async function loadSessions(year) {
-
-    try {
-
-        const response = await fetch(
-            `?action=get_sessions&year=${encodeURIComponent(year)}`,
-            {
-                cache: 'no-store'
-            }
-        );
-
-
-        if (!response.ok) {
-            throw new Error('Unable to load sessions.');
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
 
-        const data =
-            await response.json();
+        // ================================================================
+        // SET STEPPER STATE
+        // ================================================================
 
+        function setStepState(id, done) {
 
-        if (!data.success) {
-            throw new Error(
-                data.message ||
-                'Unable to load sessions.'
+            const element =
+                document.getElementById(id);
+
+            if (!element) {
+                return;
+            }
+
+            element.classList.toggle(
+                'is-done',
+                Boolean(done)
             );
         }
 
 
-        const sessionsArea =
-            document.getElementById('sessionsArea');
+        // ================================================================
+        // HIGHLIGHT SELECTED YEAR
+        // ================================================================
+
+        function markSelectedYear(year) {
+
+            document
+                .querySelectorAll('.year-item')
+                .forEach(item => {
+
+                    item.classList.toggle(
+                        'is-selected',
+                        item.dataset.year === year
+                    );
+
+                });
+        }
 
 
-        sessionsArea.innerHTML = '';
+        // ================================================================
+        // UPDATE RESULT BOX
+        // ================================================================
+
+        function updateResultBox() {
+
+            selectedYearEl.textContent =
+                currentYear || '—';
+
+            selectedSessionEl.textContent =
+                currentSession || '—';
+
+            selectedExamEl.textContent =
+                currentExam || '—';
 
 
-        const wrapper =
-            document.createElement('div');
-
-        wrapper.className =
-            'radio-list';
-
-
-        // --------------------------------------------------------
-        // Default session options.
-        // --------------------------------------------------------
-
-        const defaults = [
-            'First Term',
-            'Second Term',
-            'Third Term'
-        ];
+            const ready =
+                Boolean(
+                    currentYear &&
+                    currentSession &&
+                    currentExam
+                );
 
 
-        const sessions =
-            Array.from(
-                new Set([
-                    ...defaults,
-                    ...(data.sessions || [])
-                ])
+            saveBtn.disabled = !ready;
+
+
+            document
+                .getElementById('pillYear')
+                .classList.toggle(
+                    'is-filled',
+                    Boolean(currentYear)
+                );
+
+
+            document
+                .getElementById('pillSession')
+                .classList.toggle(
+                    'is-filled',
+                    Boolean(currentSession)
+                );
+
+
+            document
+                .getElementById('pillExam')
+                .classList.toggle(
+                    'is-filled',
+                    Boolean(currentExam)
+                );
+
+
+            setStepState(
+                'step-year',
+                Boolean(currentYear)
+            );
+
+            setStepState(
+                'step-session',
+                Boolean(currentSession)
+            );
+
+            setStepState(
+                'step-exam',
+                Boolean(currentExam)
+            );
+
+            setStepState(
+                'step-save',
+                ready
             );
 
 
-        sessions.forEach(session => {
-
-            const label =
-                document.createElement('label');
+            markSelectedYear(currentYear);
+        }
 
 
-            const input =
-                document.createElement('input');
+        // ================================================================
+        // LOAD SESSIONS
+        // ================================================================
+
+        async function loadSessions(year) {
+
+            try {
+
+                const response = await fetch(
+                    `?action=get_sessions&year=${encodeURIComponent(year)}`, {
+                        cache: 'no-store'
+                    }
+                );
 
 
-            input.type = 'radio';
-
-            input.name = 'sessionRadio';
-
-            input.value = session;
+                if (!response.ok) {
+                    throw new Error('Unable to load sessions.');
+                }
 
 
-            if (data.year_status !== 'active') {
-
-                input.disabled = true;
-
-            }
+                const data =
+                    await response.json();
 
 
-            label.appendChild(input);
-
-            label.appendChild(
-                document.createTextNode(
-                    ' ' + session
-                )
-            );
-
-
-            wrapper.appendChild(label);
-
-        });
+                if (!data.success) {
+                    throw new Error(
+                        data.message ||
+                        'Unable to load sessions.'
+                    );
+                }
 
 
-        if (
-            !data.sessions ||
-            data.sessions.length === 0
-        ) {
+                const sessionsArea =
+                    document.getElementById('sessionsArea');
 
-            wrapper.insertAdjacentHTML(
-                'beforeend',
-                `
+
+                sessionsArea.innerHTML = '';
+
+
+                const wrapper =
+                    document.createElement('div');
+
+                wrapper.className =
+                    'radio-list';
+
+
+                // --------------------------------------------------------
+                // Default session options.
+                // --------------------------------------------------------
+
+                const defaults = [
+                    'First Term',
+                    'Second Term',
+                    'Third Term'
+                ];
+
+
+                const sessions =
+                    Array.from(
+                        new Set([
+                            ...defaults,
+                            ...(data.sessions || [])
+                        ])
+                    );
+
+
+                sessions.forEach(session => {
+
+                    const label =
+                        document.createElement('label');
+
+
+                    const input =
+                        document.createElement('input');
+
+
+                    input.type = 'radio';
+
+                    input.name = 'sessionRadio';
+
+                    input.value = session;
+
+
+                    if (data.year_status !== 'active') {
+
+                        input.disabled = true;
+
+                    }
+
+
+                    label.appendChild(input);
+
+                    label.appendChild(
+                        document.createTextNode(
+                            ' ' + session
+                        )
+                    );
+
+
+                    wrapper.appendChild(label);
+
+                });
+
+
+                if (
+                    !data.sessions ||
+                    data.sessions.length === 0
+                ) {
+
+                    wrapper.insertAdjacentHTML(
+                        'beforeend',
+                        `
                 <div class="small-muted w-100">
                     No saved sessions found.
                     You can add one.
                 </div>
                 `
-            );
+                    );
 
-        }
+                }
 
 
-        if (
-            data.year_status !== 'active'
-        ) {
+                if (
+                    data.year_status !== 'active'
+                ) {
 
-            wrapper.insertAdjacentHTML(
-                'beforeend',
-                `
+                    wrapper.insertAdjacentHTML(
+                        'beforeend',
+                        `
                 <div class="small-muted w-100 mt-1">
                     <i class="fas fa-circle-info me-1"></i>
                     Year is inactive —
                     activate it before selecting a session.
                 </div>
                 `
-            );
+                    );
 
-        }
-
-
-        sessionsArea.appendChild(wrapper);
+                }
 
 
-        // --------------------------------------------------------
-        // Session listeners.
-        // --------------------------------------------------------
-
-        wrapper
-            .querySelectorAll(
-                'input[name="sessionRadio"]'
-            )
-            .forEach(radio => {
-
-                radio.addEventListener(
-                    'change',
-                    () => {
-
-                        currentSession =
-                            radio.value;
-
-                        currentExam = null;
+                sessionsArea.appendChild(wrapper);
 
 
-                        openAddExamBtn.disabled =
-                            !currentSession;
+                // --------------------------------------------------------
+                // Session listeners.
+                // --------------------------------------------------------
+
+                wrapper
+                    .querySelectorAll(
+                        'input[name="sessionRadio"]'
+                    )
+                    .forEach(radio => {
+
+                        radio.addEventListener(
+                            'change',
+                            () => {
+
+                                currentSession =
+                                    radio.value;
+
+                                currentExam = null;
 
 
-                        document
-                            .getElementById(
-                                'examsArea'
-                            )
-                            .innerHTML = `
+                                openAddExamBtn.disabled = !currentSession;
+
+
+                                document
+                                    .getElementById(
+                                        'examsArea'
+                                    )
+                                    .innerHTML = `
                                 <div class="small-muted">
                                     <i class="fas fa-spinner fa-spin me-1"></i>
                                     Loading exam titles...
@@ -3227,408 +3154,406 @@ async function loadSessions(year) {
                             `;
 
 
-                        updateResultBox();
+                                updateResultBox();
 
 
-                        loadExamsFor(
-                            currentYear,
-                            currentSession
+                                loadExamsFor(
+                                    currentYear,
+                                    currentSession
+                                );
+
+                            }
                         );
 
-                    }
+                    });
+
+
+            } catch (error) {
+
+                console.error(
+                    'loadSessions:',
+                    error
                 );
 
-            });
 
-
-    } catch (error) {
-
-        console.error(
-            'loadSessions:',
-            error
-        );
-
-
-        document
-            .getElementById('sessionsArea')
-            .innerHTML = `
+                document
+                    .getElementById('sessionsArea')
+                    .innerHTML = `
                 <div class="text-danger">
                     <i class="fas fa-triangle-exclamation me-1"></i>
                     Failed to load sessions.
                 </div>
             `;
 
-    }
-
-}
-
-
-// ================================================================
-// LOAD EXAM TITLES
-// ================================================================
-
-async function loadExamsFor(
-    year,
-    session
-) {
-
-    try {
-
-        const response = await fetch(
-            `?action=get_exams&year=${encodeURIComponent(year)}&session=${encodeURIComponent(session)}`,
-            {
-                cache: 'no-store'
             }
-        );
 
-
-        if (!response.ok) {
-            throw new Error(
-                'Unable to load exam titles.'
-            );
         }
 
 
-        const data =
-            await response.json();
+        // ================================================================
+        // LOAD EXAM TITLES
+        // ================================================================
 
-
-        if (!data.success) {
-            throw new Error(
-                data.message ||
-                'Unable to load exam titles.'
-            );
-        }
-
-
-        const examsArea =
-            document.getElementById(
-                'examsArea'
-            );
-
-
-        examsArea.innerHTML = '';
-
-
-        const wrapper =
-            document.createElement('div');
-
-        wrapper.className =
-            'radio-list';
-
-
-        const defaults = [
-            'Exam',
-            'Test',
-            'Mock'
-        ];
-
-
-        const exams =
-            Array.from(
-                new Set([
-                    ...defaults,
-                    ...(data.exams || [])
-                ])
-            );
-
-
-        exams.forEach(exam => {
-
-            const label =
-                document.createElement('label');
-
-
-            const input =
-                document.createElement('input');
-
-
-            input.type = 'radio';
-
-            input.name = 'examRadio';
-
-            input.value = exam;
-
-
-            label.appendChild(input);
-
-            label.appendChild(
-                document.createTextNode(
-                    ' ' + exam
-                )
-            );
-
-
-            wrapper.appendChild(label);
-
-        });
-
-
-        if (
-            !data.exams ||
-            data.exams.length === 0
+        async function loadExamsFor(
+            year,
+            session
         ) {
 
-            wrapper.insertAdjacentHTML(
-                'beforeend',
-                `
+            try {
+
+                const response = await fetch(
+                    `?action=get_exams&year=${encodeURIComponent(year)}&session=${encodeURIComponent(session)}`, {
+                        cache: 'no-store'
+                    }
+                );
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        'Unable to load exam titles.'
+                    );
+                }
+
+
+                const data =
+                    await response.json();
+
+
+                if (!data.success) {
+                    throw new Error(
+                        data.message ||
+                        'Unable to load exam titles.'
+                    );
+                }
+
+
+                const examsArea =
+                    document.getElementById(
+                        'examsArea'
+                    );
+
+
+                examsArea.innerHTML = '';
+
+
+                const wrapper =
+                    document.createElement('div');
+
+                wrapper.className =
+                    'radio-list';
+
+
+                const defaults = [
+                    'Exam',
+                    'Test',
+                    'Mock'
+                ];
+
+
+                const exams =
+                    Array.from(
+                        new Set([
+                            ...defaults,
+                            ...(data.exams || [])
+                        ])
+                    );
+
+
+                exams.forEach(exam => {
+
+                    const label =
+                        document.createElement('label');
+
+
+                    const input =
+                        document.createElement('input');
+
+
+                    input.type = 'radio';
+
+                    input.name = 'examRadio';
+
+                    input.value = exam;
+
+
+                    label.appendChild(input);
+
+                    label.appendChild(
+                        document.createTextNode(
+                            ' ' + exam
+                        )
+                    );
+
+
+                    wrapper.appendChild(label);
+
+                });
+
+
+                if (
+                    !data.exams ||
+                    data.exams.length === 0
+                ) {
+
+                    wrapper.insertAdjacentHTML(
+                        'beforeend',
+                        `
                 <div class="small-muted w-100">
                     No saved exam titles found.
                     You can add one.
                 </div>
                 `
-            );
+                    );
 
-        }
-
-
-        examsArea.appendChild(wrapper);
+                }
 
 
-        wrapper
-            .querySelectorAll(
-                'input[name="examRadio"]'
-            )
-            .forEach(radio => {
+                examsArea.appendChild(wrapper);
 
-                radio.addEventListener(
-                    'change',
-                    () => {
 
-                        currentExam =
-                            radio.value;
+                wrapper
+                    .querySelectorAll(
+                        'input[name="examRadio"]'
+                    )
+                    .forEach(radio => {
 
-                        updateResultBox();
+                        radio.addEventListener(
+                            'change',
+                            () => {
 
-                    }
+                                currentExam =
+                                    radio.value;
+
+                                updateResultBox();
+
+                            }
+                        );
+
+                    });
+
+
+            } catch (error) {
+
+                console.error(
+                    'loadExamsFor:',
+                    error
                 );
 
-            });
 
-
-    } catch (error) {
-
-        console.error(
-            'loadExamsFor:',
-            error
-        );
-
-
-        document
-            .getElementById('examsArea')
-            .innerHTML = `
+                document
+                    .getElementById('examsArea')
+                    .innerHTML = `
                 <div class="text-danger">
                     <i class="fas fa-triangle-exclamation me-1"></i>
                     Failed to load exam titles.
                 </div>
             `;
 
-    }
+            }
 
-}
+        }
 
 
-// ================================================================
-// RESTORE CURRENT SELECTION AFTER YEAR LIST REFRESH
-// ================================================================
+        // ================================================================
+        // RESTORE CURRENT SELECTION AFTER YEAR LIST REFRESH
+        // ================================================================
 
-async function refreshYearList() {
+        async function refreshYearList() {
 
-    try {
+            try {
 
-        const response =
-            await fetch(
-                'manage_session.php',
-                {
-                    cache: 'no-store'
+                const response =
+                    await fetch(
+                        'manage_session.php', {
+                            cache: 'no-store'
+                        }
+                    );
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        'Unable to refresh academic years.'
+                    );
                 }
-            );
 
 
-        if (!response.ok) {
-            throw new Error(
-                'Unable to refresh academic years.'
-            );
-        }
+                const html =
+                    await response.text();
 
 
-        const html =
-            await response.text();
+                const doc =
+                    new DOMParser()
+                    .parseFromString(
+                        html,
+                        'text/html'
+                    );
 
 
-        const doc =
-            new DOMParser()
-                .parseFromString(
-                    html,
-                    'text/html'
+                const newList =
+                    doc.getElementById(
+                        'yearList'
+                    );
+
+
+                if (!newList) {
+                    return;
+                }
+
+
+                document
+                    .getElementById('yearList')
+                    .innerHTML =
+                    newList.innerHTML;
+
+
+                attachEventListeners();
+
+
+                if (!currentYear) {
+
+                    updateResultBox();
+
+                    return;
+                }
+
+
+                markSelectedYear(
+                    currentYear
                 );
 
 
-        const newList =
-            doc.getElementById(
-                'yearList'
-            );
-
-
-        if (!newList) {
-            return;
-        }
-
-
-        document
-            .getElementById('yearList')
-            .innerHTML =
-            newList.innerHTML;
-
-
-        attachEventListeners();
-
-
-        if (!currentYear) {
-
-            updateResultBox();
-
-            return;
-        }
-
-
-        markSelectedYear(
-            currentYear
-        );
-
-
-        openAddSessionBtn.disabled =
-            false;
-
-
-        await loadSessions(
-            currentYear
-        );
-
-
-        // --------------------------------------------------------
-        // Restore selected session.
-        // --------------------------------------------------------
-
-        if (currentSession) {
-
-            const sessionRadio =
-                Array.from(
-                    document.querySelectorAll(
-                        'input[name="sessionRadio"]'
-                    )
-                ).find(
-                    radio =>
-                        radio.value ===
-                        currentSession
-                );
-
-
-            if (sessionRadio) {
-
-                sessionRadio.checked =
-                    true;
-
-                openAddExamBtn.disabled =
+                openAddSessionBtn.disabled =
                     false;
 
 
-                await loadExamsFor(
-                    currentYear,
-                    currentSession
+                await loadSessions(
+                    currentYear
                 );
 
 
-                // ------------------------------------------------
-                // Restore selected exam.
-                // ------------------------------------------------
+                // --------------------------------------------------------
+                // Restore selected session.
+                // --------------------------------------------------------
 
-                if (currentExam) {
+                if (currentSession) {
 
-                    const examRadio =
+                    const sessionRadio =
                         Array.from(
                             document.querySelectorAll(
-                                'input[name="examRadio"]'
+                                'input[name="sessionRadio"]'
                             )
                         ).find(
                             radio =>
-                                radio.value ===
-                                currentExam
+                            radio.value ===
+                            currentSession
                         );
 
 
-                    if (examRadio) {
+                    if (sessionRadio) {
 
-                        examRadio.checked =
+                        sessionRadio.checked =
                             true;
+
+                        openAddExamBtn.disabled =
+                            false;
+
+
+                        await loadExamsFor(
+                            currentYear,
+                            currentSession
+                        );
+
+
+                        // ------------------------------------------------
+                        // Restore selected exam.
+                        // ------------------------------------------------
+
+                        if (currentExam) {
+
+                            const examRadio =
+                                Array.from(
+                                    document.querySelectorAll(
+                                        'input[name="examRadio"]'
+                                    )
+                                ).find(
+                                    radio =>
+                                    radio.value ===
+                                    currentExam
+                                );
+
+
+                            if (examRadio) {
+
+                                examRadio.checked =
+                                    true;
+
+                            }
+
+                        }
 
                     }
 
                 }
+
+
+                updateResultBox();
+
+
+            } catch (error) {
+
+                console.error(
+                    'refreshYearList:',
+                    error
+                );
 
             }
 
         }
 
 
-        updateResultBox();
+        // ================================================================
+        // ATTACH YEAR BUTTON EVENTS
+        // ================================================================
+
+        function attachEventListeners() {
 
 
-    } catch (error) {
+            // ============================================================
+            // SELECT YEAR
+            // ============================================================
 
-        console.error(
-            'refreshYearList:',
-            error
-        );
+            document
+                .querySelectorAll('.select-year-btn')
+                .forEach(button => {
 
-    }
+                    button.onclick = async function() {
 
-}
-
-
-// ================================================================
-// ATTACH YEAR BUTTON EVENTS
-// ================================================================
-
-function attachEventListeners() {
+                        const year =
+                            this.dataset.year;
 
 
-    // ============================================================
-    // SELECT YEAR
-    // ============================================================
+                        currentYear =
+                            year;
 
-    document
-        .querySelectorAll('.select-year-btn')
-        .forEach(button => {
+                        currentSession =
+                            null;
 
-            button.onclick = async function () {
-
-                const year =
-                    this.dataset.year;
+                        currentExam =
+                            null;
 
 
-                currentYear =
-                    year;
+                        openAddSessionBtn.disabled =
+                            false;
 
-                currentSession =
-                    null;
-
-                currentExam =
-                    null;
+                        openAddExamBtn.disabled =
+                            true;
 
 
-                openAddSessionBtn.disabled =
-                    false;
-
-                openAddExamBtn.disabled =
-                    true;
-
-
-                document
-                    .getElementById(
-                        'examsArea'
-                    )
-                    .innerHTML = `
+                        document
+                            .getElementById(
+                                'examsArea'
+                            )
+                            .innerHTML = `
                         <div class="small-muted">
                             <i class="fas fa-arrow-up me-1"></i>
                             Select a session to load
@@ -3637,192 +3562,186 @@ function attachEventListeners() {
                     `;
 
 
-                updateResultBox();
+                        updateResultBox();
 
 
-                await loadSessions(
-                    currentYear
-                );
-
-            };
-
-        });
-
-
-    // ============================================================
-    // TOGGLE YEAR
-    // ============================================================
-
-    document
-        .querySelectorAll('.toggle-year-btn')
-        .forEach(button => {
-
-            button.onclick = async function () {
-
-                const year =
-                    this.dataset.year;
-
-
-                if (
-                    !confirm(
-                        `Change status for ${year}?`
-                    )
-                ) {
-
-                    return;
-                }
-
-
-                try {
-
-                    const response =
-                        await fetch(
-                            '?action=toggle_year',
-                            {
-                                method: 'POST',
-
-                                headers: {
-                                    'Content-Type':
-                                        'application/json'
-                                },
-
-                                body:
-                                    JSON.stringify({
-                                        year
-                                    })
-                            }
+                        await loadSessions(
+                            currentYear
                         );
 
+                    };
 
-                    const data =
-                        await response.json();
-
-
-                    alert(
-                        data.message ||
-                        'Status updated.'
-                    );
+                });
 
 
-                    if (!data.success) {
-                        return;
-                    }
+            // ============================================================
+            // TOGGLE YEAR
+            // ============================================================
+
+            document
+                .querySelectorAll('.toggle-year-btn')
+                .forEach(button => {
+
+                    button.onclick = async function() {
+
+                        const year =
+                            this.dataset.year;
 
 
-                    // ------------------------------------------------
-                    // Keep the selected year.
-                    // ------------------------------------------------
-
-                    currentYear =
-                        year;
-
-
-                    await refreshYearList();
-
-
-                } catch (error) {
-
-                    console.error(
-                        'toggle_year:',
-                        error
-                    );
-
-
-                    alert(
-                        'Unable to update academic year status.'
-                    );
-
-                }
-
-            };
-
-        });
-
-
-    // ============================================================
-    // DELETE YEAR
-    // ============================================================
-
-    document
-        .querySelectorAll('.delete-year-btn')
-        .forEach(button => {
-
-            button.onclick = async function () {
-
-                const year =
-                    this.dataset.year;
-
-
-                if (
-                    !confirm(
-                        `Delete ${year} permanently?`
-                    )
-                ) {
-
-                    return;
-                }
-
-
-                try {
-
-                    const response =
-                        await fetch(
-                            '?action=delete_year',
-                            {
-                                method: 'POST',
-
-                                headers: {
-                                    'Content-Type':
-                                        'application/json'
-                                },
-
-                                body:
-                                    JSON.stringify({
-                                        year
-                                    })
-                            }
-                        );
-
-
-                    const data =
-                        await response.json();
-
-
-                    alert(
-                        data.message ||
-                        'Academic year deleted.'
-                    );
-
-
-                    if (!data.success) {
-                        return;
-                    }
-
-
-                    // ------------------------------------------------
-                    // If deleted year was selected,
-                    // clear workspace.
-                    // ------------------------------------------------
-
-                    if (
-                        currentYear === year
-                    ) {
-
-                        currentYear =
-                            null;
-
-                        currentSession =
-                            null;
-
-                        currentExam =
-                            null;
-
-
-                        document
-                            .getElementById(
-                                'sessionsArea'
+                        if (
+                            !confirm(
+                                `Change status for ${year}?`
                             )
-                            .innerHTML = `
+                        ) {
+
+                            return;
+                        }
+
+
+                        try {
+
+                            const response =
+                                await fetch(
+                                    '?action=toggle_year', {
+                                        method: 'POST',
+
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+
+                                        body: JSON.stringify({
+                                            year
+                                        })
+                                    }
+                                );
+
+
+                            const data =
+                                await response.json();
+
+
+                            alert(
+                                data.message ||
+                                'Status updated.'
+                            );
+
+
+                            if (!data.success) {
+                                return;
+                            }
+
+
+                            // ------------------------------------------------
+                            // Keep the selected year.
+                            // ------------------------------------------------
+
+                            currentYear =
+                                year;
+
+
+                            await refreshYearList();
+
+
+                        } catch (error) {
+
+                            console.error(
+                                'toggle_year:',
+                                error
+                            );
+
+
+                            alert(
+                                'Unable to update academic year status.'
+                            );
+
+                        }
+
+                    };
+
+                });
+
+
+            // ============================================================
+            // DELETE YEAR
+            // ============================================================
+
+            document
+                .querySelectorAll('.delete-year-btn')
+                .forEach(button => {
+
+                    button.onclick = async function() {
+
+                        const year =
+                            this.dataset.year;
+
+
+                        if (
+                            !confirm(
+                                `Delete ${year} permanently?`
+                            )
+                        ) {
+
+                            return;
+                        }
+
+
+                        try {
+
+                            const response =
+                                await fetch(
+                                    '?action=delete_year', {
+                                        method: 'POST',
+
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+
+                                        body: JSON.stringify({
+                                            year
+                                        })
+                                    }
+                                );
+
+
+                            const data =
+                                await response.json();
+
+
+                            alert(
+                                data.message ||
+                                'Academic year deleted.'
+                            );
+
+
+                            if (!data.success) {
+                                return;
+                            }
+
+
+                            // ------------------------------------------------
+                            // If deleted year was selected,
+                            // clear workspace.
+                            // ------------------------------------------------
+
+                            if (
+                                currentYear === year
+                            ) {
+
+                                currentYear =
+                                    null;
+
+                                currentSession =
+                                    null;
+
+                                currentExam =
+                                    null;
+
+
+                                document
+                                    .getElementById(
+                                        'sessionsArea'
+                                    )
+                                    .innerHTML = `
                                 <div class="small-muted">
                                     <i class="fas fa-arrow-up me-1"></i>
                                     Select a year to load sessions.
@@ -3830,11 +3749,11 @@ function attachEventListeners() {
                             `;
 
 
-                        document
-                            .getElementById(
-                                'examsArea'
-                            )
-                            .innerHTML = `
+                                document
+                                    .getElementById(
+                                        'examsArea'
+                                    )
+                                    .innerHTML = `
                                 <div class="small-muted">
                                     <i class="fas fa-arrow-up me-1"></i>
                                     Select a session to load
@@ -3843,432 +3762,422 @@ function attachEventListeners() {
                             `;
 
 
-                        openAddSessionBtn.disabled =
-                            true;
+                                openAddSessionBtn.disabled =
+                                    true;
 
-                        openAddExamBtn.disabled =
-                            true;
+                                openAddExamBtn.disabled =
+                                    true;
 
-                        updateResultBox();
+                                updateResultBox();
 
-                    }
-
-
-                    // ------------------------------------------------
-                    // Refresh only the list.
-                    // ------------------------------------------------
-
-                    const response2 =
-                        await fetch(
-                            'manage_session.php',
-                            {
-                                cache: 'no-store'
                             }
-                        );
 
 
-                    const html =
-                        await response2.text();
+                            // ------------------------------------------------
+                            // Refresh only the list.
+                            // ------------------------------------------------
+
+                            const response2 =
+                                await fetch(
+                                    'manage_session.php', {
+                                        cache: 'no-store'
+                                    }
+                                );
 
 
-                    const doc =
-                        new DOMParser()
-                            .parseFromString(
-                                html,
-                                'text/html'
+                            const html =
+                                await response2.text();
+
+
+                            const doc =
+                                new DOMParser()
+                                .parseFromString(
+                                    html,
+                                    'text/html'
+                                );
+
+
+                            const newList =
+                                doc.getElementById(
+                                    'yearList'
+                                );
+
+
+                            if (newList) {
+
+                                document
+                                    .getElementById(
+                                        'yearList'
+                                    )
+                                    .innerHTML =
+                                    newList.innerHTML;
+
+                                attachEventListeners();
+
+                            }
+
+
+                        } catch (error) {
+
+                            console.error(
+                                'delete_year:',
+                                error
                             );
 
 
-                    const newList =
-                        doc.getElementById(
-                            'yearList'
-                        );
+                            alert(
+                                'Unable to delete academic year.'
+                            );
+
+                        }
+
+                    };
+
+                });
+
+        }
 
 
-                    if (newList) {
+        // ================================================================
+        // ADD SESSION MODAL
+        // ================================================================
 
-                        document
-                            .getElementById(
-                                'yearList'
-                            )
-                            .innerHTML =
-                            newList.innerHTML;
-
-                        attachEventListeners();
-
-                    }
+        const addSessionModal =
+            new bootstrap.Modal(
+                document.getElementById(
+                    'addSessionModal'
+                )
+            );
 
 
-                } catch (error) {
+        openAddSessionBtn.onclick =
+            function() {
 
-                    console.error(
-                        'delete_year:',
-                        error
-                    );
-
+                if (!currentYear) {
 
                     alert(
-                        'Unable to delete academic year.'
+                        'Select a year first.'
                     );
 
+                    return;
                 }
+
+
+                document
+                    .getElementById(
+                        'modalYearText'
+                    )
+                    .textContent =
+                    currentYear;
+
+
+                document
+                    .getElementById(
+                        'modalYearInput'
+                    )
+                    .value =
+                    currentYear;
+
+
+                addSessionModal.show();
 
             };
 
-        });
 
-}
+        // ================================================================
+        // ADD SESSION FORM
+        // ================================================================
 
+        document
+            .getElementById('addSessionForm')
+            .addEventListener(
+                'submit',
+                async function(event) {
 
-// ================================================================
-// ADD SESSION MODAL
-// ================================================================
-
-const addSessionModal =
-    new bootstrap.Modal(
-        document.getElementById(
-            'addSessionModal'
-        )
-    );
+                    event.preventDefault();
 
 
-openAddSessionBtn.onclick =
-    function () {
+                    const session =
+                        this.session.value.trim();
 
-        if (!currentYear) {
 
-            alert(
-                'Select a year first.'
+                    if (!session) {
+
+                        alert(
+                            'Enter session name.'
+                        );
+
+                        return;
+                    }
+
+
+                    try {
+
+                        const response =
+                            await fetch(
+                                '?action=add_session', {
+                                    method: 'POST',
+
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+
+                                    body: JSON.stringify({
+                                        year: currentYear,
+
+                                        session
+                                    })
+                                }
+                            );
+
+
+                        const data =
+                            await response.json();
+
+
+                        alert(
+                            data.message ||
+                            'Session added.'
+                        );
+
+
+                        if (!data.success) {
+                            return;
+                        }
+
+
+                        this.reset();
+
+                        addSessionModal.hide();
+
+
+                        await loadSessions(
+                            currentYear
+                        );
+
+
+                    } catch (error) {
+
+                        console.error(
+                            'add_session:',
+                            error
+                        );
+
+
+                        alert(
+                            'Unable to add session.'
+                        );
+
+                    }
+
+                }
             );
 
-            return;
-        }
+
+        // ================================================================
+        // ADD EXAM MODAL
+        // ================================================================
+
+        const addExamModal =
+            new bootstrap.Modal(
+                document.getElementById(
+                    'addExamModal'
+                )
+            );
 
 
-        document
-            .getElementById(
-                'modalYearText'
-            )
-            .textContent =
-            currentYear;
+        openAddExamBtn.onclick =
+            function() {
 
+                if (!currentYear) {
 
-        document
-            .getElementById(
-                'modalYearInput'
-            )
-            .value =
-            currentYear;
-
-
-        addSessionModal.show();
-
-    };
-
-
-// ================================================================
-// ADD SESSION FORM
-// ================================================================
-
-document
-    .getElementById('addSessionForm')
-    .addEventListener(
-        'submit',
-        async function (event) {
-
-            event.preventDefault();
-
-
-            const session =
-                this.session.value.trim();
-
-
-            if (!session) {
-
-                alert(
-                    'Enter session name.'
-                );
-
-                return;
-            }
-
-
-            try {
-
-                const response =
-                    await fetch(
-                        '?action=add_session',
-                        {
-                            method: 'POST',
-
-                            headers: {
-                                'Content-Type':
-                                    'application/json'
-                            },
-
-                            body:
-                                JSON.stringify({
-                                    year:
-                                        currentYear,
-
-                                    session
-                                })
-                        }
+                    alert(
+                        'Select a year first.'
                     );
 
-
-                const data =
-                    await response.json();
-
-
-                alert(
-                    data.message ||
-                    'Session added.'
-                );
-
-
-                if (!data.success) {
                     return;
                 }
 
 
-                this.reset();
+                if (!currentSession) {
 
-                addSessionModal.hide();
-
-
-                await loadSessions(
-                    currentYear
-                );
-
-
-            } catch (error) {
-
-                console.error(
-                    'add_session:',
-                    error
-                );
-
-
-                alert(
-                    'Unable to add session.'
-                );
-
-            }
-
-        }
-    );
-
-
-// ================================================================
-// ADD EXAM MODAL
-// ================================================================
-
-const addExamModal =
-    new bootstrap.Modal(
-        document.getElementById(
-            'addExamModal'
-        )
-    );
-
-
-openAddExamBtn.onclick =
-    function () {
-
-        if (!currentYear) {
-
-            alert(
-                'Select a year first.'
-            );
-
-            return;
-        }
-
-
-        if (!currentSession) {
-
-            alert(
-                'Select a session first.'
-            );
-
-            return;
-        }
-
-
-        document
-            .getElementById(
-                'modalExamYearText'
-            )
-            .textContent =
-            currentYear;
-
-
-        document
-            .getElementById(
-                'modalExamSessionText'
-            )
-            .textContent =
-            currentSession;
-
-
-        document
-            .getElementById(
-                'modalExamYearInput'
-            )
-            .value =
-            currentYear;
-
-
-        document
-            .getElementById(
-                'modalExamSessionInput'
-            )
-            .value =
-            currentSession;
-
-
-        addExamModal.show();
-
-    };
-
-
-// ================================================================
-// ADD EXAM FORM
-// ================================================================
-
-document
-    .getElementById('addExamForm')
-    .addEventListener(
-        'submit',
-        async function (event) {
-
-            event.preventDefault();
-
-
-            const exam =
-                this.exam.value.trim();
-
-
-            if (!exam) {
-
-                alert(
-                    'Enter exam title.'
-                );
-
-                return;
-            }
-
-
-            try {
-
-                const response =
-                    await fetch(
-                        '?action=add_exam',
-                        {
-                            method: 'POST',
-
-                            headers: {
-                                'Content-Type':
-                                    'application/json'
-                            },
-
-                            body:
-                                JSON.stringify({
-                                    year:
-                                        currentYear,
-
-                                    session:
-                                        currentSession,
-
-                                    exam
-                                })
-                        }
+                    alert(
+                        'Select a session first.'
                     );
 
-
-                const data =
-                    await response.json();
-
-
-                alert(
-                    data.message ||
-                    'Exam title added.'
-                );
-
-
-                if (!data.success) {
                     return;
                 }
 
 
-                this.reset();
-
-                addExamModal.hide();
-
-
-                await loadExamsFor(
-                    currentYear,
-                    currentSession
-                );
+                document
+                    .getElementById(
+                        'modalExamYearText'
+                    )
+                    .textContent =
+                    currentYear;
 
 
-            } catch (error) {
-
-                console.error(
-                    'add_exam:',
-                    error
-                );
-
-
-                alert(
-                    'Unable to add exam title.'
-                );
-
-            }
-
-        }
-    );
+                document
+                    .getElementById(
+                        'modalExamSessionText'
+                    )
+                    .textContent =
+                    currentSession;
 
 
-// ================================================================
-// SAVE SELECTION
-// ================================================================
-
-saveBtn.onclick =
-    async function () {
-
-        if (
-            !currentYear ||
-            !currentSession ||
-            !currentExam
-        ) {
-
-            return;
-        }
+                document
+                    .getElementById(
+                        'modalExamYearInput'
+                    )
+                    .value =
+                    currentYear;
 
 
-        if (
-            !confirm(
-                'Save this as the active academic session?'
-            )
-        ) {
-
-            return;
-        }
+                document
+                    .getElementById(
+                        'modalExamSessionInput'
+                    )
+                    .value =
+                    currentSession;
 
 
-        // --------------------------------------------------------
-        // Prevent accidental double-clicks.
-        // --------------------------------------------------------
+                addExamModal.show();
 
-        const originalHtml =
-            saveBtn.innerHTML;
+            };
 
 
-        saveBtn.disabled = true;
+        // ================================================================
+        // ADD EXAM FORM
+        // ================================================================
+
+        document
+            .getElementById('addExamForm')
+            .addEventListener(
+                'submit',
+                async function(event) {
+
+                    event.preventDefault();
 
 
-        saveBtn.innerHTML = `
+                    const exam =
+                        this.exam.value.trim();
+
+
+                    if (!exam) {
+
+                        alert(
+                            'Enter exam title.'
+                        );
+
+                        return;
+                    }
+
+
+                    try {
+
+                        const response =
+                            await fetch(
+                                '?action=add_exam', {
+                                    method: 'POST',
+
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+
+                                    body: JSON.stringify({
+                                        year: currentYear,
+
+                                        session: currentSession,
+
+                                        exam
+                                    })
+                                }
+                            );
+
+
+                        const data =
+                            await response.json();
+
+
+                        alert(
+                            data.message ||
+                            'Exam title added.'
+                        );
+
+
+                        if (!data.success) {
+                            return;
+                        }
+
+
+                        this.reset();
+
+                        addExamModal.hide();
+
+
+                        await loadExamsFor(
+                            currentYear,
+                            currentSession
+                        );
+
+
+                    } catch (error) {
+
+                        console.error(
+                            'add_exam:',
+                            error
+                        );
+
+
+                        alert(
+                            'Unable to add exam title.'
+                        );
+
+                    }
+
+                }
+            );
+
+
+        // ================================================================
+        // SAVE SELECTION
+        // ================================================================
+
+        saveBtn.onclick =
+            async function() {
+
+                if (
+                    !currentYear ||
+                    !currentSession ||
+                    !currentExam
+                ) {
+
+                    return;
+                }
+
+
+                if (
+                    !confirm(
+                        'Save this as the active academic session?'
+                    )
+                ) {
+
+                    return;
+                }
+
+
+                // --------------------------------------------------------
+                // Prevent accidental double-clicks.
+                // --------------------------------------------------------
+
+                const originalHtml =
+                    saveBtn.innerHTML;
+
+
+                saveBtn.disabled = true;
+
+
+                saveBtn.innerHTML = `
             <span
                 class="spinner-border spinner-border-sm me-2"
                 role="status"
@@ -4278,232 +4187,223 @@ saveBtn.onclick =
         `;
 
 
-        try {
+                try {
 
-            const response =
-                await fetch(
-                    '?action=save_selection',
-                    {
-                        method: 'POST',
+                    const response =
+                        await fetch(
+                            '?action=save_selection', {
+                                method: 'POST',
 
-                        headers: {
-                            'Content-Type':
-                                'application/json'
-                        },
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
 
-                        body:
-                            JSON.stringify({
-                                year:
-                                    currentYear,
+                                body: JSON.stringify({
+                                    year: currentYear,
 
-                                session:
-                                    currentSession,
+                                    session: currentSession,
 
-                                exam:
-                                    currentExam
-                            })
+                                    exam: currentExam
+                                })
+                            }
+                        );
+
+
+                    const data =
+                        await response.json();
+
+
+                    // ----------------------------------------------------
+                    // IMPORTANT:
+                    //
+                    // The server now returns success after updating the
+                    // EXISTING active row.
+                    //
+                    // No new academic year is inserted.
+                    // ----------------------------------------------------
+
+                    if (data.success) {
+
+                        alert(
+                            data.message ||
+                            'Academic session saved successfully.'
+                        );
+
+
+                        // ------------------------------------------------
+                        // Refresh the page only after successful save.
+                        // ------------------------------------------------
+
+                        window.location.reload();
+
+                        return;
+
                     }
-                );
 
 
-            const data =
-                await response.json();
-
-
-            // ----------------------------------------------------
-            // IMPORTANT:
-            //
-            // The server now returns success after updating the
-            // EXISTING active row.
-            //
-            // No new academic year is inserted.
-            // ----------------------------------------------------
-
-            if (data.success) {
-
-                alert(
-                    data.message ||
-                    'Academic session saved successfully.'
-                );
-
-
-                // ------------------------------------------------
-                // Refresh the page only after successful save.
-                // ------------------------------------------------
-
-                window.location.reload();
-
-                return;
-
-            }
-
-
-            alert(
-                'Save failed: ' +
-                (
-                    data.message ||
-                    'Unable to save selection.'
-                )
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                'save_selection:',
-                error
-            );
-
-
-            alert(
-                'Unable to save the academic session.'
-            );
-
-
-        } finally {
-
-            // ----------------------------------------------------
-            // If reload did not happen, restore button.
-            // ----------------------------------------------------
-
-            saveBtn.disabled =
-                !(
-                    currentYear &&
-                    currentSession &&
-                    currentExam
-                );
-
-            saveBtn.innerHTML =
-                originalHtml;
-
-        }
-
-    };
-
-
-// ================================================================
-// INITIAL STATE
-// ================================================================
-
-openAddSessionBtn.disabled =
-    true;
-
-openAddExamBtn.disabled =
-    true;
-
-saveBtn.disabled =
-    true;
-
-updateResultBox();
-
-attachEventListeners();
-
-
-// ================================================================
-// RESTORE ACTIVE SESSION
-// ================================================================
-
-if (
-    ACTIVE_SESSION &&
-    ACTIVE_SESSION.year
-) {
-
-    currentYear =
-        ACTIVE_SESSION.year;
-
-    currentSession =
-        ACTIVE_SESSION.session;
-
-    currentExam =
-        ACTIVE_SESSION.exam_title;
-
-
-    updateResultBox();
-
-
-    openAddSessionBtn.disabled =
-        false;
-
-
-    openAddExamBtn.disabled =
-        !currentSession;
-
-
-    loadSessions(
-        currentYear
-    ).then(
-        async function () {
-
-            // ----------------------------------------------------
-            // Restore session radio.
-            // ----------------------------------------------------
-
-            if (currentSession) {
-
-                const sessionRadio =
-                    Array.from(
-                        document.querySelectorAll(
-                            'input[name="sessionRadio"]'
+                    alert(
+                        'Save failed: ' +
+                        (
+                            data.message ||
+                            'Unable to save selection.'
                         )
-                    ).find(
-                        radio =>
-                            radio.value ===
-                            currentSession
                     );
 
 
-                if (sessionRadio) {
+                } catch (error) {
 
-                    sessionRadio.checked =
-                        true;
-
-
-                    await loadExamsFor(
-                        currentYear,
-                        currentSession
+                    console.error(
+                        'save_selection:',
+                        error
                     );
 
 
-                    // --------------------------------------------
-                    // Restore exam radio.
-                    // --------------------------------------------
+                    alert(
+                        'Unable to save the academic session.'
+                    );
 
-                    if (currentExam) {
 
-                        const examRadio =
+                } finally {
+
+                    // ----------------------------------------------------
+                    // If reload did not happen, restore button.
+                    // ----------------------------------------------------
+
+                    saveBtn.disabled = !(
+                        currentYear &&
+                        currentSession &&
+                        currentExam
+                    );
+
+                    saveBtn.innerHTML =
+                        originalHtml;
+
+                }
+
+            };
+
+
+        // ================================================================
+        // INITIAL STATE
+        // ================================================================
+
+        openAddSessionBtn.disabled =
+            true;
+
+        openAddExamBtn.disabled =
+            true;
+
+        saveBtn.disabled =
+            true;
+
+        updateResultBox();
+
+        attachEventListeners();
+
+
+        // ================================================================
+        // RESTORE ACTIVE SESSION
+        // ================================================================
+
+        if (
+            ACTIVE_SESSION &&
+            ACTIVE_SESSION.year
+        ) {
+
+            currentYear =
+                ACTIVE_SESSION.year;
+
+            currentSession =
+                ACTIVE_SESSION.session;
+
+            currentExam =
+                ACTIVE_SESSION.exam_title;
+
+
+            updateResultBox();
+
+
+            openAddSessionBtn.disabled =
+                false;
+
+
+            openAddExamBtn.disabled = !currentSession;
+
+
+            loadSessions(
+                currentYear
+            ).then(
+                async function() {
+
+                    // ----------------------------------------------------
+                    // Restore session radio.
+                    // ----------------------------------------------------
+
+                    if (currentSession) {
+
+                        const sessionRadio =
                             Array.from(
                                 document.querySelectorAll(
-                                    'input[name="examRadio"]'
+                                    'input[name="sessionRadio"]'
                                 )
                             ).find(
                                 radio =>
-                                    radio.value ===
-                                    currentExam
+                                radio.value ===
+                                currentSession
                             );
 
 
-                        if (examRadio) {
+                        if (sessionRadio) {
 
-                            examRadio.checked =
+                            sessionRadio.checked =
                                 true;
+
+
+                            await loadExamsFor(
+                                currentYear,
+                                currentSession
+                            );
+
+
+                            // --------------------------------------------
+                            // Restore exam radio.
+                            // --------------------------------------------
+
+                            if (currentExam) {
+
+                                const examRadio =
+                                    Array.from(
+                                        document.querySelectorAll(
+                                            'input[name="examRadio"]'
+                                        )
+                                    ).find(
+                                        radio =>
+                                        radio.value ===
+                                        currentExam
+                                    );
+
+
+                                if (examRadio) {
+
+                                    examRadio.checked =
+                                        true;
+
+                                }
+
+                            }
 
                         }
 
                     }
 
+
+                    updateResultBox();
+
                 }
-
-            }
-
-
-            updateResultBox();
+            );
 
         }
-    );
-
-}
-
-</script>
+    </script>
 
 </body>
 

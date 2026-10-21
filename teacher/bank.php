@@ -55,6 +55,12 @@ try {
     $active_institution_id = $universal_test_scope
         ? examcenterActiveInstitutionId($conn)
         : null;
+    $institution_profile = examcenterInstitutionProfile($conn);
+    $is_school_institution = $active_institution_id === null || in_array(
+        $institution_profile['category'],
+        ['primary_school', 'secondary_school'],
+        true
+    );
 
     if ($universal_test_scope && $active_institution_id === null) {
         $universal_test_scope = false;
@@ -88,7 +94,6 @@ try {
         ->fetch_assoc();
 
     $stmt->close();
-
 
     if (!$teacher) {
 
@@ -140,6 +145,16 @@ try {
 
     $stmt->close();
 
+    $assigned_courses = (!$is_school_institution && $active_institution_id)
+        ? examcenterTeacherCourseAssignments($conn, $teacher_id, $active_institution_id)
+        : [];
+    if (!$is_school_institution) {
+        $assigned_subjects = array_values(array_unique(array_map(
+            static fn($assignment) => trim((string)$assignment['course_name']),
+            $assigned_courses
+        )));
+    }
+
 
     if (empty($assigned_subjects)) {
         $error = "No subjects assigned to you. Contact your admin.";
@@ -155,7 +170,7 @@ try {
     $levels = [];
 
     $result = $conn->query("
-        SELECT id, level_code
+        SELECT id, level_code, class_group
         FROM academic_levels
         ORDER BY level_code ASC
     ");
@@ -165,6 +180,20 @@ try {
         while ($row = $result->fetch_assoc()) {
             $levels[] = $row;
         }
+    }
+    if (($institution_profile['category'] ?? '') === 'primary_school') {
+        $levels = array_values(array_filter($levels, static fn($level) => strtoupper((string)$level['class_group']) === 'PRIMARY' || preg_match('/^(P|PRI|PRIMARY)/i', (string)$level['level_code']) === 1));
+    } elseif (($institution_profile['category'] ?? '') === 'secondary_school') {
+        $levels = array_values(array_filter($levels, static fn($level) => in_array(strtoupper((string)$level['class_group']), ['JSS', 'SS'], true)));
+    }
+
+    $academic_periods = [];
+    if (!$is_school_institution && $active_institution_id) {
+        $stmt = $conn->prepare("SELECT id, name AS period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY name");
+        $stmt->bind_param('i', $active_institution_id);
+        $stmt->execute();
+        $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
     }
 
 
@@ -178,14 +207,19 @@ try {
     $universal_test_select = '';
     $universal_test_joins = '';
     $universal_test_condition = '';
+    $teacher_test_values = $is_school_institution
+        ? $assigned_subjects
+        : array_values(array_unique(array_map(static fn($assignment) => (int)$assignment['course_id'], $assigned_courses)));
+    $teacher_test_column = $is_school_institution ? 't.subject' : 't.course_id';
+    $teacher_test_types = str_repeat($is_school_institution ? 's' : 'i', count($teacher_test_values));
 
-    if (!empty($assigned_subjects)) {
+    if (!empty($teacher_test_values)) {
 
         $test_placeholders = implode(
             ',',
             array_fill(
                 0,
-                count($assigned_subjects),
+                count($teacher_test_values),
                 '?'
             )
         );
@@ -211,22 +245,19 @@ try {
                 al.level_code
                 {$universal_test_select}
             FROM tests t
-            JOIN academic_levels al
+            LEFT JOIN academic_levels al
                 ON al.id = t.academic_level_id
             {$universal_test_joins}
-            WHERE t.subject IN ($test_placeholders)
+            WHERE {$teacher_test_column} IN ($test_placeholders)
             {$universal_test_condition}
             ORDER BY t.created_at DESC
         ");
 
         if ($stmt) {
 
-            $types = str_repeat(
-                's',
-                count($assigned_subjects)
-            );
+            $types = $teacher_test_types;
 
-            $test_params = $assigned_subjects;
+            $test_params = $teacher_test_values;
 
             if ($universal_test_scope) {
                 $test_params[] = $active_institution_id;
@@ -286,14 +317,14 @@ try {
 
     if (
         $current_test_id > 0 &&
-        !empty($assigned_subjects)
+        !empty($teacher_test_values)
     ) {
 
         $test_placeholders = implode(
             ',',
             array_fill(
                 0,
-                count($assigned_subjects),
+                count($teacher_test_values),
                 '?'
             )
         );
@@ -309,28 +340,25 @@ try {
                 al.level_code
                 {$universal_test_select}
             FROM tests t
-            JOIN academic_levels al
+            LEFT JOIN academic_levels al
                 ON al.id = t.academic_level_id
             {$universal_test_joins}
             WHERE t.id = ?
-            AND t.subject IN ($test_placeholders)
+            AND {$teacher_test_column} IN ($test_placeholders)
             {$universal_test_condition}
             LIMIT 1
         ";
 
         $types =
             'i' .
-            str_repeat(
-                's',
-                count($assigned_subjects)
-            );
+            $teacher_test_types;
 
         $params = [
             $current_test_id
         ];
 
-        foreach ($assigned_subjects as $subject) {
-            $params[] = $subject;
+        foreach ($teacher_test_values as $testValue) {
+            $params[] = $testValue;
         }
 
         if ($universal_test_scope) {
@@ -438,9 +466,31 @@ try {
         $_GET['subject'] ?? ''
     );
 
+    $course_filter = (int)($_GET['course'] ?? 0);
+    $unit_filter = (int)($_GET['unit'] ?? 0);
+    $period_filter = (int)($_GET['period'] ?? 0);
+    $question_context_available = $active_institution_id !== null
+        && examcenterUniversalTableExists($conn, 'courses')
+        && examcenterUniversalTableExists($conn, 'organizational_units')
+        && examcenterUniversalTableExists($conn, 'academic_periods')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'course_id')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'organizational_unit_id')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'academic_period_id');
+    $question_context_select = $question_context_available
+        ? 'new_questions.course_id, new_questions.organizational_unit_id, new_questions.academic_period_id, co.name AS course_name, ou.name AS unit_name, ap.name AS period_name'
+        : 'NULL AS course_id, NULL AS organizational_unit_id, NULL AS academic_period_id, NULL AS course_name, NULL AS unit_name, NULL AS period_name';
+    $question_context_joins = $question_context_available
+        ? ' LEFT JOIN courses co ON co.id = new_questions.course_id LEFT JOIN organizational_units ou ON ou.id = new_questions.organizational_unit_id LEFT JOIN academic_periods ap ON ap.id = new_questions.academic_period_id'
+        : '';
+
     $type_filter = trim(
         $_GET['type'] ?? ''
     );
+
+    if (!$is_school_institution) {
+        $class_filter = '';
+        $subject_filter = '';
+    }
 
 
     $result = false;
@@ -466,16 +516,18 @@ try {
 
         $sql = "
             SELECT
-                id,
-                question_text,
-                class,
-                subject,
-                question_type,
-                created_at
+                new_questions.id,
+                new_questions.question_text,
+                new_questions.class,
+                new_questions.subject,
+                {$question_context_select},
+                new_questions.question_type,
+                new_questions.created_at
             FROM new_questions
-            WHERE teacher_id = ?
-            AND test_id IS NULL
-            AND subject IN ($placeholders)
+            {$question_context_joins}
+            WHERE new_questions.teacher_id = ?
+            AND new_questions.test_id IS NULL
+            AND new_questions.subject IN ($placeholders)
         ";
 
         $types =
@@ -504,7 +556,7 @@ try {
         if ($search !== '') {
 
             $sql .= "
-                AND question_text LIKE ?
+                AND new_questions.question_text LIKE ?
             ";
 
             $types .= 's';
@@ -525,7 +577,7 @@ try {
         if ($class_filter !== '') {
 
             $sql .= "
-                AND class = ?
+                AND new_questions.class = ?
             ";
 
             $types .= 's';
@@ -552,7 +604,7 @@ try {
             ) {
 
                 $sql .= "
-                    AND subject = ?
+                    AND new_questions.subject = ?
                 ";
 
                 $types .= 's';
@@ -565,6 +617,40 @@ try {
                     AND 1 = 0
                 ";
             }
+        }
+
+        if (!$is_school_institution && $question_context_available && $course_filter > 0) {
+            $course_allowed = false;
+            foreach ($assigned_courses as $assignment) {
+                if ((int)$assignment['course_id'] === $course_filter) $course_allowed = true;
+            }
+            if ($course_allowed) {
+                $sql .= ' AND new_questions.course_id = ?';
+                $types .= 'i';
+                $params[] = $course_filter;
+            } else {
+                $sql .= ' AND 1 = 0';
+            }
+        }
+
+        if (!$is_school_institution && $question_context_available && $unit_filter > 0) {
+            $unit_allowed = false;
+            foreach ($assigned_courses as $assignment) {
+                if ((int)($assignment['unit_id'] ?? 0) === $unit_filter) $unit_allowed = true;
+            }
+            if ($unit_allowed) {
+                $sql .= ' AND new_questions.organizational_unit_id = ?';
+                $types .= 'i';
+                $params[] = $unit_filter;
+            } else {
+                $sql .= ' AND 1 = 0';
+            }
+        }
+
+        if (!$is_school_institution && $question_context_available && $period_filter > 0) {
+            $sql .= ' AND new_questions.academic_period_id = ?';
+            $types .= 'i';
+            $params[] = $period_filter;
         }
 
 
@@ -592,7 +678,7 @@ try {
             ) {
 
                 $sql .= "
-                    AND question_type = ?
+                    AND new_questions.question_type = ?
                 ";
 
                 $types .= 's';
@@ -1225,6 +1311,11 @@ try {
         <?php unset($_SESSION['error']); ?>
 
     <?php endif; ?>
+    <?php if (isset($is_school_institution) && !$is_school_institution && empty($question_context_available)): ?>
+        <div class="alert alert-warning shadow-sm m-3" role="alert">
+            Apply the ADDED question-bank migration in <code>help.txt</code> to filter and display course, unit, and period details for reusable questions.
+        </div>
+    <?php endif; ?>
     <!-- ============================================================
      SIDEBAR
 ============================================================ -->
@@ -1407,9 +1498,7 @@ try {
 
                     <div class="card-body">
 
-                        <h6>
-                            Subjects
-                        </h6>
+                        <h6><?= $is_school_institution ? 'Subjects' : 'Courses' ?></h6>
 
                         <h2>
                             <?= count(
@@ -1461,6 +1550,7 @@ try {
                         </div>
 
 
+                        <?php if ($is_school_institution): ?>
                         <!-- CLASS -->
 
                         <div class="col-md-2">
@@ -1550,6 +1640,36 @@ try {
 
                         </div>
 
+
+                        <?php else: ?>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Course</label>
+                            <select class="form-select" name="course">
+                                <option value="">All Courses</option>
+                                <?php foreach ($assigned_courses as $assignment): ?>
+                                    <option value="<?= (int)$assignment['course_id'] ?>" <?= $course_filter === (int)$assignment['course_id'] ? 'selected' : '' ?>><?= htmlspecialchars($assignment['course_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Unit</label>
+                            <select class="form-select" name="unit">
+                                <option value="">All Units</option>
+                                <?php foreach ($assigned_courses as $assignment): if (empty($assignment['unit_id'])) continue; ?>
+                                    <option value="<?= (int)$assignment['unit_id'] ?>" <?= $unit_filter === (int)$assignment['unit_id'] ? 'selected' : '' ?>><?= htmlspecialchars($assignment['unit_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small fw-semibold">Period</label>
+                            <select class="form-select" name="period">
+                                <option value="">All Periods</option>
+                                <?php foreach ($academic_periods as $period): ?>
+                                    <option value="<?= (int)$period['id'] ?>" <?= $period_filter === (int)$period['id'] ? 'selected' : '' ?>><?= htmlspecialchars($period['period_type'] . ': ' . $period['period_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
 
                         <!-- TYPE -->
 
@@ -1724,11 +1844,11 @@ try {
                                     </th>
 
                                     <th>
-                                        Class
+                                        <?= $is_school_institution ? 'Class' : 'Unit' ?>
                                     </th>
 
                                     <th>
-                                        Subject
+                                        <?= $is_school_institution ? 'Subject' : 'Course' ?>
                                     </th>
 
                                     <th>
@@ -1810,7 +1930,7 @@ try {
                                             <td>
 
                                                 <?= htmlspecialchars(
-                                                    $row['class']
+                                                    ($is_school_institution ? $row['class'] : ($row['unit_name'] ?? $row['class']))
                                                 ); ?>
 
                                             </td>
@@ -1821,7 +1941,7 @@ try {
                                             <td>
 
                                                 <?= htmlspecialchars(
-                                                    $row['subject']
+                                                    ($is_school_institution ? $row['subject'] : ($row['course_name'] ?? $row['subject']))
                                                 ); ?>
 
                                             </td>

@@ -6,6 +6,39 @@
  * -------------------------------------------------------------------------
  */
 
+if (!function_exists('ensureAuditLogsTable')) {
+    function ensureAuditLogsTable(mysqli $conn): void
+    {
+        static $ready = false;
+
+        if ($ready) {
+            return;
+        }
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                admin_id INT NULL,
+                username VARCHAR(150) NOT NULL DEFAULT 'Unknown',
+                module VARCHAR(100) NOT NULL DEFAULT 'System',
+                action VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
+                description TEXT NOT NULL,
+                ip_address VARCHAR(45) NULL,
+                computer_name VARCHAR(255) NULL,
+                user_agent TEXT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_audit_logs_created_at (created_at),
+                INDEX idx_audit_logs_admin_id (admin_id),
+                INDEX idx_audit_logs_module (module),
+                INDEX idx_audit_logs_action (action)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+              COLLATE=utf8mb4_unicode_ci
+        ");
+
+        $ready = true;
+    }
+}
+
 if (!function_exists('getClientIP')) {
     function getClientIP()
     {
@@ -81,6 +114,8 @@ if (!function_exists('logAudit')) {
     string $action = "SYSTEM"
 ) {
     try {
+        ensureAuditLogsTable($conn);
+
         $username = getAuditUsername();
         $ip = getClientIP();
         $computer = getComputerName();

@@ -68,10 +68,14 @@ $tests = [];
 
 $teacher = null;
 $assigned_subjects = [];
+$assigned_courses = [];
+$institution_profile = ['id' => null, 'category' => 'other', 'type_name' => ''];
+$is_school_institution = true;
 $levels = [];
 $test_titles = [];
 $academic_years = [];
 $universal_context_available = false;
+$question_bank_context_storage_available = false;
 $universal_institution_id = null;
 $universal_courses = [];
 $organizational_units = [];
@@ -130,11 +134,28 @@ try {
         exit();
     }
 
-    $universal_institution_id = examcenterActiveInstitutionId($conn);
+    $institution_profile = examcenterInstitutionProfile($conn);
+    $universal_institution_id = $institution_profile['id'];
+    $is_school_institution = $universal_institution_id === null || in_array(
+        $institution_profile['category'],
+        ['primary_school', 'secondary_school'],
+        true
+    );
     $universal_context_available = $universal_institution_id !== null
         && examcenterUniversalTableExists($conn, 'courses')
         && examcenterUniversalTableExists($conn, 'organizational_units')
-        && examcenterUniversalTableExists($conn, 'academic_periods');
+        && examcenterUniversalTableExists($conn, 'academic_periods')
+        && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
+        && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+    if (!$universal_context_available) {
+        $is_school_institution = true;
+    }
+    $question_bank_context_storage_available = $universal_institution_id !== null
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'course_id')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'organizational_unit_id')
+        && examcenterUniversalColumnExists($conn, 'new_questions', 'academic_period_id');
 
     if ($universal_context_available) {
         $institutionId = (int)$universal_institution_id;
@@ -201,6 +222,14 @@ try {
 
     $stmt->close();
 
+    if (!$is_school_institution && $universal_institution_id !== null) {
+        $assigned_courses = examcenterTeacherCourseAssignments($conn, $teacher_id, $universal_institution_id);
+        $assigned_subjects = array_values(array_unique(array_map(
+            static fn($assignment) => trim((string)$assignment['course_name']),
+            $assigned_courses
+        )));
+    }
+
     if (empty($assigned_subjects)) {
         $error = "No subjects assigned to you. Contact your admin.";
     }
@@ -226,6 +255,11 @@ try {
         while ($row = $result->fetch_assoc()) {
             $levels[] = $row;
         }
+    }
+    if (($institution_profile['category'] ?? '') === 'primary_school') {
+        $levels = array_values(array_filter($levels, static fn($level) => strtoupper((string)$level['class_group']) === 'PRIMARY' || preg_match('/^(P|PRI|PRIMARY)/i', (string)$level['level_code']) === 1));
+    } elseif (($institution_profile['category'] ?? '') === 'secondary_school') {
+        $levels = array_values(array_filter($levels, static fn($level) => in_array(strtoupper((string)$level['class_group']), ['JSS', 'SS'], true)));
     }
 
     /*
@@ -276,19 +310,25 @@ try {
     $universal_test_columns = $universal_context_available
         ? ", t.institution_id, t.organizational_unit_id, t.programme_id,
              t.programme_level_id, t.academic_period_id, t.course_id,
-             t.assessment_group_id, ou.name AS unit_name, c.course_name, ap.name AS period_name"
+             t.assessment_group_id, ou.name AS unit_name, c.name AS course_name, ap.name AS period_name"
         : '';
     $universal_test_joins = $universal_context_available
         ? " LEFT JOIN organizational_units ou ON ou.id = t.organizational_unit_id
             LEFT JOIN courses c ON c.id = t.course_id
             LEFT JOIN academic_periods ap ON ap.id = t.academic_period_id"
         : '';
+    $institution_test_scope = $universal_context_available ? ' AND t.institution_id = ?' : '';
+    $teacher_test_values = $is_school_institution
+        ? $assigned_subjects
+        : array_values(array_unique(array_map(static fn($assignment) => (int)$assignment['course_id'], $assigned_courses)));
+    $teacher_test_column = $is_school_institution ? 't.subject' : 't.course_id';
+    $teacher_test_types = str_repeat($is_school_institution ? 's' : 'i', count($teacher_test_values));
 
-    if (!empty($assigned_subjects)) {
+    if (!empty($teacher_test_values)) {
 
         $placeholders = implode(
             ',',
-            array_fill(0, count($assigned_subjects), '?')
+            array_fill(0, count($teacher_test_values), '?')
         );
 
         $stmt = $conn->prepare("
@@ -303,10 +343,11 @@ try {
                 al.level_code,
                 al.class_group
             FROM tests t
-            INNER JOIN academic_levels al
+            LEFT JOIN academic_levels al
                 ON al.id = t.academic_level_id
             {$universal_test_joins}
-            WHERE t.subject IN ($placeholders)
+            WHERE {$teacher_test_column} IN ($placeholders)
+              {$institution_test_scope}
             ORDER BY t.created_at DESC
         ");
 
@@ -314,12 +355,13 @@ try {
             throw new Exception("Unable to fetch tests.");
         }
 
-        $types = str_repeat('s', count($assigned_subjects));
-
-        $stmt->bind_param(
-            $types,
-            ...$assigned_subjects
-        );
+        $types = $teacher_test_types;
+        $test_params = $teacher_test_values;
+        if ($universal_context_available) {
+            $test_params[] = (int)$universal_institution_id;
+            $types .= 'i';
+        }
+        $stmt->bind_param($types, ...$test_params);
 
         $stmt->execute();
 
@@ -333,13 +375,13 @@ try {
     | CURRENT TEST
     |--------------------------------------------------------------------------
     */
-    if (isset($_SESSION['current_test_id']) && !empty($assigned_subjects)) {
+    if (isset($_SESSION['current_test_id']) && !empty($teacher_test_values)) {
 
         $test_id = (int)$_SESSION['current_test_id'];
 
         $placeholders = implode(
             ',',
-            array_fill(0, count($assigned_subjects), '?')
+            array_fill(0, count($teacher_test_values), '?')
         );
 
         $stmt = $conn->prepare("
@@ -354,11 +396,12 @@ try {
                 al.level_code,
                 al.class_group
             FROM tests t
-            INNER JOIN academic_levels al
+            LEFT JOIN academic_levels al
                 ON al.id = t.academic_level_id
             {$universal_test_joins}
             WHERE t.id = ?
-              AND t.subject IN ($placeholders)
+              AND {$teacher_test_column} IN ($placeholders)
+              {$institution_test_scope}
             LIMIT 1
         ");
 
@@ -368,13 +411,14 @@ try {
 
         $params = array_merge(
             [$test_id],
-            $assigned_subjects
+            $teacher_test_values
         );
 
-        $types = 'i' . str_repeat(
-            's',
-            count($assigned_subjects)
-        );
+        $types = 'i' . $teacher_test_types;
+        if ($universal_context_available) {
+            $params[] = (int)$universal_institution_id;
+            $types .= 'i';
+        }
 
         $stmt->bind_param(
             $types,
@@ -1384,7 +1428,7 @@ try {
                                         class="form-label"
                                         for="year"
                                     >
-                                        Academic Year
+                                        <?= $is_school_institution ? 'Academic Year' : 'Cohort / Year' ?>
                                     </label>
 
                                     <select
@@ -1395,7 +1439,7 @@ try {
                                     >
 
                                         <option value="">
-                                            Select Academic Year
+                                            <?= $is_school_institution ? 'Select Academic Year' : 'Select Cohort / Year' ?>
                                         </option>
 
                                         <?php foreach ($academic_years as $year): ?>
@@ -1447,13 +1491,13 @@ try {
 
                                 </div>
 
-                                <?php if ($universal_context_available): ?>
+                                <?php if ($universal_context_available && !$is_school_institution): ?>
                                     <div class="setup-col-3">
                                         <label class="form-label" for="course_id">Course</label>
-                                        <select class="form-select" name="course_id" id="course_id">
-                                            <option value="">Optional course</option>
-                                            <?php foreach ($universal_courses as $course): ?>
-                                                <option value="<?= (int)$course['id'] ?>">
+                                        <select class="form-select" name="course_id" id="course_id" required>
+                                            <option value="">Select course</option>
+                                            <?php foreach ($assigned_courses as $course): ?>
+                                                <option value="<?= (int)$course['course_id'] ?>">
                                                     <?= e(($course['course_code'] ? $course['course_code'] . ' - ' : '') . $course['course_name']) ?>
                                                 </option>
                                             <?php endforeach; ?>
@@ -1461,21 +1505,25 @@ try {
                                     </div>
 
                                     <div class="setup-col-3">
-                                        <label class="form-label" for="organizational_unit_id">Assessment Unit</label>
+                                        <label class="form-label" for="organizational_unit_id">Organizational Unit</label>
                                         <select class="form-select" name="organizational_unit_id" id="organizational_unit_id">
-                                            <option value="">Optional class, department, faculty or team</option>
-                                            <?php foreach ($organizational_units as $unit): ?>
-                                                <option value="<?= (int)$unit['id'] ?>">
-                                                    <?= e($unit['type_name'] . ': ' . $unit['unit_name'] . ($unit['unit_code'] ? ' (' . $unit['unit_code'] . ')' : '')) ?>
+                                            <option value="">Optional unit</option>
+                                            <?php foreach ($assigned_courses as $assignment): ?>
+                                                <?php if (!empty($assignment['unit_id'])): ?>
+                                                <option value="<?= (int)$assignment['unit_id'] ?>">
+                                                    <?= e($assignment['unit_name']) ?>
                                                 </option>
+                                                <?php endif; ?>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
+                                <?php endif; ?>
 
+                                <?php if ($universal_context_available): ?>
                                     <div class="setup-col-3">
-                                        <label class="form-label" for="academic_period_id">Academic Period</label>
-                                        <select class="form-select" name="academic_period_id" id="academic_period_id">
-                                            <option value="">Optional period</option>
+                                        <label class="form-label" for="academic_period_id"><?= $is_school_institution ? 'Term / Academic Period' : 'Academic Period' ?></label>
+                                        <select class="form-select" name="academic_period_id" id="academic_period_id" <?= $is_school_institution ? '' : 'required' ?>>
+                                            <option value=""><?= $is_school_institution ? 'Optional term' : 'Select period' ?></option>
                                             <?php foreach ($academic_periods as $period): ?>
                                                 <option value="<?= (int)$period['id'] ?>">
                                                     <?= e($period['period_type'] . ': ' . $period['period_name']) ?>
@@ -1486,6 +1534,7 @@ try {
                                 <?php endif; ?>
 
 
+                                <?php if ($is_school_institution): ?>
                                 <div class="setup-col-2">
 
                                     <label
@@ -1554,6 +1603,7 @@ try {
                                     </select>
 
                                 </div>
+                                <?php endif; ?>
 
 
                                 <div class="setup-col-2">
@@ -1603,6 +1653,7 @@ try {
                              UPLOAD TEST
                         ================================================== -->
 
+                        <?php if ($is_school_institution): ?>
                         <div class="form-section mt-5">
 
                             <div class="form-section-title">
@@ -1711,6 +1762,7 @@ try {
                             </div>
 
                         </div>
+                        <?php endif; ?>
 
 
                         <!-- =================================================
@@ -1762,7 +1814,7 @@ try {
                                                 <?= e(
                                                     $test['title']
                                                     . ' — '
-                                                    . $test['level_code']
+                                                    . ($is_school_institution ? ($test['level_code'] ?? '') : ($test['unit_name'] ?? ''))
                                                     . ' / '
                                                     . $test['subject']
                                                     . ' / '
@@ -1861,6 +1913,12 @@ try {
 
                             <?php if ($isBankMode): ?>
 
+                                <?php if (!$is_school_institution && !$question_bank_context_storage_available): ?>
+                                    <div class="alert alert-warning" role="alert">
+                                        Apply the ADDED question-bank migration in <code>help.txt</code> before saving universal course, unit, and period details.
+                                    </div>
+                                <?php endif; ?>
+
                                 <!-- BANK DETAILS -->
 
                                 <div class="form-section">
@@ -1875,6 +1933,7 @@ try {
 
                                     <div class="row g-3">
 
+                                        <?php if ($is_school_institution): ?>
                                         <div class="col-md-4">
 
                                             <label
@@ -1943,7 +2002,35 @@ try {
                                             </select>
 
                                         </div>
-
+                                        <?php else: ?>
+                                        <div class="col-md-4">
+                                            <label class="form-label" for="bankCourse">Course</label>
+                                            <select class="form-select" name="course_id" id="bankCourse" required>
+                                                <option value="">Select course</option>
+                                                <?php foreach ($assigned_courses as $assignment): ?>
+                                                    <option value="<?= (int)$assignment['course_id'] ?>" <?= selected($edit_question['course_id'] ?? '', $assignment['course_id']) ?>><?= e($assignment['course_name']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label" for="bankUnit">Organizational Unit</label>
+                                            <select class="form-select" name="organizational_unit_id" id="bankUnit">
+                                                <option value="">Optional unit</option>
+                                                <?php foreach ($assigned_courses as $assignment): if (empty($assignment['unit_id'])) continue; ?>
+                                                    <option value="<?= (int)$assignment['unit_id'] ?>" <?= selected($edit_question['organizational_unit_id'] ?? '', $assignment['unit_id']) ?>><?= e($assignment['unit_name']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label" for="bankPeriod">Academic Period</label>
+                                            <select class="form-select" name="academic_period_id" id="bankPeriod">
+                                                <option value="">Optional period</option>
+                                                <?php foreach ($academic_periods as $period): ?>
+                                                    <option value="<?= (int)$period['id'] ?>" <?= selected($edit_question['academic_period_id'] ?? '', $period['id']) ?>><?= e($period['period_type'] . ': ' . $period['period_name']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <?php endif; ?>
 
                                         <div class="col-md-4">
 
@@ -2119,7 +2206,7 @@ try {
                              BANK BULK UPLOAD
                         ================================================== -->
 
-                        <?php if ($isBankMode && !$edit_question): ?>
+                        <?php if ($isBankMode && $is_school_institution && !$edit_question): ?>
 
                             <div class="form-section mt-5 pt-4 border-top">
 

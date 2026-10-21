@@ -70,22 +70,26 @@ try {
 
     $activity = "Admin {$admin['username']} accessed view questions page.";
 
-    $stmt = $conn->prepare("
-        INSERT INTO activities_log
-        (activity, admin_id, ip_address, user_agent, created_at)
-        VALUES (?, ?, ?, ?, NOW())
-    ");
+    if (examcenterUniversalTableExists($conn, 'activities_log')) {
+        try {
+            $stmt = $conn->prepare("
+                INSERT INTO activities_log
+                (activity, admin_id, ip_address, user_agent, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            ");
 
-    if ($stmt) {
-        $stmt->bind_param(
-            "siss",
-            $activity,
-            $admin_id,
-            $ip_address,
-            $user_agent
-        );
-        $stmt->execute();
-        $stmt->close();
+            $stmt->bind_param(
+                "siss",
+                $activity,
+                $admin_id,
+                $ip_address,
+                $user_agent
+            );
+            $stmt->execute();
+            $stmt->close();
+        } catch (Throwable $logError) {
+            error_log("View questions activity log failed: " . $logError->getMessage());
+        }
     }
 
 } catch (Exception $e) {
@@ -203,22 +207,26 @@ if (
             */
             $activity = "Admin deleted question ID: {$question_id} ({$question_type})";
 
-            $stmt = $conn->prepare("
-                INSERT INTO activities_log
-                (activity, admin_id, ip_address, user_agent, created_at)
-                VALUES (?, ?, ?, ?, NOW())
-            ");
+            if (examcenterUniversalTableExists($conn, 'activities_log')) {
+                try {
+                    $stmt = $conn->prepare("
+                        INSERT INTO activities_log
+                        (activity, admin_id, ip_address, user_agent, created_at)
+                        VALUES (?, ?, ?, ?, NOW())
+                    ");
 
-            if ($stmt) {
-                $stmt->bind_param(
-                    "siss",
-                    $activity,
-                    $admin_id,
-                    $ip_address,
-                    $user_agent
-                );
-                $stmt->execute();
-                $stmt->close();
+                    $stmt->bind_param(
+                        "siss",
+                        $activity,
+                        $admin_id,
+                        $ip_address,
+                        $user_agent
+                    );
+                    $stmt->execute();
+                    $stmt->close();
+                } catch (Throwable $logError) {
+                    error_log("Question deletion activity log failed: " . $logError->getMessage());
+                }
             }
 
             $conn->commit();
@@ -306,8 +314,8 @@ $count_query = "
     JOIN tests t
         ON q.test_id = t.id
     LEFT JOIN classes c
-        ON q.class = c.class_name
-        OR q.class = CAST(c.id AS CHAR)
+        ON q.class COLLATE utf8mb4_unicode_ci = c.class_name COLLATE utf8mb4_unicode_ci
+        OR q.class COLLATE utf8mb4_unicode_ci = CAST(c.id AS CHAR) COLLATE utf8mb4_unicode_ci
     " . ($universal_questions_available ? "
     LEFT JOIN organizational_units ou
         ON ou.id = t.organizational_unit_id
@@ -333,8 +341,8 @@ $select_query = "
     JOIN tests t
         ON q.test_id = t.id
     LEFT JOIN classes c
-        ON q.class = c.class_name
-        OR q.class = CAST(c.id AS CHAR)
+        ON q.class COLLATE utf8mb4_unicode_ci = c.class_name COLLATE utf8mb4_unicode_ci
+        OR q.class COLLATE utf8mb4_unicode_ci = CAST(c.id AS CHAR) COLLATE utf8mb4_unicode_ci
     " . ($universal_questions_available ? "
     LEFT JOIN organizational_units ou
         ON ou.id = t.organizational_unit_id

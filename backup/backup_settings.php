@@ -6,6 +6,7 @@ require_once "backup_functions.php";
 require_once "../includes/audit.php";
 
 $conn = Database::connection();
+ensureBackupSettingsTable($conn);
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../login.php");

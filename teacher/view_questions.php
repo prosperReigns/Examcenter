@@ -206,6 +206,12 @@ try {
     }
 
     $active_institution_id = examcenterActiveInstitutionId($conn);
+    $institution_profile = examcenterInstitutionProfile($conn);
+    $is_school_institution = $active_institution_id === null || in_array(
+        $institution_profile['category'],
+        ['primary_school', 'secondary_school'],
+        true
+    );
     $universal_questions_available = $active_institution_id !== null
         && examcenterUniversalTableExists($conn, 'organizational_units')
         && examcenterUniversalTableExists($conn, 'courses')
@@ -213,7 +219,11 @@ try {
         && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
         && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
         && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
-        && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+        && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id')
+        && examcenterUniversalColumnExists($conn, 'results', 'academic_period_id');
+    if (!$universal_questions_available) {
+        $is_school_institution = true;
+    }
 
     $universal_joins = $universal_questions_available ? "
         LEFT JOIN organizational_units ou
@@ -229,6 +239,9 @@ try {
     $universal_class = $universal_questions_available
         ? 'COALESCE(ou.name, al.level_code)'
         : 'al.level_code';
+    $universal_result_select = $universal_questions_available
+        ? ', ou.name AS unit_name, co.name AS course_name, ap.name AS period_name, t.course_id, t.organizational_unit_id, t.academic_period_id'
+        : '';
 
     $organizational_units = [];
     $courses = [];
@@ -289,6 +302,16 @@ try {
 
     $stmt->close();
 
+    $assigned_courses = (!$is_school_institution && $active_institution_id)
+        ? examcenterTeacherCourseAssignments($conn, $teacher_id, $active_institution_id)
+        : [];
+    if (!$is_school_institution) {
+        $assigned_subjects = array_values(array_unique(array_map(
+            static fn($assignment) => trim((string)$assignment['course_name']),
+            $assigned_courses
+        )));
+    }
+
 
     $error = '';
     $success = '';
@@ -316,6 +339,18 @@ try {
     $unit_filter = (int) ($_GET['unit'] ?? 0);
     $course_filter = (int) ($_GET['course'] ?? 0);
     $period_filter = (int) ($_GET['period'] ?? 0);
+    if (!$is_school_institution) {
+        $class_filter = '';
+        $subject_filter = '';
+    } elseif (($institution_profile['category'] ?? '') === 'primary_school'
+        && $class_filter !== ''
+        && preg_match('/^(P|PRI|PRIMARY)/i', $class_filter) !== 1) {
+        $class_filter = '';
+    } elseif (($institution_profile['category'] ?? '') === 'secondary_school'
+        && $class_filter !== ''
+        && preg_match('/^(JSS|SS)/i', $class_filter) !== 1) {
+        $class_filter = '';
+    }
 
 
     /* =====================================================
@@ -339,23 +374,24 @@ try {
        SUBJECT ACCESS CONDITION
     ===================================================== */
 
-    if (!empty($assigned_subjects)) {
-
-        $subject_conditions = [];
-
-        foreach ($assigned_subjects as $subject) {
-            $subject_conditions[] =
-                "t.subject LIKE CONCAT(?, '%')";
+    $subject_conditions = [];
+    $subject_params = [];
+    $subject_param_types = '';
+    if (!$is_school_institution) {
+        foreach ($assigned_courses as $assignment) {
+            $subject_conditions[] = 't.course_id = ?';
+            $subject_params[] = (int)$assignment['course_id'];
+            $subject_param_types .= 'i';
         }
-
-        $subject_where =
-            '(' .
-            implode(
-                ' OR ',
-                $subject_conditions
-            ) .
-            ')';
-
+    } else {
+        foreach ($assigned_subjects as $subject) {
+            $subject_conditions[] = "t.subject LIKE CONCAT(?, '%')";
+            $subject_params[] = $subject;
+            $subject_param_types .= 's';
+        }
+    }
+    if ($subject_conditions) {
+        $subject_where = '(' . implode(' OR ', $subject_conditions) . ')';
     } else {
 
         /*
@@ -391,6 +427,11 @@ try {
 
             $export_student =
                 trim($_POST['student_name'] ?? '');
+
+            if (!$is_school_institution) {
+                $export_class = '';
+                $export_subject = '';
+            }
 
 
             /*
@@ -431,6 +472,7 @@ try {
                         )
                         LIMIT 1
                     ) AS stream_name
+                    {$universal_result_select}
 
                 FROM results r
 
@@ -440,21 +482,21 @@ try {
                 INNER JOIN tests t
                     ON r.test_id = t.id
 
-                INNER JOIN academic_levels al
+                LEFT JOIN academic_levels al
                     ON al.id = t.academic_level_id
+                {$universal_joins}
 
                 WHERE {$subject_where}
             ";
 
 
-            $export_params =
-                $assigned_subjects;
-
-            $export_types =
-                str_repeat(
-                    's',
-                    count($assigned_subjects)
-                );
+            $export_params = $subject_params;
+            $export_types = $subject_param_types;
+            if ($universal_questions_available) {
+                $export_query .= ' AND t.institution_id = ?';
+                $export_params[] = $active_institution_id;
+                $export_types .= 'i';
+            }
 
 
             if ($export_title !== '') {
@@ -644,9 +686,9 @@ try {
 
             $headers = [
                 ['Student', 2000],
-                ['Class', 1500],
+                [$is_school_institution ? 'Class' : 'Unit', 1500],
                 ['Test Title', 2000],
-                ['Subject', 1500],
+                [$is_school_institution ? 'Subject' : 'Course', 1500],
                 ['Score', 1000],
                 ['Percentage', 1000],
                 ['Date', 1500],
@@ -684,8 +726,9 @@ try {
                     );
 
 
-                $class_name =
-                    formatClassName(
+                $class_name = !$is_school_institution
+                    ? (string)($result['unit_name'] ?? $result['course_name'] ?? '')
+                    : formatClassName(
                         $result['academic_level'] ?? '',
                         $result['stream_name'] ?? ''
                     );
@@ -718,7 +761,7 @@ try {
                 $table
                     ->addCell(1500)
                     ->addText(
-                        $result['subject']
+                        !$is_school_institution ? ($result['course_name'] ?? $result['subject']) : $result['subject']
                     );
 
 
@@ -923,9 +966,9 @@ try {
         INNER JOIN tests t
             ON r.test_id = t.id
 
-        INNER JOIN academic_levels al
+        LEFT JOIN academic_levels al
             ON al.id = t.academic_level_id
-
+        {$universal_joins}
     ";
 
 
@@ -959,6 +1002,7 @@ try {
             al.level_code AS academic_level,
 
             al.class_group
+            {$universal_result_select}
 
         {$base_from}
 
@@ -967,14 +1011,16 @@ try {
     ";
 
 
-    $params =
-        $assigned_subjects;
+    $params = $subject_params;
+    $types = $subject_param_types;
 
-    $types =
-        str_repeat(
-            's',
-            count($assigned_subjects)
-        );
+    if ($universal_questions_available && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')) {
+        $scopeCondition = ' AND t.institution_id = ?';
+        $count_query .= $scopeCondition;
+        $select_query .= $scopeCondition;
+        $params[] = $active_institution_id;
+        $types .= 'i';
+    }
 
 
     /* =====================================================
@@ -1053,6 +1099,25 @@ try {
             $year_filter;
 
         $types .= 's';
+    }
+
+    if ($universal_questions_available && $unit_filter > 0) {
+        $count_query .= ' AND t.organizational_unit_id = ?';
+        $select_query .= ' AND t.organizational_unit_id = ?';
+        $params[] = $unit_filter;
+        $types .= 'i';
+    }
+    if ($universal_questions_available && $course_filter > 0) {
+        $count_query .= ' AND t.course_id = ?';
+        $select_query .= ' AND t.course_id = ?';
+        $params[] = $course_filter;
+        $types .= 'i';
+    }
+    if ($universal_questions_available && $period_filter > 0) {
+        $count_query .= ' AND COALESCE(r.academic_period_id, t.academic_period_id) = ?';
+        $select_query .= ' AND COALESCE(r.academic_period_id, t.academic_period_id) = ?';
+        $params[] = $period_filter;
+        $types .= 'i';
     }
 
 
@@ -1233,7 +1298,7 @@ try {
 
             FROM tests t
 
-            INNER JOIN academic_levels al
+            LEFT JOIN academic_levels al
                 ON al.id =
                     t.academic_level_id
 
@@ -1254,16 +1319,12 @@ try {
 
         if ($stmt) {
 
-            $filter_types =
-                str_repeat(
-                    's',
-                    count($assigned_subjects)
-                );
+            $filter_types = $subject_param_types;
 
 
             $stmt->bind_param(
                 $filter_types,
-                ...$assigned_subjects
+                ...$subject_params
             );
 
 
@@ -1310,16 +1371,12 @@ try {
 
         if ($stmt) {
 
-            $filter_types =
-                str_repeat(
-                    's',
-                    count($assigned_subjects)
-                );
+            $filter_types = $subject_param_types;
 
 
             $stmt->bind_param(
                 $filter_types,
-                ...$assigned_subjects
+                ...$subject_params
             );
 
 
@@ -1370,16 +1427,12 @@ try {
 
         if ($stmt) {
 
-            $filter_types =
-                str_repeat(
-                    's',
-                    count($assigned_subjects)
-                );
+            $filter_types = $subject_param_types;
 
 
             $stmt->bind_param(
                 $filter_types,
-                ...$assigned_subjects
+                ...$subject_params
             );
 
 
@@ -1430,16 +1483,12 @@ try {
 
         if ($stmt) {
 
-            $filter_types =
-                str_repeat(
-                    's',
-                    count($assigned_subjects)
-                );
+            $filter_types = $subject_param_types;
 
 
             $stmt->bind_param(
                 $filter_types,
-                ...$assigned_subjects
+                ...$subject_params
             );
 
 
@@ -2742,6 +2791,7 @@ body {
             <div class="row g-3">
 
 
+                <?php if ($is_school_institution): ?>
                 <!-- CLASS -->
 
                 <div class="col-xl-2 col-md-4">
@@ -2774,7 +2824,11 @@ body {
                                 );
                             ?>
 
-                            <?php if ($level !== ''): ?>
+                            <?php if ($is_school_institution && $level !== '' && (
+                                (($institution_profile['category'] ?? '') === 'primary_school' && preg_match('/^(P|PRI|PRIMARY)/i', $level) === 1)
+                                || (($institution_profile['category'] ?? '') === 'secondary_school' && preg_match('/^(JSS|SS)/i', $level) === 1)
+                                || !in_array(($institution_profile['category'] ?? ''), ['primary_school', 'secondary_school'], true)
+                            )): ?>
 
                                 <option
                                     value="<?= e($level) ?>"
@@ -2834,6 +2888,37 @@ body {
 
                 </div>
 
+
+                <?php else: ?>
+                <div class="col-xl-2 col-md-4">
+                    <label class="form-label" for="courseFilter">Course</label>
+                    <select name="course" id="courseFilter" class="form-select">
+                        <option value="">All Courses</option>
+                        <?php foreach ($courses as $course): ?>
+                            <?php $allowedCourse = false; foreach ($assigned_courses as $assignment) if ((int)$assignment['course_id'] === (int)$course['id']) $allowedCourse = true; if (!$allowedCourse) continue; ?>
+                            <option value="<?= (int)$course['id'] ?>" <?= $course_filter === (int)$course['id'] ? 'selected' : '' ?>><?= e($course['course_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-md-4">
+                    <label class="form-label" for="unitFilter">Organizational Unit</label>
+                    <select name="unit" id="unitFilter" class="form-select">
+                        <option value="">All Units</option>
+                        <?php foreach ($organizational_units as $unit): ?>
+                            <option value="<?= (int)$unit['id'] ?>" <?= $unit_filter === (int)$unit['id'] ? 'selected' : '' ?>><?= e($unit['unit_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-md-4">
+                    <label class="form-label" for="periodFilter">Academic Period</label>
+                    <select name="period" id="periodFilter" class="form-select">
+                        <option value="">All Periods</option>
+                        <?php foreach ($academic_periods as $period): ?>
+                            <option value="<?= (int)$period['id'] ?>" <?= $period_filter === (int)$period['id'] ? 'selected' : '' ?>><?= e($period['period_type'] . ': ' . $period['period_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
 
                 <!-- TEST -->
 
@@ -3033,7 +3118,7 @@ body {
                             </th>
 
                             <th>
-                                Class
+                                <?= $is_school_institution ? 'Class' : 'Unit' ?>
                             </th>
 
                             <th>
@@ -3041,7 +3126,7 @@ body {
                             </th>
 
                             <th>
-                                Subject
+                                <?= $is_school_institution ? 'Subject' : 'Course' ?>
                             </th>
 
                             <th>
@@ -3111,8 +3196,9 @@ body {
                          * Source:
                          * academic_levels.level_code
                          */
-                        $class_name =
-                            formatClassName(
+                        $class_name = !$is_school_institution
+                            ? (string)($result['unit_name'] ?? $result['course_name'] ?? '')
+                            : formatClassName(
                                 $result['academic_level']
                                 ?? '',
                                 ''
@@ -3216,7 +3302,7 @@ body {
                                 <span class="subject-badge">
 
                                     <?= e(
-                                        $result['subject']
+                                    (!$is_school_institution ? ($result['course_name'] ?? $result['subject']) : $result['subject'])
                                         ?? ''
                                     ) ?>
 

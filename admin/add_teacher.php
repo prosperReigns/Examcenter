@@ -96,6 +96,22 @@ try {
 |--------------------------------------------------------------------------
 */
 $available_subjects = [];
+$institution_profile = examcenterInstitutionProfile($conn);
+$active_institution_id = $institution_profile['id'];
+$institution_category = $institution_profile['category'];
+$institution_type_configured = $institution_profile['type_id'] !== null;
+$is_school = !$institution_type_configured
+    || in_array($institution_category, ['primary_school', 'secondary_school'], true);
+$allowed_school_levels = $institution_category === 'primary_school'
+    ? ['PRIMARY']
+    : ($institution_category === 'secondary_school' ? ['JSS', 'SS'] : ['PRIMARY', 'JSS', 'SS']);
+$allowed_class_groups = !$institution_type_configured
+    ? ['PRIMARY', 'JSS', 'SS']
+    : ($institution_category === 'primary_school'
+        ? ['PRIMARY']
+        : ($institution_category === 'secondary_school' ? ['JSS', 'SS'] : []));
+$available_courses = [];
+$selected_courses = [];
 
 try {
 
@@ -107,6 +123,7 @@ try {
         FROM subjects s
         JOIN subject_levels sl
             ON s.id = sl.subject_id
+        WHERE sl.class_level IN ('PRIMARY', 'JSS', 'SS')
         ORDER BY s.subject_name, sl.class_level
     ");
 
@@ -114,7 +131,7 @@ try {
 
         while ($row = $subjects->fetch_assoc()) {
 
-            $available_subjects[] = [
+            if (in_array($row['class_level'], $allowed_school_levels, true)) $available_subjects[] = [
                 'id'    => $row['subject_id'],
                 'name'  => $row['subject_name'],
                 'level' => $row['class_level']
@@ -138,16 +155,16 @@ try {
 $classes = [];
 $organizational_units = [];
 $universal_teacher_available = false;
-$active_institution_id = null;
+$active_institution_id = $institution_profile['id'];
 
 try {
 
     $result = $conn->query("
-        SELECT
-            id,
-            class_name
-        FROM classes
-        WHERE is_active = 1
+        SELECT c.id, c.class_name
+        FROM classes c
+        INNER JOIN academic_levels al ON al.id = c.academic_level_id
+        WHERE c.is_active = 1
+          AND al.class_group IN ('" . implode("','", $allowed_class_groups ?: ['__none__']) . "')
         ORDER BY class_name
     ");
 
@@ -165,12 +182,44 @@ try {
     error_log("Error fetching classes: " . $e->getMessage());
 }
 
-$active_institution_id = examcenterActiveInstitutionId($conn);
+$active_institution_id = $institution_profile['id'];
 $universal_teacher_available = $active_institution_id !== null
     && examcenterUniversalTableExists($conn, 'people')
     && examcenterUniversalTableExists($conn, 'institution_memberships')
     && examcenterUniversalTableExists($conn, 'unit_memberships')
     && examcenterUniversalTableExists($conn, 'organizational_units');
+
+$course_assignment_available = $active_institution_id !== null
+    && examcenterUniversalTableExists($conn, 'courses')
+    && examcenterUniversalTableExists($conn, 'course_assignments');
+
+if ($institution_type_configured && !$is_school
+    && (!$universal_teacher_available || !$course_assignment_available)) {
+    $is_school = true;
+    $allowed_school_levels = ['PRIMARY', 'JSS', 'SS'];
+    $allowed_class_groups = ['PRIMARY', 'JSS', 'SS'];
+    $available_subjects = [];
+    $legacy_subjects = $conn->query(
+        "SELECT s.id AS subject_id, s.subject_name, sl.class_level
+         FROM subjects s INNER JOIN subject_levels sl ON sl.subject_id = s.id
+         WHERE sl.class_level IN ('PRIMARY', 'JSS', 'SS')
+         ORDER BY s.subject_name, sl.class_level"
+    );
+    if ($legacy_subjects) {
+        while ($row = $legacy_subjects->fetch_assoc()) {
+            $available_subjects[] = ['id' => $row['subject_id'], 'name' => $row['subject_name'], 'level' => $row['class_level']];
+        }
+        $legacy_subjects->free();
+    }
+}
+
+if ($course_assignment_available) {
+    $stmt = $conn->prepare("SELECT id, name, code FROM courses WHERE institution_id = ? AND is_active = 1 ORDER BY name");
+    $stmt->bind_param('i', $active_institution_id);
+    $stmt->execute();
+    $available_courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
 
 if ($universal_teacher_available) {
     $stmt = $conn->prepare(
@@ -301,12 +350,13 @@ if (isset($_GET['edit_id'])) {
                 $stmt = $conn->prepare(
                     "SELECT um.unit_id AS organizational_unit_id
                      FROM unit_memberships um
+                     INNER JOIN organizational_units ou ON ou.id = um.unit_id
                      INNER JOIN institution_memberships im
                          ON im.person_id = um.person_id
-                     WHERE im.institution_id = ?
+                     WHERE ou.institution_id = ? AND im.institution_id = ?
                        AND im.legacy_teacher_id = ?"
                 );
-                $stmt->bind_param('ii', $active_institution_id, $teacher_id);
+                $stmt->bind_param('iii', $active_institution_id, $active_institution_id, $teacher_id);
                 $stmt->execute();
                 $unit_result = $stmt->get_result();
                 while ($row = $unit_result->fetch_assoc()) {
@@ -314,6 +364,19 @@ if (isset($_GET['edit_id'])) {
                 }
                 $unit_result->free();
                 $stmt->close();
+                if (!$is_school && examcenterUniversalTableExists($conn, 'course_assignments')) {
+                    $stmt = $conn->prepare(
+                        "SELECT DISTINCT ca.course_id
+                         FROM course_assignments ca
+                         INNER JOIN institution_memberships im ON im.person_id = ca.person_id
+                         WHERE im.institution_id = ? AND im.legacy_teacher_id = ? AND ca.role_code = 'teacher'"
+                    );
+                    $stmt->bind_param('ii', $active_institution_id, $teacher_id);
+                    $stmt->execute();
+                    $course_result = $stmt->get_result();
+                    while ($row = $course_result->fetch_assoc()) $selected_courses[] = (int)$row['course_id'];
+                    $stmt->close();
+                }
             }
 
         } else {
@@ -348,10 +411,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $selected_subjects = $_POST['subjects'] ?? [];
     $selected_classes  = $_POST['classes'] ?? [];
     $selected_units    = $_POST['organizational_units'] ?? [];
+    $selected_courses  = $_POST['courses'] ?? [];
 
     if (!is_array($selected_subjects)) $selected_subjects = [];
     if (!is_array($selected_classes)) $selected_classes = [];
     if (!is_array($selected_units)) $selected_units = [];
+    if (!is_array($selected_courses)) $selected_courses = [];
 
 
     /*
@@ -381,13 +446,57 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $error = "Please enter a valid email address.";
 
-    } elseif (empty($selected_subjects)) {
+    } elseif ($is_school && empty($selected_subjects)) {
 
         $error = "Please select at least one subject.";
+
+    } elseif (!$is_school && (!$course_assignment_available || empty($selected_courses))) {
+
+        $error = "Select at least one active institution course.";
+
+    } elseif (!$is_school && !$universal_teacher_available) {
+
+        $error = "Universal teacher and organizational unit tables are required for this institution type.";
+
+    } elseif (!$is_school && (!empty($selected_subjects) || !empty($selected_classes))) {
+
+        $error = "School subjects and classes cannot be assigned to this institution type.";
+
+    } elseif ($is_school && !empty($selected_courses)) {
+
+        $error = "Institution courses cannot be assigned through the school teacher form.";
+
+    } elseif ($is_school && !empty($selected_units)) {
+
+        $error = "Organizational units cannot be assigned through the school teacher form.";
+
+    } elseif (!$is_school && count(array_unique(array_map('intval', $selected_courses))) !== count($selected_courses)) {
+
+        $error = "Invalid course selection.";
 
     } else {
 
         try {
+
+            if (!$is_school) {
+                $allowedCourseIds = array_map('intval', array_column($available_courses, 'id'));
+                $requestedCourseIds = array_values(array_unique(array_map('intval', $selected_courses)));
+                if (count($requestedCourseIds) !== count($selected_courses)
+                    || array_diff($requestedCourseIds, $allowedCourseIds)) {
+                    throw new InvalidArgumentException('One or more selected courses are not active in this institution.');
+                }
+                $allowedUnitIds = array_map('intval', array_column($organizational_units, 'id'));
+                $requestedUnitIds = array_values(array_unique(array_map('intval', $selected_units)));
+                if (array_diff($requestedUnitIds, $allowedUnitIds)) {
+                    throw new InvalidArgumentException('One or more selected units are not active in this institution.');
+                }
+            } else {
+                $allowedClassIds = array_map('intval', array_column($classes, 'id'));
+                $requestedClassIds = array_values(array_unique(array_map('intval', $selected_classes)));
+                if (array_diff($requestedClassIds, $allowedClassIds)) {
+                    throw new InvalidArgumentException('One or more selected classes are not active.');
+                }
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -632,22 +741,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $person_id = $stmt->insert_id;
                         $stmt->close();
 
-                        $membership_code = 'teacher:' . $teacher_id;
                         $role_code = 'teacher';
                         $membership_status = 'active';
                         $stmt = $conn->prepare(
                             "INSERT INTO institution_memberships
-                             (institution_id, person_id, membership_code, role_code, status, legacy_teacher_id)
-                             VALUES (?, ?, ?, ?, ?, ?)"
+                            (institution_id, person_id, role_code, status, legacy_teacher_id)
+                              VALUES (?, ?, ?, ?, ?)"
                         );
-                        $stmt->bind_param('iisssi', $active_institution_id, $person_id, $membership_code, $role_code, $membership_status, $teacher_id);
+                        $stmt->bind_param('iissi', $active_institution_id, $person_id, $role_code, $membership_status, $teacher_id);
                         $stmt->execute();
                         $membership_id = $stmt->insert_id;
                         $stmt->close();
                     }
 
-                    $stmt = $conn->prepare("DELETE FROM unit_memberships WHERE person_id = ?");
-                    $stmt->bind_param('i', $person_id);
+                    $stmt = $conn->prepare("DELETE um FROM unit_memberships um INNER JOIN organizational_units ou ON ou.id = um.unit_id WHERE um.person_id = ? AND ou.institution_id = ?");
+                    $stmt->bind_param('ii', $person_id, $active_institution_id);
                     $stmt->execute();
                     $stmt->close();
 
@@ -681,6 +789,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 }
 
 
+                if ($is_school) {
                 /*
                 |--------------------------------------------------------------------------
                 | Clear Existing Class Assignments
@@ -799,6 +908,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     }
 
                     $stmt->close();
+                }
+                } else {
+                    $stmt = $conn->prepare("DELETE ca FROM course_assignments ca INNER JOIN courses c ON c.id = ca.course_id WHERE ca.person_id = ? AND ca.role_code = 'teacher' AND c.institution_id = ?");
+                    $stmt->bind_param('ii', $person_id, $active_institution_id);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    foreach (array_values(array_unique(array_map('intval', $selected_courses))) as $course_id) {
+                        $stmt = $conn->prepare("INSERT IGNORE INTO course_assignments (course_id, person_id, role_code) VALUES (?, ?, 'teacher')");
+                        $stmt->bind_param('ii', $course_id, $person_id);
+                        if (!$stmt->execute()) throw new Exception('Course assignment failed: ' . $stmt->error);
+                        $stmt->close();
+                    }
                 }
 
 
@@ -1861,7 +1983,7 @@ aria-expanded="false"
             |--------------------------------------------------------------------------
             -->
 
-            <div class="selection-section">
+            <?php if ($is_school): ?><div class="selection-section">
 
                 <div class="selection-header">
 
@@ -1960,9 +2082,30 @@ aria-expanded="false"
 
                 <?php endif; ?>
 
-            </div>
+            </div><?php endif; ?>
 
-            <?php if ($universal_teacher_available): ?>
+            <?php if (!$is_school && $course_assignment_available): ?>
+                <div class="selection-section">
+                    <div class="selection-header">
+                        <div><h6 class="selection-title"><i class="fas fa-book text-primary me-2"></i>Assigned Courses <span class="text-danger">*</span></h6></div>
+                        <span class="selection-count" id="courseCount">0 selected</span>
+                    </div>
+                    <?php if ($available_courses): ?>
+                        <div class="selection-grid">
+                            <?php foreach ($available_courses as $index => $course): ?>
+                                <div class="selection-item">
+                                    <input type="checkbox" class="course-checkbox" name="courses[]" value="<?= (int)$course['id'] ?>" id="course_<?= $index ?>" <?= in_array((int)$course['id'], array_map('intval', $selected_courses), true) ? 'checked' : '' ?>>
+                                    <label class="selection-label" for="course_<?= $index ?>"><?= htmlspecialchars($course['name'] . ($course['code'] ? ' (' . $course['code'] . ')' : '')) ?></label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="empty-selection">No active courses are available. Add courses before assigning them.</div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!$is_school && $universal_teacher_available): ?>
                 <div class="selection-section">
                     <div class="selection-header">
                         <div>
@@ -2006,7 +2149,7 @@ aria-expanded="false"
             |--------------------------------------------------------------------------
             -->
 
-            <div class="selection-section">
+            <?php if ($is_school): ?><div class="selection-section">
 
                 <div class="selection-header">
 
@@ -2094,7 +2237,7 @@ aria-expanded="false"
 
                 <?php endif; ?>
 
-            </div>
+            </div><?php endif; ?>
 
 
             <!--
@@ -2350,6 +2493,8 @@ $(document).ready(function () {
 
         const unitCount =
             $('.unit-checkbox:checked').length;
+        const courseCount =
+            $('.course-checkbox:checked').length;
 
 
         $('#subjectCount').text(
@@ -2373,10 +2518,11 @@ $(document).ready(function () {
                 ? ' selected'
                 : ' selected')
             );
+        $('#courseCount').text(courseCount + ' selected');
     }
 
 
-    $('.subject-checkbox, .class-checkbox, .unit-checkbox').on(
+    $('.subject-checkbox, .class-checkbox, .unit-checkbox, .course-checkbox').on(
         'change',
         updateSelectionCounts
     );

@@ -3,6 +3,40 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once '../includes/universal_architecture.php';
+
+function logSettingsActivity(
+    mysqli $conn,
+    string $activity,
+    int $adminId,
+    string $ipAddress,
+    string $userAgent
+): void {
+    try {
+        if (!examcenterUniversalTableExists($conn, 'activities_log')) {
+            return;
+        }
+
+        $stmt = $conn->prepare(
+            "INSERT INTO activities_log
+            (activity, admin_id, ip_address, user_agent, created_at)
+            VALUES (?, ?, ?, ?, NOW())"
+        );
+
+        $stmt->bind_param(
+            "siss",
+            $activity,
+            $adminId,
+            $ipAddress,
+            $userAgent
+        );
+
+        $stmt->execute();
+        $stmt->close();
+    } catch (Throwable $logError) {
+        error_log("Settings activity log failed: " . $logError->getMessage());
+    }
+}
 
 // =========================================================
 // ERROR REPORTING
@@ -86,24 +120,7 @@ try {
     $activity =
         "Admin {$admin['username']} accessed settings page.";
 
-    $stmt = $conn->prepare(
-        "INSERT INTO activities_log
-        (activity, admin_id, ip_address, user_agent, created_at)
-        VALUES (?, ?, ?, ?, NOW())"
-    );
-
-    if ($stmt) {
-        $stmt->bind_param(
-            "siss",
-            $activity,
-            $admin_id,
-            $ip_address,
-            $user_agent
-        );
-
-        $stmt->execute();
-        $stmt->close();
-    }
+    logSettingsActivity($conn, $activity, $admin_id, $ip_address, $user_agent);
 
 } catch (Exception $e) {
     error_log("Settings page error: " . $e->getMessage());
@@ -223,24 +240,7 @@ if (
             $activity =
                 "Admin {$admin['username']} changed their password.";
 
-            $stmt = $conn->prepare(
-                "INSERT INTO activities_log
-                (activity, admin_id, ip_address, user_agent, created_at)
-                VALUES (?, ?, ?, ?, NOW())"
-            );
-
-            if ($stmt) {
-                $stmt->bind_param(
-                    "siss",
-                    $activity,
-                    $admin_id,
-                    $ip_address,
-                    $user_agent
-                );
-
-                $stmt->execute();
-                $stmt->close();
-            }
+            logSettingsActivity($conn, $activity, $admin_id, $ip_address, $user_agent);
 
         } catch (Exception $e) {
             error_log(
@@ -302,24 +302,7 @@ if (
             "Admin {$admin['username']} updated system settings: " .
             "show_results_immediately={$show_results}";
 
-        $stmt = $conn->prepare(
-            "INSERT INTO activities_log
-            (activity, admin_id, ip_address, user_agent, created_at)
-            VALUES (?, ?, ?, ?, NOW())"
-        );
-
-        if ($stmt) {
-            $stmt->bind_param(
-                "siss",
-                $activity,
-                $admin_id,
-                $ip_address,
-                $user_agent
-            );
-
-            $stmt->execute();
-            $stmt->close();
-        }
+        logSettingsActivity($conn, $activity, $admin_id, $ip_address, $user_agent);
 
     } catch (Exception $e) {
         error_log(

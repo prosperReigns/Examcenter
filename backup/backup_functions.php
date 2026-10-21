@@ -24,6 +24,32 @@ if (!is_writable(BACKUP_DIRECTORY)) {
     );
 }
 
+/**
+ * Create the backup scheduler settings table for existing installations.
+ */
+function ensureBackupSettingsTable(mysqli $conn): void
+{
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS backup_settings (
+            id INT NOT NULL PRIMARY KEY,
+            auto_backup_enabled TINYINT(1) NOT NULL DEFAULT 0,
+            backup_frequency VARCHAR(20) NOT NULL DEFAULT 'daily',
+            backup_time TIME NOT NULL DEFAULT '02:00:00',
+            retention_days INT NOT NULL DEFAULT 30,
+            max_backups INT NOT NULL DEFAULT 10,
+            last_backup DATETIME NULL DEFAULT NULL,
+            next_backup DATETIME NULL DEFAULT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    $conn->query("
+        INSERT IGNORE INTO backup_settings (id)
+        VALUES (1)
+    ");
+}
+
 function getBackupConfig(): array
 {
     return [

@@ -83,9 +83,36 @@ try {
 }
 
 $universal_periods_available = examcenterUniversalTableExists($conn, 'academic_periods');
-$universal_institution_id = examcenterActiveInstitutionId($conn);
+$institution_profile = examcenterInstitutionProfile($conn);
+$universal_institution_id = $institution_profile['id'];
 $universal_periods_available = $universal_periods_available
     && $universal_institution_id !== null;
+$session_ui = [
+    'year' => 'Academic Period',
+    'session' => 'Session',
+    'exam' => 'Assessment',
+    'session_heading' => 'Sessions',
+    'placeholder' => 'Enter a session name',
+    'defaults' => [],
+];
+$sessionCategory = !$universal_periods_available || $institution_profile['type_id'] === null
+    ? 'secondary_school'
+    : $institution_profile['category'];
+switch ($sessionCategory) {
+    case 'primary_school':
+    case 'secondary_school':
+        $session_ui = ['year' => 'Academic Year', 'session' => 'Term', 'exam' => 'Exam Title', 'session_heading' => 'Terms', 'placeholder' => 'e.g. First Term', 'defaults' => ['First Term', 'Second Term', 'Third Term']];
+        break;
+    case 'higher_education':
+        $session_ui = ['year' => 'Academic Session', 'session' => 'Semester', 'exam' => 'Assessment', 'session_heading' => 'Semesters', 'placeholder' => 'e.g. First Semester', 'defaults' => ['First Semester', 'Second Semester']];
+        break;
+    case 'vocational':
+        $session_ui = ['year' => 'Training Cycle', 'session' => 'Cohort', 'exam' => 'Assessment', 'session_heading' => 'Cohorts', 'placeholder' => 'e.g. Cohort 1', 'defaults' => ['Cohort 1', 'Cohort 2']];
+        break;
+    case 'business':
+        $session_ui = ['year' => 'Business Cycle', 'session' => 'Phase', 'exam' => 'Assessment', 'session_heading' => 'Phases', 'placeholder' => 'e.g. Stage 1', 'defaults' => ['Stage 1', 'Stage 2']];
+        break;
+}
 
 
 // ================================================================
@@ -2163,7 +2190,7 @@ body {
                 </span>
 
                 <h5>
-                    Add Academic Year
+                    Add <?= htmlspecialchars($session_ui['year']) ?>
                 </h5>
 
             </div>
@@ -2217,7 +2244,7 @@ body {
                 </span>
 
                 <h6>
-                    Academic Years
+                    <?= htmlspecialchars($session_ui['year']) ?>s
                 </h6>
 
             </div>
@@ -2398,7 +2425,7 @@ body {
 
                         <span class="num">1</span>
 
-                        Year
+                        <?= htmlspecialchars($session_ui['year']) ?>
 
                     </div>
 
@@ -2413,7 +2440,7 @@ body {
 
                         <span class="num">2</span>
 
-                        Term
+                        <?= htmlspecialchars($session_ui['session']) ?>
 
                     </div>
 
@@ -2428,7 +2455,7 @@ body {
 
                         <span class="num">3</span>
 
-                        Exam Title
+                        <?= htmlspecialchars($session_ui['exam']) ?>
 
                     </div>
 
@@ -2466,7 +2493,7 @@ body {
                         >
 
                             <span class="label">
-                                Year
+                                <?= htmlspecialchars($session_ui['year']) ?>
                             </span>
 
                             <span
@@ -2485,7 +2512,7 @@ body {
                         >
 
                             <span class="label">
-                                Session
+                                <?= htmlspecialchars($session_ui['session']) ?>
                             </span>
 
                             <span
@@ -2504,7 +2531,7 @@ body {
                         >
 
                             <span class="label">
-                                Exam Title
+                                <?= htmlspecialchars($session_ui['exam']) ?>
                             </span>
 
                             <span
@@ -2536,7 +2563,7 @@ body {
 
                             <i class="fas fa-layer-group"></i>
 
-                            Sessions (Terms)
+                            <?= htmlspecialchars($session_ui['session_heading']) ?>
 
                         </h6>
 
@@ -2584,7 +2611,7 @@ body {
 
                             <i class="fas fa-file-lines"></i>
 
-                            Exam Titles
+                            <?= htmlspecialchars($session_ui['exam']) ?>s
 
                         </h6>
 
@@ -2598,7 +2625,7 @@ body {
 
                             <i class="fas fa-plus me-1"></i>
 
-                            Add Exam Title
+                            Add <?= htmlspecialchars($session_ui['exam']) ?>
 
                         </button>
 
@@ -2696,14 +2723,14 @@ body {
                 <div class="mb-3">
 
                     <label class="form-label">
-                        Session Name
+                        <?= htmlspecialchars($session_ui['session']) ?> Name
                     </label>
 
                     <input
                         type="text"
                         class="form-control"
                         name="session"
-                        placeholder="e.g. First Term"
+                        placeholder="<?= htmlspecialchars($session_ui['placeholder'], ENT_QUOTES) ?>"
                         required
                     >
 
@@ -2770,7 +2797,7 @@ body {
 
                     <i class="fas fa-file-lines me-2"></i>
 
-                    Add Exam Title for
+                    Add <?= htmlspecialchars($session_ui['exam']) ?> for
 
                     <span id="modalExamYearText"></span>
 
@@ -2796,14 +2823,14 @@ body {
                 <div class="mb-3">
 
                     <label class="form-label">
-                        Exam Title
+                        <?= htmlspecialchars($session_ui['exam']) ?>
                     </label>
 
                     <input
                         type="text"
                         class="form-control"
                         name="exam"
-                        placeholder="e.g. Midterm Exam"
+                        placeholder="e.g. Midterm <?= htmlspecialchars($session_ui['exam'], ENT_QUOTES) ?>"
                         required
                     >
 
@@ -2841,7 +2868,7 @@ body {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    Add Exam Title
+                    Add <?= htmlspecialchars($session_ui['exam']) ?>
                 </button>
 
             </div>
@@ -2890,6 +2917,8 @@ $(document).ready(function () {
 </script>
 
 <script>
+
+const SESSION_DEFAULTS = <?= json_encode($session_ui['defaults'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
 const ACTIVE_SESSION =
     <?php
@@ -3116,11 +3145,7 @@ async function loadSessions(year) {
         // Default session options.
         // --------------------------------------------------------
 
-        const defaults = [
-            'First Term',
-            'Second Term',
-            'Third Term'
-        ];
+        const defaults = SESSION_DEFAULTS;
 
 
         const sessions =

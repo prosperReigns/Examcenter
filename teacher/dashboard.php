@@ -3,6 +3,7 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once '../includes/audit.php';
 //equire_once '../license/license_guard.php';
 
 
@@ -138,49 +139,16 @@ $teacher_username = $_SESSION['user_username'] ?? 'Teacher';
 // ACTIVITY LOGGER
 // ============================================================
 
-function log_activity(
-    $conn,
-    $activity,
-    $teacher_id,
-    $ip_address,
-    $user_agent
-) {
-
-    $stmt = $conn->prepare(
-        "INSERT INTO activities_log
-        (activity, admin_id, ip_address, user_agent, created_at)
-        VALUES (?, NULL, ?, ?, NOW())"
-    );
-
-    if (!$stmt) {
-        return;
-    }
-
-    $stmt->bind_param(
-        "sss",
-        $activity,
-        $ip_address,
-        $user_agent
-    );
-
-    $stmt->execute();
-    $stmt->close();
-}
-
-
 // ============================================================
 // LOGIN ACTIVITY
 // ============================================================
 
-$ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-$user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-
-log_activity(
+logAudit(
     $conn,
+    null,
+    'Teacher Portal',
     "Teacher {$teacher_username} logged in",
-    $user_id,
-    $ip_address,
-    $user_agent
+    'LOGIN'
 );
 
 
@@ -450,26 +418,24 @@ if ($result) {
 
 $recent_activities = [];
 
-$query = "
-    SELECT
-        activity,
-        created_at,
-        ip_address
-    FROM activities_log
-    WHERE admin_id IS NULL
-    ORDER BY created_at DESC
-    LIMIT 5
-";
+try {
+    $query = "
+        SELECT description AS activity, created_at, ip_address
+        FROM audit_logs
+        WHERE module = 'Teacher Portal' AND action = 'LOGIN'
+        ORDER BY created_at DESC
+        LIMIT 5
+    ";
 
-$result = $conn->query($query);
-
-if ($result) {
-
-    while ($row = $result->fetch_assoc()) {
-        $recent_activities[] = $row;
+    $result = $conn->query($query);
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $recent_activities[] = $row;
+        }
+        $result->free();
     }
-
-    $result->free();
+} catch (Throwable $e) {
+    error_log('Unable to load recent teacher activities: ' . $e->getMessage());
 }
 
 

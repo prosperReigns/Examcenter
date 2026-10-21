@@ -55,7 +55,10 @@ $universal_tests_available = examcenterUniversalTableExists($conn, 'institutions
     && examcenterUniversalColumnExists($conn, 'tests', 'institution_id')
     && examcenterUniversalColumnExists($conn, 'tests', 'organizational_unit_id')
     && examcenterUniversalColumnExists($conn, 'tests', 'course_id')
-    && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id');
+    && examcenterUniversalColumnExists($conn, 'tests', 'academic_period_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'programme_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'programme_level_id')
+    && examcenterUniversalColumnExists($conn, 'tests', 'assessment_group_id');
 
 $universal_select = '';
 $universal_joins = '';
@@ -76,9 +79,9 @@ if ($universal_tests_available) {
         LEFT JOIN programme_levels pl ON pl.id = t.programme_level_id
         LEFT JOIN academic_periods ap ON ap.id = t.academic_period_id
         LEFT JOIN assessment_groups ag ON ag.id = t.assessment_group_id";
-    $universal_group = ", i.name AS institution_name, ou.name AS unit_name, co.code AS course_code,
-        co.name AS course_name, p.name AS programme_name, pl.name AS level_name, ap.name AS period_name,
-        ag.name AS group_name, t.institution_id, t.organizational_unit_id,
+    $universal_group = ", i.name, ou.name, co.code,
+        co.name, p.name, pl.name, ap.name,
+        ag.name, t.institution_id, t.organizational_unit_id,
         t.programme_id, t.programme_level_id, t.academic_period_id,
         t.course_id, t.assessment_group_id";
 }

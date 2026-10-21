@@ -35,19 +35,30 @@ if (!$admin || strtolower($admin['role']) !== 'admin') {
 }
 
 $error = $success = '';
+$institution_profile = examcenterInstitutionProfile($conn);
+$active_institution_id = $institution_profile['id'];
+$institution_type_configured = $institution_profile['type_id'] !== null;
+$is_school = !$institution_type_configured
+    || in_array($institution_profile['category'], ['primary_school', 'secondary_school'], true);
+$available_level = !$institution_type_configured
+    ? ['PRIMARY', 'JSS', 'SS']
+    : ($institution_profile['category'] === 'primary_school'
+        ? ['PRIMARY']
+        : ($institution_profile['category'] === 'secondary_school' ? ['JSS', 'SS'] : []));
 $course_schema_available = false;
 $institutions = [];
 $courses = [];
 
 $course_schema_available = examcenterUniversalTableExists($conn, 'courses')
-    && examcenterActiveInstitutionId($conn) !== null;
+    && $active_institution_id !== null;
+if (!$course_schema_available && $institution_type_configured && !$is_school) {
+    $is_school = true;
+    $available_level = ['PRIMARY', 'JSS', 'SS'];
+}
 
 if ($course_schema_available) {
     $result = $conn->query(
-        "SELECT id, name
-         FROM institutions
-         WHERE is_active = 1
-         ORDER BY name"
+        "SELECT id, name FROM institutions WHERE id = " . (int)$active_institution_id
     );
     if ($result) {
         while ($row = $result->fetch_assoc()) {
@@ -63,14 +74,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Course management is unavailable because the universal course schema is not installed.';
         } else {
             $institution_id = (int)($_POST['institution_id'] ?? 0);
-            $course_name = trim($_POST['course_name'] ?? '');
-            $course_code = strtoupper(trim($_POST['course_code'] ?? ''));
+            $course_name = trim($_POST['name'] ?? '');
+            $course_code = strtoupper(trim($_POST['code'] ?? ''));
+            if ($course_code === '' && $course_name !== '') {
+                $course_code = strtoupper(substr(preg_replace('/[^A-Z0-9]+/i', '-', $course_name), 0, 80));
+            }
             $course_type = trim($_POST['course_type'] ?? 'subject') ?: 'subject';
             $description = trim($_POST['course_description'] ?? '');
-            $legacy_subject_id = (int)($_POST['legacy_subject_id'] ?? 0);
+            $legacy_subject_id = 0;
 
-            if ($institution_id <= 0 || $course_name === '') {
-                $error = 'Institution and course name are required.';
+            if ($is_school || $institution_id !== (int)$active_institution_id || $course_name === '' || $course_code === '') {
+                $error = 'Institution, course name, and course code are required.';
             } else {
                 $stmt = $conn->prepare(
                     "INSERT INTO courses (
@@ -100,14 +114,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Course management is unavailable because the universal course schema is not installed.';
         } else {
             $course_id = (int)($_POST['course_id'] ?? 0);
-            $stmt = $conn->prepare("UPDATE courses SET is_active = 0 WHERE id = ?");
-            $stmt->bind_param('i', $course_id);
+            $stmt = $conn->prepare("UPDATE courses SET is_active = 0 WHERE id = ? AND institution_id = ?");
+            $stmt->bind_param('ii', $course_id, $active_institution_id);
             $success = $stmt->execute() ? 'Course deactivated successfully.' : 'Unable to deactivate course.';
             $stmt->close();
         }
-    } elseif (isset($_POST['add_subject'])) {
+    } elseif (isset($_POST['add_subject']) && $is_school) {
         $subject_name = trim($_POST['subject_name']);
         $class_levels = $_POST['class_level'] ?? [];
+        if (!is_array($class_levels)) $class_levels = [];
+        $class_levels = array_values(array_intersect($class_levels, $available_level));
 
         if (!empty($subject_name) && !empty($class_levels)) {
             // 1. Insert subject if it doesn't exist
@@ -143,10 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = "Subject name and class level are required.";
         }
-
     }
 
-    if (isset($_POST['delete_subject'])) {
+    if (isset($_POST['delete_subject']) && $is_school) {
         $subject_id = (int)$_POST['subject_id'];
         $stmt = $conn->prepare("DELETE FROM subjects WHERE id = ?");
         $stmt->bind_param("i", $subject_id);
@@ -159,7 +174,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$available_level = ["JSS", 'SS', "PRIMARY"];
 // Fetch all subjects
 $subjects = [];
 $result = $conn->query("
@@ -181,10 +195,10 @@ if ($result) {
 
 if ($course_schema_available) {
     $result = $conn->query(
-        "SELECT c.id, c.course_code, c.course_name, c.course_type, c.description,
-                c.status, i.name, s.subject_name
+        "SELECT c.id, c.code, c.name, c.course_type, c.description,
+                c.is_active, i.name AS institution_name, s.subject_name
          FROM courses c
-         INNER JOIN institutions i ON i.id = c.institution_id
+         INNER JOIN institutions i ON i.id = c.institution_id AND i.id = " . (int)$active_institution_id . "
          LEFT JOIN subjects s ON s.id = c.legacy_subject_id
          ORDER BY i.name, c.name"
     );
@@ -198,28 +212,30 @@ if ($course_schema_available) {
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Subjects | Admin</title>
+    <title><?= $is_school ? 'Manage Subjects' : 'Manage Courses' ?> | Admin</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../css/all.css">
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link rel="stylesheet" href="../css/sidebar.css">
     <link rel="stylesheet" href="../css/dataTables.bootstrap5.min.css">
 </head>
+
 <body>
 
-<!-- Sidebar -->
-<?php require __DIR__ . '/sidebar.php'; ?>
+    <!-- Sidebar -->
+    <?php require __DIR__ . '/sidebar.php'; ?>
 
-<div class="main-content">
-    <div class="header d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0">Manage Subjects and Courses</h2>
-    <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
-    </div>
+    <div class="main-content">
+        <div class="header d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0"><?= $is_school ? 'Manage Subjects' : 'Manage Institution Courses' ?></h2>
+            <button class="btn btn-primary d-lg-none" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+        </div>
 
-    <?php
+        <?php
         $totalSubjects = count($subjects);
 
         $jssCount = 0;
@@ -233,7 +249,7 @@ if ($course_schema_available) {
         }
         ?>
 
-        <div class="row mb-4">
+        <?php if ($is_school): ?><div class="row mb-4">
 
             <div class="col-md-3">
                 <div class="card shadow-sm border-0">
@@ -271,240 +287,233 @@ if ($course_schema_available) {
                 </div>
             </div>
 
-        </div>
-    <?php if ($error): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?><button class="btn-close" data-bs-dismiss="alert"></button></div>
-    <?php endif; ?>
-    <?php if ($success): ?>
-        <div class="alert alert-success alert-dismissible fade show"><?php echo htmlspecialchars($success); ?><button class="btn-close" data-bs-dismiss="alert"></button></div>
-    <?php endif; ?>
+        </div><?php endif; ?>
+        <?php if ($error): ?>
+            <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?><button class="btn-close" data-bs-dismiss="alert"></button></div>
+        <?php endif; ?>
+        <?php if ($success): ?>
+            <div class="alert alert-success alert-dismissible fade show"><?php echo htmlspecialchars($success); ?><button class="btn-close" data-bs-dismiss="alert"></button></div>
+        <?php endif; ?>
 
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header bg-success text-white">
-            <i class="fas fa-book-open me-2"></i>Create Institution Course
-        </div>
-        <div class="card-body">
-            <?php if (!$course_schema_available): ?>
-                <div class="alert alert-warning mb-0">
-                    Course management is unavailable because the proposed
-                    institutions and courses tables are not installed.
-                    Legacy subject management remains available.
-                </div>
-            <?php elseif (!$institutions): ?>
-                <div class="alert alert-warning mb-0">
-                    Create an active institution before adding courses.
-                </div>
-            <?php else: ?>
-                <form method="POST" action="" class="row g-3">
-                    <div class="col-md-4">
-                        <label for="institution_id" class="form-label">Institution</label>
-                        <select class="form-select" id="institution_id" name="institution_id" required>
-                            <option value="">Select institution</option>
-                            <?php foreach ($institutions as $institution): ?>
-                                <option value="<?= (int)$institution['id'] ?>">
-                                    <?= htmlspecialchars($institution['institution_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="course_name" class="form-label">Course Name</label>
-                        <input type="text" class="form-control" id="course_name" name="course_name" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label for="course_code" class="form-label">Code</label>
-                        <input type="text" class="form-control" id="course_code" name="course_code" placeholder="Optional">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="course_type" class="form-label">Type</label>
-                        <input type="text" class="form-control" id="course_type" name="course_type" value="subject" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="course_description" class="form-label">Description</label>
-                        <textarea class="form-control" id="course_description" name="course_description" rows="2"></textarea>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="legacy_subject_id" class="form-label">Legacy Subject Mapping</label>
-                        <select class="form-select" id="legacy_subject_id" name="legacy_subject_id">
-                            <option value="0">None</option>
-                            <?php foreach ($subjects as $subject): ?>
-                                <option value="<?= (int)$subject['id'] ?>">
-                                    <?= htmlspecialchars($subject['subject_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" name="add_course" class="btn btn-success w-100">
-                            <i class="fas fa-plus me-2"></i>Add Course
-                        </button>
-                    </div>
-                </form>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <?php if ($course_schema_available): ?>
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-dark text-white">
-                <i class="fas fa-layer-group me-2"></i>Institution Courses
+        <?php if (!$is_school): ?><div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-book-open me-2"></i>Create Institution Course
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped" id="coursesTable">
-                        <thead>
-                            <tr>
-                                <th>Institution</th>
-                                <th>Course</th>
-                                <th>Code</th>
-                                <th>Type</th>
-                                <th>Legacy Subject</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($courses as $course): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($course['institution_name']) ?></td>
-                                    <td><?= htmlspecialchars($course['course_name']) ?></td>
-                                    <td><?= htmlspecialchars($course['course_code'] ?: '-') ?></td>
-                                    <td><?= htmlspecialchars($course['course_type']) ?></td>
-                                    <td><?= htmlspecialchars($course['subject_name'] ?: '-') ?></td>
-                                    <td><?= htmlspecialchars($course['status']) ?></td>
-                                    <td>
-                                        <?php if ($course['status'] === 'active'): ?>
-                                            <form method="POST" action="" onsubmit="return confirm('Deactivate this course?');">
-                                                <input type="hidden" name="course_id" value="<?= (int)$course['id'] ?>">
-                                                <button type="submit" name="deactivate_course" class="btn btn-outline-danger btn-sm">
-                                                    <i class="fas fa-ban"></i> Deactivate
-                                                </button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span class="text-muted">Inactive</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                            <?php if (!$courses): ?>
-                                <tr><td colspan="7" class="text-center text-muted">No courses found.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <div class="row">
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white">
-                    <i class="fas fa-plus-circle me-2"></i>
-                    Add New Subject
-                </div>
-                <div class="card-body">
-                    <form method="POST" action="">
-                        <div class="mb-3">
-                            <label for="subject_name" class="form-label">Subject Name</label>
-                            <input type="text" class="form-control" id="subject_name" name="subject_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="class_level" class="form-label">Class Level</label>
-                            <select class="form-select" size="3" id="class_level" name="class_level[]" multiple required>
-                                <?php foreach($available_level as $cl): ?>
-                                    <option value="<?= htmlspecialchars($cl) ?>"><?= htmlspecialchars($cl) ?></option>
+                <?php if (!$course_schema_available): ?>
+                    <div class="alert alert-warning mb-0">
+                        Course management is unavailable because the proposed
+                        institutions and courses tables are not installed.
+                        Legacy subject management remains available.
+                    </div>
+                <?php elseif (!$institutions): ?>
+                    <div class="alert alert-warning mb-0">
+                        Create an active institution before adding courses.
+                    </div>
+                <?php else: ?>
+                    <form method="POST" action="" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="institution_id" class="form-label">Institution</label>
+                            <select class="form-select" id="institution_id" name="institution_id" required>
+                                <?php foreach ($institutions as $institution): ?>
+                                    <option value="<?= (int)$institution['id'] ?>" selected>
+                                        <?= htmlspecialchars($institution['name']) ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small class="form-text text-muted">Hold Ctrl (Windows) or Cmd (Mac) to select multiple levels</small>
                         </div>
-
-                        <button type="submit" name="add_subject" class="btn btn-primary w-100"> <i class="fas fa-plus-circle me-2"></i>Add Subject</button>
+                        <div class="col-md-4">
+                            <label for="course_name" class="form-label">Course Name</label>
+                            <input type="text" class="form-control" id="course_name" name="name" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="course_code" class="form-label">Code</label>
+                            <input type="text" class="form-control" id="course_code" name="code" placeholder="Optional">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="course_type" class="form-label">Type</label>
+                            <input type="text" class="form-control" id="course_type" name="course_type" value="subject" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="course_description" class="form-label">Description</label>
+                            <textarea class="form-control" id="course_description" name="course_description" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" name="add_course" class="btn btn-success w-100">
+                                <i class="fas fa-plus me-2"></i>Add Course
+                            </button>
+                        </div>
                     </form>
-                </div>
+                <?php endif; ?>
             </div>
-        </div>
+        </div><?php endif; ?>
 
-        <div class="col-md-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-success text-white">
-                    <i class="fas fa-book me-2"></i>
-                    Existing Subjects
+        <?php if (!$is_school && $course_schema_available): ?>
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white">
+                    <i class="fas fa-layer-group me-2"></i>Institution Courses
                 </div>
                 <div class="card-body">
-                    <table class="table table-striped" id="subjectsTable">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Subject Name</th>
-                                <th>Class Level</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($subjects as $index=>$subject): ?>
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="coursesTable">
+                            <thead>
                                 <tr>
-                                    <td><?= $index+1 ?></td>
-                                    <td><?php echo htmlspecialchars($subject['subject_name']); ?></td>
-                                    <td>
-                                    <?php
-                                    if (!empty($subject['class_levels'])) {
-                                        foreach (explode(',', $subject['class_levels']) as $level) {
-                                            $level = trim($level);
-
-                                            echo "<span class='badge bg-primary me-1'>{$level}</span>";
-                                        }
-                                    } else {
-                                        echo "<span class='badge bg-secondary'>Not Linked</span>";
-                                    }
-                                    ?>
-                                    </td>
-                                    <td>
-                                        <form method="POST" action="" onsubmit="return confirm('Are you sure you want to delete this subject?');">
-                                            <input type="hidden" name="subject_id" value="<?php echo (int)$subject['id']; ?>">
-                                            <button type="submit" name="delete_subject" class="btn btn-danger btn-sm"><i class="fas fa-trash-alt"></i>Delete</button>
-                                        </form>
-                                    </td>
+                                    <th>Institution</th>
+                                    <th>Course</th>
+                                    <th>Code</th>
+                                    <th>Type</th>
+                                    <th>Legacy Subject</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($courses as $course): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($course['institution_name']) ?></td>
+                                        <td><?= htmlspecialchars($course['name']) ?></td>
+                                        <td><?= htmlspecialchars($course['code'] ?: '-') ?></td>
+                                        <td><?= htmlspecialchars($course['course_type']) ?></td>
+                                        <td><?= htmlspecialchars($course['subject_name'] ?: '-') ?></td>
+                                        <td><?= (int)$course['is_active'] === 1 ? 'Active' : 'Inactive' ?></td>
+                                        <td>
+                                            <?php if ((int)$course['is_active'] === 1): ?>
+                                                <form method="POST" action="" onsubmit="return confirm('Deactivate this course?');">
+                                                    <input type="hidden" name="course_id" value="<?= (int)$course['id'] ?>">
+                                                    <button type="submit" name="deactivate_course" class="btn btn-outline-danger btn-sm">
+                                                        <i class="fas fa-ban"></i> Deactivate
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                <span class="text-muted">Inactive</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <?php if (!$courses): ?>
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">No courses found.</td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
+        <?php endif; ?>
 
-<script src="../js/jquery-3.7.0.min.js"></script>
-<script src="../js/bootstrap.bundle.min.js"></script>
-<script src="../js/dataTables.min.js"></script>
-<script src="../js/dataTables.bootstrap5.min.js"></script>
-<script>
-$(document).ready(function() {
-    $('#sidebarToggle').click(function() {
-            $('.sidebar').toggleClass('active');
+        <?php if ($is_school): ?><div class="row">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Add New Subject
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="">
+                            <div class="mb-3">
+                                <label for="subject_name" class="form-label">Subject Name</label>
+                                <input type="text" class="form-control" id="subject_name" name="subject_name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="class_level" class="form-label">Class Level</label>
+                                <select class="form-select" size="3" id="class_level" name="class_level[]" multiple required>
+                                    <?php foreach ($available_level as $cl): ?>
+                                        <option value="<?= htmlspecialchars($cl) ?>"><?= htmlspecialchars($cl) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="form-text text-muted">Hold Ctrl (Windows) or Cmd (Mac) to select multiple levels</small>
+                            </div>
+
+                            <button type="submit" name="add_subject" class="btn btn-primary w-100"> <i class="fas fa-plus-circle me-2"></i>Add Subject</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-book me-2"></i>
+                        Existing <?= $is_school ? 'Subjects' : 'School Subjects' ?>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-striped" id="subjectsTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Subject Name</th>
+                                    <th>Class Level</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($subjects as $index => $subject): ?>
+                                    <tr>
+                                        <td><?= $index + 1 ?></td>
+                                        <td><?php echo htmlspecialchars($subject['subject_name']); ?></td>
+                                        <td>
+                                            <?php
+                                            if (!empty($subject['class_levels'])) {
+                                                foreach (explode(',', $subject['class_levels']) as $level) {
+                                                    $level = trim($level);
+
+                                                    echo "<span class='badge bg-primary me-1'>{$level}</span>";
+                                                }
+                                            } else {
+                                                echo "<span class='badge bg-secondary'>Not Linked</span>";
+                                            }
+                                            ?>
+                                        </td>
+                                        <td>
+                                            <form method="POST" action="" onsubmit="return confirm('Are you sure you want to delete this subject?');">
+                                                <input type="hidden" name="subject_id" value="<?php echo (int)$subject['id']; ?>">
+                                                <button type="submit" name="delete_subject" class="btn btn-danger btn-sm"><i class="fas fa-trash-alt"></i>Delete</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div><?php endif; ?>
+    </div>
+
+    <script src="../js/jquery-3.7.0.min.js"></script>
+    <script src="../js/bootstrap.bundle.min.js"></script>
+    <script src="../js/dataTables.min.js"></script>
+    <script src="../js/dataTables.bootstrap5.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#sidebarToggle').click(function() {
+                $('.sidebar').toggleClass('active');
+            });
+            $('#subjectsTable').DataTable({
+                language: {
+                    search: "Search Subject:",
+                    searchPlaceholder: "Mathematics..."
+                },
+                "pageLength": 10,
+                "lengthChange": false,
+                "ordering": true,
+                "columnDefs": [{
+                        "orderable": false,
+                        "targets": 2
+                    } // Disable ordering on action column
+                ]
+            });
+            if ($('#coursesTable').length) {
+                $('#coursesTable').DataTable({
+                    pageLength: 10,
+                    lengthChange: false,
+                    ordering: true
+                });
+            }
         });
-    $('#subjectsTable').DataTable({
-        language:{
-        search:"Search Subject:",
-        searchPlaceholder:"Mathematics..."
-        },
-        "pageLength": 10,
-        "lengthChange": false,
-        "ordering": true,
-        "columnDefs": [
-            { "orderable": false, "targets": 2 } // Disable ordering on action column
-        ]
-    });
-    if ($('#coursesTable').length) {
-        $('#coursesTable').DataTable({
-            pageLength: 10,
-            lengthChange: false,
-            ordering: true
-        });
-    }
-});
-</script>
+    </script>
 
 </body>
+
 </html>

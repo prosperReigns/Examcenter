@@ -4,6 +4,7 @@ session_start();
 
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once '../includes/universal_architecture.php';
 
 $isBankMode = isset($_POST['bank_mode']) && $_POST['bank_mode'] === "1";
 
@@ -24,6 +25,21 @@ if ($teacher_id <= 0) {
     header("Location: " . ($isBankMode ? "bank.php" : "add_question.php"));
     exit();
 }
+
+$institution_profile = examcenterInstitutionProfile($conn);
+$institution_id = (int)($institution_profile['id'] ?? 0);
+$is_school_institution = $institution_id === 0 || in_array(
+    $institution_profile['category'],
+    ['primary_school', 'secondary_school'],
+    true
+);
+$question_universal_columns = $institution_id > 0
+    && examcenterUniversalColumnExists($conn, 'new_questions', 'course_id')
+    && examcenterUniversalColumnExists($conn, 'new_questions', 'organizational_unit_id')
+    && examcenterUniversalColumnExists($conn, 'new_questions', 'academic_period_id');
+$assigned_courses = $institution_id > 0
+    ? examcenterTeacherCourseAssignments($conn, $teacher_id, $institution_id)
+    : [];
 
 
 /*
@@ -381,6 +397,9 @@ if (
     }
 
 
+    $edit_context_columns = $question_universal_columns
+        ? ', course_id, organizational_unit_id, academic_period_id'
+        : '';
     $stmt = $conn->prepare("
         SELECT
             id,
@@ -390,6 +409,7 @@ if (
             teacher_id,
             class,
             subject
+            {$edit_context_columns}
         FROM new_questions
         WHERE id = ?
         LIMIT 1
@@ -587,6 +607,9 @@ if (
     $class = '';
     $subject = '';
     $test_id = null;
+    $course_id = null;
+    $organizational_unit_id = null;
+    $academic_period_id = null;
 
 
     /*
@@ -596,6 +619,39 @@ if (
      */
 
     if ($isBankMode) {
+
+        if (!$is_school_institution) {
+            if (!$question_universal_columns) {
+                throw new Exception('Question-bank course fields are not installed. Apply the ADDED migration in help.txt first.');
+            }
+            $course_id = (int)($_POST['course_id'] ?? 0);
+            $organizational_unit_id = (int)($_POST['organizational_unit_id'] ?? 0) ?: null;
+            $academic_period_id = (int)($_POST['academic_period_id'] ?? 0) ?: null;
+            $assigned_course = null;
+            foreach ($assigned_courses as $assignment) {
+                if ((int)$assignment['course_id'] === $course_id) {
+                    $assigned_course = $assignment;
+                    break;
+                }
+            }
+            if (!$assigned_course) {
+                throw new Exception('You are not assigned to the selected course.');
+            }
+            $subject = trim((string)$assigned_course['course_name']);
+            $class = '';
+            if ($organizational_unit_id !== null && (int)($assigned_course['unit_id'] ?? 0) !== $organizational_unit_id) {
+                throw new Exception('Selected unit is not part of your course assignment.');
+            }
+            if ($academic_period_id !== null) {
+                $periodCheck = $conn->prepare("SELECT id FROM academic_periods WHERE id = ? AND institution_id = ? AND status IN ('planned', 'active') LIMIT 1");
+                $periodCheck->bind_param('ii', $academic_period_id, $institution_id);
+                $periodCheck->execute();
+                $periodValid = $periodCheck->get_result()->fetch_assoc();
+                $periodCheck->close();
+                if (!$periodValid) throw new Exception('Invalid academic period for this institution.');
+            }
+            $test_id = null;
+        } else {
 
         $academic_level_id =
             (int)($_POST['academic_level_id'] ?? 0);
@@ -616,7 +672,7 @@ if (
          */
 
         $stmt = $conn->prepare("
-            SELECT level_code
+            SELECT level_code, class_group
             FROM academic_levels
             WHERE id = ?
             LIMIT 1
@@ -642,6 +698,16 @@ if (
 
             header("Location: bank.php");
             exit();
+        }
+
+        if (($institution_profile['category'] ?? '') === 'primary_school'
+            && strtoupper((string)$level['class_group']) !== 'PRIMARY'
+            && preg_match('/^(P|PRI|PRIMARY)/i', (string)$level['level_code']) !== 1) {
+            throw new Exception('Select a valid primary school level.');
+        }
+        if (($institution_profile['category'] ?? '') === 'secondary_school'
+            && !in_array(strtoupper((string)$level['class_group']), ['JSS', 'SS'], true)) {
+            throw new Exception('Select a valid secondary school level.');
         }
 
 
@@ -742,6 +808,7 @@ if (
          */
 
         $test_id = null;
+        }
     }
 
 
@@ -783,21 +850,37 @@ if (
          * Get test information.
          */
 
+        if ($is_school_institution) {
+            if (empty($assigned_subjects)) throw new Exception('You do not have any assigned subjects.');
+            $scopeValues = $assigned_subjects;
+            $scopeTypes = str_repeat('s', count($scopeValues));
+            $scopeColumn = 't.subject';
+            $institutionCondition = '';
+        } else {
+            $scopeValues = array_values(array_unique(array_map(static fn($assignment) => (int)$assignment['course_id'], $assigned_courses)));
+            if (!$scopeValues) throw new Exception('You do not have any assigned courses.');
+            $scopeTypes = str_repeat('i', count($scopeValues));
+            $scopeColumn = 't.course_id';
+            $institutionCondition = ' AND t.institution_id = ?';
+        }
+        $scopePlaceholders = implode(',', array_fill(0, count($scopeValues), '?'));
         $stmt = $conn->prepare("
             SELECT
                 t.id,
                 al.class_group,
                 t.subject
             FROM tests t
-            JOIN academic_levels al ON al.id = t.academic_level_id
-            WHERE t.id = ?
+            LEFT JOIN academic_levels al ON al.id = t.academic_level_id
+            WHERE t.id = ? AND {$scopeColumn} IN ({$scopePlaceholders}){$institutionCondition}
             LIMIT 1
         ");
-
-        $stmt->bind_param(
-            "i",
-            $test_id
-        );
+        $testParams = array_merge([$test_id], $scopeValues);
+        $testTypes = 'i' . $scopeTypes;
+        if (!$is_school_institution) {
+            $testParams[] = $institution_id;
+            $testTypes .= 'i';
+        }
+        $stmt->bind_param($testTypes, ...$testParams);
 
         $stmt->execute();
 
@@ -1005,6 +1088,11 @@ if (
 
             if ($isBankMode) {
 
+                if ($question_universal_columns && !$is_school_institution) {
+                    $stmt = $conn->prepare("UPDATE new_questions SET question_text = ?, teacher_id = ?, test_id = NULL, class = ?, subject = ?, course_id = ?, organizational_unit_id = ?, academic_period_id = ?, question_type = ? WHERE id = ? AND teacher_id = ? AND test_id IS NULL");
+                    $stmt->bind_param('sissiiisii', $question_text, $teacher_id, $class, $subject, $course_id, $organizational_unit_id, $academic_period_id, $question_type, $question_id, $teacher_id);
+                } else {
+
                 $stmt = $conn->prepare("
                     UPDATE new_questions
                     SET
@@ -1030,6 +1118,7 @@ if (
                     $question_id,
                     $teacher_id
                 );
+                }
 
             }
 
@@ -1073,6 +1162,11 @@ if (
 
             if ($isBankMode) {
 
+                if ($question_universal_columns && !$is_school_institution) {
+                    $stmt = $conn->prepare("INSERT INTO new_questions (question_text, test_id, teacher_id, class, subject, course_id, organizational_unit_id, academic_period_id, question_type, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                    $stmt->bind_param('sissiiis', $question_text, $teacher_id, $class, $subject, $course_id, $organizational_unit_id, $academic_period_id, $question_type);
+                } else {
+
                 /*
                  * Bank question:
                  *
@@ -1111,6 +1205,7 @@ if (
                     $subject,
                     $question_type
                 );
+                }
 
             } else {
 
