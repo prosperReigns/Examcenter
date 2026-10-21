@@ -20,6 +20,21 @@ $adminNav = [
     ['audit_logs.php', 'fa-history', 'Audit Logs'],
     ['../license/index.php', 'fa-key', 'License'],
     ['pro_suite.php', 'fa-layer-group', 'Pro Suite'],
+    // Development-only shortcuts while Pro entitlement gates are bypassed.
+    ['pro_sessions.php', 'fa-calendar-check', 'Pro: Exam Sessions'],
+    ['pro_security.php', 'fa-shield-alt', 'Pro: Secure Exam'],
+    ['pro_analytics.php', 'fa-chart-line', 'Pro: Analytics'],
+    ['pro_certificates.php', 'fa-certificate', 'Pro: Certificates'],
+    ['pro_campuses.php', 'fa-building', 'Pro: Multi-Campus'],
+    ['pro_corporate.php', 'fa-briefcase', 'Pro: Corporate'],
+    ['../teacher/pro_question_bank.php', 'fa-layer-group', 'Pro: Question Bank'],
+    ['../teacher/pro_blueprints.php', 'fa-sitemap', 'Pro: Blueprints'],
+    ['../teacher/pro_ai.php', 'fa-magic', 'Pro: AI Assessment'],
+    ['../teacher/pro_moderation.php', 'fa-clipboard-check', 'Pro: Moderation'],
+    ['../teacher/pro_coding.php', 'fa-code', 'Pro: Coding'],
+    ['../teacher/theory_assessment.php', 'fa-pen-to-square', 'Theory Assessment'],
+    ['../teacher/theory_review.php', 'fa-check-double', 'Theory Review'],
+    ['../teacher/grade_theory.php', 'fa-robot', 'Theory Grading'],
     ['settings.php', 'fa-cog', 'Settings'],
 ];
 ?>
