@@ -208,6 +208,10 @@ $queryParams = [
     <nav class="nav" aria-label="Teacher navigation">
         <a href="dashboard.php">Dashboard</a>
         <a href="add_question.php">Add Questions</a>
+            <a href="add_question.php#theory-assessment">
+                <i class="fas fa-pen-to-square"></i>
+                Theory Questions
+            </a>
         <a href="bank.php">Question Bank</a>
         <a class="active" href="view_questions.php">View Questions</a>
         <a href="manage_test.php">Manage Tests</a>
