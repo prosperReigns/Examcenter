@@ -241,6 +241,10 @@ $conn->close();
                 <i class="fas fa-plus-circle"></i>
                 Add Questions
             </a>
+            <a href="add_question.php#theory-assessment">
+                <i class="fas fa-pen-to-square"></i>
+                Theory Questions
+            </a>
             <a href="view_questions.php">
                 <i class="fas fa-list"></i>
                 View Questions
