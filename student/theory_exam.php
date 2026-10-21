@@ -101,6 +101,12 @@ if ($submission['status'] === 'submitted' || $submission['status'] === 'graded')
 <body>
     <h2><?= htmlspecialchars($test['title']) ?></h2>
     <p>Student: <?= htmlspecialchars($_SESSION['student_name'] ?? 'Student') ?></p>
+    <p>
+        <a class="btn btn-outline-primary" href="exam_preview.php"
+           onclick="return confirm('Return to the exam section selector? Any theory answers not yet submitted may be lost.');">
+            Switch Exam Section
+        </a>
+    </p>
     <p><strong>Offline theory exam:</strong> write your own answers. There is no answer key supplied by the teacher.</p>
     <form method="post"><?php foreach ($questions as $q): ?><section>
                 <h3>Q<?= $q['question_number'] ?> — <?= $q['maximum_marks'] ?> marks</h3>
