@@ -33,6 +33,8 @@ $is_school_institution = !$active_institution_id || in_array(
     ['primary_school', 'secondary_school'],
     true
 );
+$allows_standalone_assessment = !$is_school_institution
+    && in_array($institution_profile['category'], ['business', 'other'], true);
 
 // Fetch assigned subjects
 $teacher_id = (int)$_SESSION['user_id'];
@@ -113,6 +115,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
     $requested_course_id = (int)($_POST['course_id'] ?? 0);
     $requested_unit_id = (int)($_POST['organizational_unit_id'] ?? 0);
     $requested_period_id = (int)($_POST['academic_period_id'] ?? 0);
+    $requested_group_id = (int)($_POST['assessment_group_id'] ?? 0);
     $course_assignment = null;
     if (!$is_school_institution && $active_institution_id) {
         foreach ($assigned_courses as $assignment) {
@@ -125,7 +128,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
     }
 
     if  (
-        empty($year) ||
+        (($is_school_institution || !$allows_standalone_assessment) && empty($year)) ||
+        strlen($year) > 9 ||
         empty($title) ||
         ($is_school_institution && empty($academic_level_id)) ||
         empty($subject) ||
@@ -166,7 +170,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
         if (!empty($requested_unit_id) && (int)($course_assignment['unit_id'] ?? 0) !== $requested_unit_id) {
             $subject_is_assigned = false;
         }
-        if ($requested_period_id <= 0) $subject_is_assigned = false;
+        if ($requested_period_id <= 0 && !$allows_standalone_assessment) $subject_is_assigned = false;
     }
     $universal_request = $universal_tests_available && $active_institution_id !== null && (
         $requested_course_id > 0
@@ -270,6 +274,41 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
                             header('Location: add_question.php');
                             exit();
                         }
+                    }
+
+                    if ($requested_group_id > 0 && examcenterUniversalTableExists($conn, 'assessment_groups')) {
+                        $hasGroupAssignments = examcenterUniversalTableExists($conn, 'assessment_group_assignments');
+                        $groupSql = $hasGroupAssignments
+                            ? "SELECT ag.id, aga.academic_period_id
+                               FROM assessment_groups ag
+                               LEFT JOIN assessment_group_assignments aga ON aga.assessment_group_id = ag.id
+                               WHERE ag.id = ? AND ag.institution_id = ?
+                               AND (aga.academic_period_id IS NULL OR aga.academic_period_id = NULLIF(?, 0))
+                               ORDER BY aga.id LIMIT 1"
+                            : "SELECT ag.id, NULL AS academic_period_id
+                               FROM assessment_groups ag
+                               WHERE ag.id = ? AND ag.institution_id = ? LIMIT 1";
+                        $stmt = $conn->prepare($groupSql);
+                        if ($hasGroupAssignments) {
+                            $stmt->bind_param('iii', $requested_group_id, $institution_id, $requested_period_id);
+                        } else {
+                            $stmt->bind_param('ii', $requested_group_id, $institution_id);
+                        }
+                        $stmt->execute();
+                        $groupRow = $stmt->get_result()->fetch_assoc();
+                        $stmt->close();
+                        if (!$groupRow) {
+                            $_SESSION['error'] = 'Select an assessment group from this institution.';
+                            header("Location: add_question.php");
+                            exit();
+                        }
+                        $groupPeriodId = (int)($groupRow['academic_period_id'] ?? 0);
+                        if ($groupPeriodId > 0 && $groupPeriodId !== $requested_period_id) {
+                            $_SESSION['error'] = 'The assessment group belongs to a different period.';
+                            header("Location: add_question.php");
+                            exit();
+                        }
+                        $assessment_group_id = (int)$groupRow['id'];
                     }
                 }
 

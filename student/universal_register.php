@@ -119,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     $_SESSION['student_id'] = $studentId;
+                    unset($_SESSION['exam_preview_authorized'], $_SESSION['theory_test_id'], $_SESSION['exam_questions'], $_SESSION['institution_membership_id']);
                     $_SESSION['student_name'] = $name;
                     $_SESSION['student_class'] = $legacyClass;
                     $_SESSION['student_subject'] = (string)$test['subject'];
@@ -128,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['institution_membership_id'] = $membershipId;
 
                     $conn->commit();
-                    header('Location: take_exam.php');
+                    header('Location: exam_preview.php');
                     exit;
                 } catch (Throwable $e) {
                     $conn->rollback();

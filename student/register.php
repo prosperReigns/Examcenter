@@ -198,6 +198,7 @@ $stmt = $conn->prepare("INSERT INTO students (full_name, class) VALUES (?, ?)");
 if ($stmt) {
     $stmt->bind_param("ss", $name, $class);
     if ($stmt->execute()) {
+        unset($_SESSION['exam_preview_authorized'], $_SESSION['theory_test_id'], $_SESSION['exam_questions'], $_SESSION['institution_membership_id']);
         $_SESSION['student_id'] = $conn->insert_id;
         $_SESSION['student_name'] = $name;
         $_SESSION['student_class'] = $class;
@@ -243,7 +244,7 @@ if ($stmt) {
             }
         }
 
-        header("Location: take_exam.php");
+        header("Location: exam_preview.php");
         exit();
     } else {
         $error = "Registration failed. Please try again.";

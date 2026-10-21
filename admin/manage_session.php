@@ -98,6 +98,20 @@ $session_ui = [
 $sessionCategory = !$universal_periods_available || $institution_profile['type_id'] === null
     ? 'secondary_school'
     : $institution_profile['category'];
+
+// Non-school institutions use the universal period/group model. Keep the
+// legacy academic-year and term workflow below for primary/secondary schools
+// and older installations so existing Nigerian school records remain usable.
+if (
+    $universal_periods_available
+    && $institution_profile['type_id'] !== null
+    && !in_array($sessionCategory, ['primary_school', 'secondary_school'], true)
+) {
+    require_once '../includes/universal_session_management.php';
+    examcenterRenderUniversalSessionManagement($conn, $institution_profile, $admin ?? $user);
+    exit();
+}
+
 switch ($sessionCategory) {
     case 'primary_school':
     case 'secondary_school':
@@ -114,6 +128,10 @@ switch ($sessionCategory) {
         break;
 }
 
+if (empty($_SESSION['manage_session_csrf'])) {
+    $_SESSION['manage_session_csrf'] = bin2hex(random_bytes(32));
+}
+$manageSessionCsrf = (string)$_SESSION['manage_session_csrf'];
 
 // ================================================================
 // AJAX ACTIONS
@@ -124,6 +142,14 @@ if (isset($_GET['action'])) {
     $action = trim($_GET['action']);
 
     header('Content-Type: application/json; charset=utf-8');
+
+    if (in_array($action, ['add_session', 'add_exam', 'toggle_year', 'delete_year', 'save_selection'], true)) {
+        $submittedToken = (string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        if (!hash_equals($manageSessionCsrf, $submittedToken)) {
+            echo json_encode(['success' => false, 'message' => 'Your session expired. Refresh the page and try again.']);
+            exit();
+        }
+    }
 
 
     // ============================================================
@@ -367,6 +393,7 @@ if (isset($_GET['action'])) {
             );
 
             $ok = $stmt->execute();
+            $stmt->close();
 
             if ($ok && $universal_periods_available) {
                 $yearPeriodId = examcenterFindAcademicPeriod(
@@ -377,15 +404,12 @@ if (isset($_GET['action'])) {
                 examcenterSyncAcademicPeriod(
                     $conn,
                     (int)$universal_institution_id,
-                    'session',
+                    'term',
                     $sessionName,
                     'session:' . $year . ':' . $sessionName,
                     $yearPeriodId
                 );
             }
-
-            $stmt->close();
-
 
             if ($ok) {
 
@@ -486,6 +510,7 @@ if (isset($_GET['action'])) {
             $stmt->close();
 
 
+            $conn->begin_transaction();
             $status = 'inactive';
 
             $stmt = $conn->prepare("
@@ -504,6 +529,8 @@ if (isset($_GET['action'])) {
             );
 
             $ok = $stmt->execute();
+            $legacyAcademicId = (int)$stmt->insert_id;
+            $stmt->close();
 
             if ($ok && $universal_periods_available) {
                 $yearPeriodId = examcenterFindAcademicPeriod(
@@ -516,17 +543,49 @@ if (isset($_GET['action'])) {
                     (int)$universal_institution_id,
                     'session:' . $year . ':' . $sessionName
                 );
-                examcenterSyncAcademicPeriod(
-                    $conn,
-                    (int)$universal_institution_id,
-                    'assessment',
-                    $examTitle,
-                    'assessment:' . $year . ':' . $sessionName . ':' . $examTitle,
-                    $sessionPeriodId ?: $yearPeriodId
-                );
-            }
+                if (
+                    $sessionPeriodId !== null
+                    && examcenterUniversalTableExists($conn, 'assessment_groups')
+                    && examcenterUniversalTableExists($conn, 'assessment_group_assignments')
+                ) {
+                    $groupCode = 'legacy-row-' . $legacyAcademicId;
+                    $groupType = 'examination';
+                    $groupStmt = $conn->prepare(
+                        "INSERT INTO assessment_groups (institution_id, code, name, group_type)
+                         VALUES (?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = VALUES(name), group_type = VALUES(group_type)"
+                    );
+                    $groupStmt->bind_param('isss', $universal_institution_id, $groupCode, $examTitle, $groupType);
+                    $groupStmt->execute();
+                    $groupId = (int)$groupStmt->insert_id;
+                    $groupStmt->close();
 
-            $stmt->close();
+                    $assignmentStmt = $conn->prepare(
+                        "SELECT id FROM assessment_group_assignments
+                         WHERE assessment_group_id = ? AND academic_period_id = ?
+                           AND unit_id IS NULL AND programme_id IS NULL AND course_id IS NULL
+                         LIMIT 1"
+                    );
+                    $assignmentStmt->bind_param('ii', $groupId, $sessionPeriodId);
+                    $assignmentStmt->execute();
+                    $hasAssignment = (bool)$assignmentStmt->get_result()->fetch_assoc();
+                    $assignmentStmt->close();
+                    if (!$hasAssignment) {
+                        $nullUnit = null;
+                        $nullProgramme = null;
+                        $nullCourse = null;
+                        $assignmentStmt = $conn->prepare(
+                            "INSERT INTO assessment_group_assignments
+                                (assessment_group_id, unit_id, programme_id, academic_period_id, course_id)
+                             VALUES (?, ?, ?, ?, ?)"
+                        );
+                        $assignmentStmt->bind_param('iiiii', $groupId, $nullUnit, $nullProgramme, $sessionPeriodId, $nullCourse);
+                        $assignmentStmt->execute();
+                        $assignmentStmt->close();
+                    }
+                }
+            }
+            $conn->commit();
 
 
             if ($ok) {
@@ -546,6 +605,7 @@ if (isset($_GET['action'])) {
 
         } catch (Throwable $e) {
 
+            try { $conn->rollback(); } catch (Throwable $ignored) {}
             error_log("add_exam error: " . $e->getMessage());
 
             echo json_encode([
@@ -667,7 +727,7 @@ if (isset($_GET['action'])) {
                      SET status = 'planned'
                      WHERE institution_id = ?
                        AND period_type = 'academic_year'
-                       AND period_code <> ?
+                       AND code <> ?
                        AND status = 'active'"
                 );
                 $yearCode = 'year:' . $year;
@@ -680,7 +740,7 @@ if (isset($_GET['action'])) {
                      SET status = ?
                      WHERE institution_id = ?
                        AND period_type = 'academic_year'
-                       AND period_code = ?"
+                       AND code = ?"
                 );
                 $periodStatus = $newStatus === 'active' ? 'active' : 'planned';
                 $stmt->bind_param(
@@ -754,7 +814,8 @@ if (isset($_GET['action'])) {
         try {
 
             $stmt = $conn->prepare("
-                DELETE FROM academic_years
+                UPDATE academic_years
+                SET status = 'inactive'
                 WHERE year = ?
             ");
 
@@ -767,14 +828,17 @@ if (isset($_GET['action'])) {
                     "UPDATE academic_periods
                      SET status = 'cancelled'
                      WHERE institution_id = ?
-                       AND (period_code = ? OR period_code LIKE CONCAT(?, ':%'))"
+                       AND (code = ?
+                            OR code LIKE CONCAT('session:', ?, ':%')
+                            OR code LIKE CONCAT('assessment:', ?, ':%'))"
                 );
                 $yearCode = 'year:' . $year;
                 $stmtUniversal->bind_param(
-                    'iss',
+                    'isss',
                     $universal_institution_id,
                     $yearCode,
-                    $yearCode
+                    $year,
+                    $year
                 );
                 $stmtUniversal->execute();
                 $stmtUniversal->close();
@@ -787,14 +851,14 @@ if (isset($_GET['action'])) {
 
                 echo json_encode([
                     'success' => true,
-                    'message' => 'Academic year deleted successfully.'
+                    'message' => 'Academic year archived. Its records were preserved.'
                 ]);
 
             } else {
 
                 echo json_encode([
                     'success' => false,
-                    'message' => 'Could not delete academic year.'
+                    'message' => 'Could not archive academic year.'
                 ]);
             }
 
@@ -804,7 +868,7 @@ if (isset($_GET['action'])) {
 
             echo json_encode([
                 'success' => false,
-                'message' => 'Unable to delete academic year.'
+                'message' => 'Unable to archive academic year.'
             ]);
         }
 
@@ -2353,20 +2417,20 @@ body {
                                 </button>
 
 
-                                <!-- DELETE -->
+                                <!-- ARCHIVE: preserve historical references -->
 
                                 <button
                                     type="button"
-                                    class="btn btn-danger delete-year-btn"
+                                    class="btn btn-outline-secondary delete-year-btn"
                                     data-year="<?php
                                         echo htmlspecialchars(
                                             $y['year']
                                         );
                                     ?>"
-                                    title="Delete"
+                                    title="Archive"
                                 >
 
-                                    <i class="fas fa-trash"></i>
+                                    <i class="fas fa-box-archive"></i>
 
                                 </button>
 
@@ -2919,6 +2983,7 @@ $(document).ready(function () {
 <script>
 
 const SESSION_DEFAULTS = <?= json_encode($session_ui['defaults'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const SESSION_CSRF = <?= json_encode($manageSessionCsrf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
 const ACTIVE_SESSION =
     <?php
@@ -3174,13 +3239,6 @@ async function loadSessions(year) {
             input.value = session;
 
 
-            if (data.year_status !== 'active') {
-
-                input.disabled = true;
-
-            }
-
-
             label.appendChild(input);
 
             label.appendChild(
@@ -3222,8 +3280,8 @@ async function loadSessions(year) {
                 `
                 <div class="small-muted w-100 mt-1">
                     <i class="fas fa-circle-info me-1"></i>
-                    Year is inactive —
-                    activate it before selecting a session.
+                    This year is inactive. You can still add and select terms and exams;
+                    activate the year before saving it as the current academic session.
                 </div>
                 `
             );
@@ -3726,7 +3784,8 @@ function attachEventListeners() {
 
                                 headers: {
                                     'Content-Type':
-                                        'application/json'
+                                        'application/json',
+                                    'X-CSRF-Token': SESSION_CSRF
                                 },
 
                                 body:
@@ -3798,7 +3857,7 @@ function attachEventListeners() {
 
                 if (
                     !confirm(
-                        `Delete ${year} permanently?`
+                        `Archive ${year}? Existing assessments and results will be preserved.`
                     )
                 ) {
 
@@ -3816,7 +3875,8 @@ function attachEventListeners() {
 
                                 headers: {
                                     'Content-Type':
-                                        'application/json'
+                                        'application/json',
+                                    'X-CSRF-Token': SESSION_CSRF
                                 },
 
                                 body:
@@ -3833,7 +3893,7 @@ function attachEventListeners() {
 
                     alert(
                         data.message ||
-                        'Academic year deleted.'
+                        'Academic year archived.'
                     );
 
 
@@ -4046,7 +4106,8 @@ document
 
                             headers: {
                                 'Content-Type':
-                                    'application/json'
+                                    'application/json',
+                                'X-CSRF-Token': SESSION_CSRF
                             },
 
                             body:
@@ -4083,6 +4144,14 @@ document
                 await loadSessions(
                     currentYear
                 );
+
+                const createdSessionRadio = Array.from(
+                    document.querySelectorAll('input[name="sessionRadio"]')
+                ).find(radio => radio.value === session);
+                if (createdSessionRadio) {
+                    createdSessionRadio.checked = true;
+                    createdSessionRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                }
 
 
             } catch (error) {
@@ -4212,7 +4281,8 @@ document
 
                             headers: {
                                 'Content-Type':
-                                    'application/json'
+                                    'application/json',
+                                'X-CSRF-Token': SESSION_CSRF
                             },
 
                             body:
@@ -4253,6 +4323,14 @@ document
                     currentYear,
                     currentSession
                 );
+
+                const createdExamRadio = Array.from(
+                    document.querySelectorAll('input[name="examRadio"]')
+                ).find(radio => radio.value === exam);
+                if (createdExamRadio) {
+                    createdExamRadio.checked = true;
+                    createdExamRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                }
 
 
             } catch (error) {
@@ -4331,7 +4409,8 @@ saveBtn.onclick =
 
                         headers: {
                             'Content-Type':
-                                'application/json'
+                                'application/json',
+                            'X-CSRF-Token': SESSION_CSRF
                         },
 
                         body:

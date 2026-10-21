@@ -71,6 +71,7 @@ $assigned_subjects = [];
 $assigned_courses = [];
 $institution_profile = ['id' => null, 'category' => 'other', 'type_name' => ''];
 $is_school_institution = true;
+$allows_standalone_assessment = false;
 $levels = [];
 $test_titles = [];
 $academic_years = [];
@@ -80,6 +81,7 @@ $universal_institution_id = null;
 $universal_courses = [];
 $organizational_units = [];
 $academic_periods = [];
+$assessment_groups = [];
 
 $edit_question = null;
 
@@ -141,6 +143,8 @@ try {
         ['primary_school', 'secondary_school'],
         true
     );
+    $allows_standalone_assessment = !$is_school_institution
+        && in_array($institution_profile['category'], ['business', 'other'], true);
     $universal_context_available = $universal_institution_id !== null
         && examcenterUniversalTableExists($conn, 'courses')
         && examcenterUniversalTableExists($conn, 'organizational_units')
@@ -152,6 +156,8 @@ try {
     if (!$universal_context_available) {
         $is_school_institution = true;
     }
+    $allows_standalone_assessment = !$is_school_institution
+        && in_array($institution_profile['category'], ['business', 'other'], true);
     $question_bank_context_storage_available = $universal_institution_id !== null
         && examcenterUniversalColumnExists($conn, 'new_questions', 'course_id')
         && examcenterUniversalColumnExists($conn, 'new_questions', 'organizational_unit_id')
@@ -193,6 +199,19 @@ try {
         $stmt->execute();
         $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
+
+        if (examcenterUniversalTableExists($conn, 'assessment_groups')) {
+            $stmt = $conn->prepare(
+                "SELECT DISTINCT ag.id, ag.name, ag.group_type
+                 FROM assessment_groups ag
+                 WHERE ag.institution_id = ?
+                 ORDER BY ag.name"
+            );
+            $stmt->bind_param('i', $institutionId);
+            $stmt->execute();
+            $assessment_groups = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+        }
     }
 
     /*
@@ -270,7 +289,7 @@ try {
     $result = $conn->query("
         SELECT CONCAT_WS(' ', session, exam_title) AS title
         FROM academic_years
-        WHERE is_active = 1
+        WHERE status = 'active'
           AND session IS NOT NULL
           AND exam_title IS NOT NULL
         ORDER BY id DESC
@@ -1422,6 +1441,7 @@ try {
 
                             <div class="setup-grid">
 
+                                <?php if ($is_school_institution): ?>
                                 <div class="setup-col-3">
 
                                     <label
@@ -1455,8 +1475,16 @@ try {
                                     </select>
 
                                 </div>
+                                <?php else: ?>
+                                <div class="setup-col-3">
+                                    <label class="form-label" for="year">Reference year <span class="text-muted">(optional)</span></label>
+                                    <input class="form-control" type="text" name="year" id="year" maxlength="9" placeholder="e.g. 2026">
+                                    <div class="form-text">The selected period, when used, stores the full period context.</div>
+                                </div>
+                                <?php endif; ?>
 
 
+                                <?php if ($is_school_institution): ?>
                                 <div class="setup-col-3">
 
                                     <label
@@ -1490,6 +1518,12 @@ try {
                                     </select>
 
                                 </div>
+                                <?php else: ?>
+                                <div class="setup-col-3">
+                                    <label class="form-label" for="test_title">Test Title</label>
+                                    <input class="form-control" type="text" name="test_title" id="test_title" maxlength="200" required placeholder="e.g. Numerical Reasoning Assessment">
+                                </div>
+                                <?php endif; ?>
 
                                 <?php if ($universal_context_available && !$is_school_institution): ?>
                                     <div class="setup-col-3">
@@ -1522,7 +1556,7 @@ try {
                                 <?php if ($universal_context_available): ?>
                                     <div class="setup-col-3">
                                         <label class="form-label" for="academic_period_id"><?= $is_school_institution ? 'Term / Academic Period' : 'Academic Period' ?></label>
-                                        <select class="form-select" name="academic_period_id" id="academic_period_id" <?= $is_school_institution ? '' : 'required' ?>>
+                                        <select class="form-select" name="academic_period_id" id="academic_period_id" <?= ($is_school_institution || $allows_standalone_assessment) ? '' : 'required' ?>>
                                             <option value=""><?= $is_school_institution ? 'Optional term' : 'Select period' ?></option>
                                             <?php foreach ($academic_periods as $period): ?>
                                                 <option value="<?= (int)$period['id'] ?>">
@@ -1530,6 +1564,19 @@ try {
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if ($universal_context_available && examcenterUniversalTableExists($conn, 'assessment_groups')): ?>
+                                    <div class="setup-col-3">
+                                        <label class="form-label" for="assessment_group_id">Assessment Group <span class="text-muted">(optional)</span></label>
+                                        <select class="form-select" name="assessment_group_id" id="assessment_group_id">
+                                            <option value="">No group</option>
+                                            <?php foreach ($assessment_groups as $group): ?>
+                                                <option value="<?= (int)$group['id'] ?>"><?= e($group['name']) ?><?= !empty($group['group_type']) ? ' · ' . e(ucwords(str_replace('_', ' ', $group['group_type']))) : '' ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <div class="form-text">Groups organize tests; they do not replace the period or exam schedule.</div>
                                     </div>
                                 <?php endif; ?>
 

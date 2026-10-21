@@ -12,6 +12,24 @@ if (!isset($_SESSION['student_id'])) {
 }
 $db = Database::connection();
 $testId = (int)($_GET['test_id'] ?? $_SESSION['theory_test_id'] ?? 0);
+if (
+    $testId < 1
+    || $testId !== (int)($_SESSION['theory_test_id'] ?? 0)
+    || $testId !== (int)($_SESSION['current_test_id'] ?? 0)
+) {
+    header('Location: exam_preview.php');
+    exit;
+}
+$previewAuthorization = $_SESSION['exam_preview_authorized'] ?? null;
+if (
+    !is_array($previewAuthorization)
+    || (int)($previewAuthorization['student_id'] ?? 0) !== (int)$_SESSION['student_id']
+    || (int)($previewAuthorization['test_id'] ?? 0) !== $testId
+    || ($previewAuthorization['mode'] ?? '') !== 'theory'
+) {
+    header('Location: exam_preview.php');
+    exit;
+}
 $stmt = $db->prepare("SELECT ta.id assessment_id,t.title,t.subject,ta.instructions FROM theory_assessments ta JOIN tests t ON t.id=ta.test_id WHERE ta.test_id=? LIMIT 1");
 $stmt->bind_param('i', $testId);
 $stmt->execute();

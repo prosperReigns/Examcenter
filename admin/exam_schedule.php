@@ -133,16 +133,65 @@ $selected_subjects = [];
 
 $all_subjects = [];
 $active_subjects = [];
+$institution_schedule_subjects = [];
 $organizational_units = [];
 $courses = [];
 $academic_periods = [];
 $universal_schedule_available = false;
-$active_institution_id = null;
+$institution_profile = examcenterInstitutionProfile($conn);
+$active_institution_id = $institution_profile['id'];
+$institution_test_scope_available = $active_institution_id !== null
+    && examcenterUniversalColumnExists($conn, 'tests', 'institution_id');
+$institution_category = $active_institution_id === null ? 'secondary_school' : $institution_profile['category'];
+$active_institution_name = '';
+if ($active_institution_id !== null) {
+    $institutionStmt = $conn->prepare('SELECT name FROM institutions WHERE id = ? LIMIT 1');
+    $institutionStmt->bind_param('i', $active_institution_id);
+    $institutionStmt->execute();
+    $active_institution_name = (string)($institutionStmt->get_result()->fetch_assoc()['name'] ?? '');
+    $institutionStmt->close();
+}
+$is_school_institution = in_array($institution_category, ['primary_school', 'secondary_school'], true);
+$schedule_ui = [
+    'value_label' => 'Subject',
+    'unit_label' => 'Organizational Unit',
+    'course_label' => 'Course',
+    'period_label' => 'Assessment Period',
+    'value_heading' => 'Subjects',
+    'description' => 'Schedule the subjects candidates will take on each exam date.',
+];
+if ($institution_category === 'higher_education') {
+    $schedule_ui = ['value_label' => 'Course / Assessment', 'unit_label' => 'Faculty / Department', 'course_label' => 'Course', 'period_label' => 'Academic Period', 'value_heading' => 'Courses / Assessments', 'description' => 'Schedule institution courses and assessments by date.'];
+} elseif ($institution_category === 'vocational') {
+    $schedule_ui = ['value_label' => 'Module / Assessment', 'unit_label' => 'Programme / Cohort', 'course_label' => 'Module / Course', 'period_label' => 'Training Period / Cohort', 'value_heading' => 'Modules / Assessments', 'description' => 'Schedule training modules and assessments by date.'];
+} elseif ($institution_category === 'business') {
+    $schedule_ui = ['value_label' => 'Assessment', 'unit_label' => 'Team / Division', 'course_label' => 'Assessment Area', 'period_label' => 'Campaign / Operational Period', 'value_heading' => 'Assessments', 'description' => 'Schedule configured assessments by date, campaign, or operational period.'];
+} elseif ($institution_category === 'other') {
+    $schedule_ui = ['value_label' => 'Assessment', 'unit_label' => 'Organizational Unit', 'course_label' => 'Assessment Area', 'period_label' => 'Configured Period', 'value_heading' => 'Assessments', 'description' => 'Schedule configured assessments by date and any relevant institutional structure.'];
+}
+$schedule_value_label = $schedule_ui['value_label'];
+$schedule_value_heading = $schedule_ui['value_heading'];
+$schedule_unit_label = $schedule_ui['unit_label'];
+$schedule_course_label = $schedule_ui['course_label'];
+$schedule_period_label = $schedule_ui['period_label'];
+$schedule_description = $schedule_ui['description'];
+$period_type_labels = [
+    'academic_year' => 'Academic Year', 'term' => 'Term', 'session' => 'Session',
+    'semester' => 'Semester', 'trimester' => 'Trimester', 'quarter' => 'Quarter',
+    'teaching_period' => 'Teaching Period', 'training_cohort' => 'Training Cohort',
+    'programme_period' => 'Programme Period', 'module_period' => 'Module Period',
+    'assessment_period' => 'Assessment Period', 'recruitment_campaign' => 'Recruitment Campaign',
+    'operational_period' => 'Operational Period', 'custom' => 'Custom Period',
+];
 $schedule_unit_id = (int)($_POST['organizational_unit_id'] ?? $_GET['organizational_unit_id'] ?? 0);
 $schedule_course_id = (int)($_POST['course_id'] ?? $_GET['course_id'] ?? 0);
 $schedule_period_id = (int)($_POST['academic_period_id'] ?? $_GET['academic_period_id'] ?? 0);
+$csrfSessionKey = 'exam_schedule_csrf';
+if (empty($_SESSION[$csrfSessionKey])) {
+    $_SESSION[$csrfSessionKey] = bin2hex(random_bytes(32));
+}
+$examScheduleCsrf = (string)$_SESSION[$csrfSessionKey];
 
-$active_institution_id = examcenterActiveInstitutionId($conn);
 $universal_schedule_available = $active_institution_id !== null
     && examcenterUniversalTableExists($conn, 'organizational_units')
     && examcenterUniversalTableExists($conn, 'courses')
@@ -164,66 +213,80 @@ if ($universal_schedule_available) {
     $courses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT id, name AS period_name, period_type FROM academic_periods WHERE institution_id = ? ORDER BY name");
+    $stmt = $conn->prepare("SELECT id, name AS period_name, period_type FROM academic_periods WHERE institution_id = ? AND status IN ('planned', 'active') ORDER BY starts_at, name");
     $stmt->bind_param('i', $active_institution_id);
     $stmt->execute();
     $academic_periods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 }
 
+$periodTypesByCategory = [
+    'primary_school' => ['academic_year', 'term', 'session', 'trimester', 'quarter', 'custom'],
+    'secondary_school' => ['academic_year', 'term', 'session', 'trimester', 'quarter', 'custom'],
+    'higher_education' => ['academic_year', 'session', 'semester', 'trimester', 'quarter', 'teaching_period', 'assessment_period', 'custom'],
+    'vocational' => ['training_cohort', 'programme_period', 'module_period', 'assessment_period', 'custom'],
+    'business' => ['recruitment_campaign', 'operational_period', 'assessment_period', 'custom'],
+];
+if (isset($periodTypesByCategory[$institution_category])) {
+    $academic_periods = array_values(array_filter(
+        $academic_periods,
+        static fn(array $period): bool => in_array((string)$period['period_type'], $periodTypesByCategory[$institution_category], true)
+    ));
+}
+
+$show_unit_filter = $universal_schedule_available && !empty($organizational_units);
+$show_course_filter = $universal_schedule_available && !$is_school_institution && !empty($courses);
+$show_period_filter = $universal_schedule_available && !empty($academic_periods);
+if (!$show_unit_filter) $schedule_unit_id = 0;
+if (!$show_course_filter) $schedule_course_id = 0;
+if (!$show_period_filter) $schedule_period_id = 0;
+
 // ---------------------------------------------------------
 // Fetch Available Subjects
 // ---------------------------------------------------------
 try {
 
-    $subject_query = "SELECT DISTINCT LCASE(s.subject_name) AS subject_name
-        FROM subjects s";
-    $subject_conditions = [];
-    $subject_params = [];
-    $subject_types = '';
-
-    if ($universal_schedule_available) {
-        $subject_query .= "
-            INNER JOIN tests t
-                ON LOWER(t.subject) = LOWER(s.subject_name)
-                OR LOWER(t.subject) LIKE CONCAT(LOWER(s.subject_name), ' (%)')
-            WHERE t.institution_id = ?";
-        $subject_params[] = $active_institution_id;
-        $subject_types .= 'i';
-
-        if ($schedule_unit_id > 0) {
-            $subject_query .= " AND t.organizational_unit_id = ?";
-            $subject_params[] = $schedule_unit_id;
-            $subject_types .= 'i';
+    $loadScheduleValues = static function (int $unitId, int $courseId, int $periodId) use ($conn, $universal_schedule_available, $institution_test_scope_available, $is_school_institution, $active_institution_id): array {
+        if (!$institution_test_scope_available && $active_institution_id === null) {
+            $sql = "SELECT DISTINCT LOWER(subject_name) AS schedule_value FROM subjects WHERE subject_name IS NOT NULL AND TRIM(subject_name) <> '' ORDER BY schedule_value";
+            $result = $conn->query($sql);
+            return $result ? array_column($result->fetch_all(MYSQLI_ASSOC), 'schedule_value') : [];
         }
-        if ($schedule_course_id > 0) {
-            $subject_query .= " AND t.course_id = ?";
-            $subject_params[] = $schedule_course_id;
-            $subject_types .= 'i';
+        if (!$institution_test_scope_available) {
+            return [];
         }
-        if ($schedule_period_id > 0) {
-            $subject_query .= " AND t.academic_period_id = ?";
-            $subject_params[] = $schedule_period_id;
-            $subject_types .= 'i';
+
+        $params = [(int)$active_institution_id];
+        $types = 'i';
+        if ($is_school_institution) {
+            $sql = "SELECT DISTINCT LOWER(s.subject_name) AS schedule_value
+                    FROM subjects s
+                    INNER JOIN tests t ON LOWER(t.subject) = LOWER(s.subject_name)
+                        OR LOWER(t.subject) LIKE CONCAT(LOWER(s.subject_name), ' (%)')
+                    WHERE t.institution_id = ? AND s.subject_name IS NOT NULL AND TRIM(s.subject_name) <> ''";
+        } else {
+            $sql = "SELECT DISTINCT LOWER(t.subject) AS schedule_value
+                    FROM tests t
+                    WHERE t.institution_id = ? AND t.subject IS NOT NULL AND TRIM(t.subject) <> ''";
         }
-    }
-
-    $subject_query .= " ORDER BY subject_name ASC";
-    $stmt = $conn->prepare($subject_query);
-
-    if (!empty($subject_params)) {
-        $stmt->bind_param($subject_types, ...$subject_params);
-    }
-
-    $stmt->execute();
-
-    $result = $stmt->get_result();
-
-    while ($row = $result->fetch_assoc()) {
-        $all_subjects[] = $row['subject_name'];
-    }
-
-    $stmt->close();
+        foreach ([['organizational_unit_id', $unitId], ['course_id', $courseId], ['academic_period_id', $periodId]] as [$column, $value]) {
+            if (!$universal_schedule_available) break;
+            if ($value > 0) {
+                $sql .= " AND t.{$column} = ?";
+                $params[] = $value;
+                $types .= 'i';
+            }
+        }
+        $sql .= ' ORDER BY schedule_value';
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $values = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'schedule_value');
+        $stmt->close();
+        return $values;
+    };
+    $institution_schedule_subjects = $loadScheduleValues(0, 0, 0);
+    $all_subjects = $loadScheduleValues($schedule_unit_id, $schedule_course_id, $schedule_period_id);
 
 } catch (Exception $e) {
 
@@ -243,6 +306,10 @@ if (
     isset($_POST['save_daily_subjects'])
 ) {
 
+    if (!hash_equals($examScheduleCsrf, (string)($_POST['csrf_token'] ?? ''))) {
+        $error = 'Your session expired. Refresh the page and try again.';
+    }
+
     $exam_date = trim(
         $_POST['exam_date'] ?? ''
     );
@@ -253,22 +320,23 @@ if (
         $selected_subjects = [];
     }
 
-    $selected_subjects = array_unique(
-        array_map(
-            'strtolower',
-            $selected_subjects
-        )
-    );
+    $selected_subjects = array_values(array_unique(array_filter(array_map(
+        static fn($value): string => is_scalar($value) ? strtolower(trim((string)$value)) : '',
+        $selected_subjects
+    ), static fn(string $value): bool => $value !== '')));
 
     // -----------------------------------------------------
     // Validate Date
     // -----------------------------------------------------
-    if (
+    $parsedExamDate = DateTimeImmutable::createFromFormat('!Y-m-d', $exam_date);
+    $dateErrors = DateTimeImmutable::getLastErrors();
+    if ($error !== '') {
+        // Keep the posted values available so the user can retry safely.
+    } elseif (
         empty($exam_date) ||
-        !preg_match(
-            '/^\d{4}-\d{2}-\d{2}$/',
-            $exam_date
-        )
+        $parsedExamDate === false ||
+        $parsedExamDate->format('Y-m-d') !== $exam_date ||
+        ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0))
     ) {
 
         $error = "Please provide a valid exam date.";
@@ -410,7 +478,7 @@ if (
 try {
 
     $stmt = $conn->prepare(
-        "SELECT subject, exam_date
+        "SELECT subject, DATE(exam_date) AS exam_date
          FROM active_exams
          WHERE is_active = 1
          ORDER BY exam_date DESC, subject ASC"
@@ -421,6 +489,13 @@ try {
     $result = $stmt->get_result();
 
     while ($row = $result->fetch_assoc()) {
+
+        if (
+            $universal_schedule_available
+            && !in_array(strtolower(trim((string)$row['subject'])), $institution_schedule_subjects, true)
+        ) {
+            continue;
+        }
 
         $active_subjects[$row['exam_date']][] =
             $row['subject'];
@@ -463,7 +538,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Exam Schedule | Examcenter</title>
+    <title><?= $is_school_institution ? 'Exam Schedule' : 'Assessment Schedule' ?> | Examcenter</title>
 
     <!-- Bootstrap -->
     <link
@@ -1297,11 +1372,12 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
             <div>
 
                 <h1 class="page-title">
-                    Exam Schedule
+                    <?= $is_school_institution ? 'Exam Schedule' : 'Assessment Schedule' ?>
                 </h1>
 
                 <p class="page-subtitle">
-                    Schedule the subjects students will take on each exam date.
+                    <?php if ($active_institution_name !== ''): ?><strong><?= htmlspecialchars($active_institution_name, ENT_QUOTES, 'UTF-8') ?>:</strong> <?php endif; ?>
+                    <?= htmlspecialchars($schedule_description, ENT_QUOTES, 'UTF-8') ?>
                 </p>
 
             </div>
@@ -1396,7 +1472,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                     </div>
 
                     <div class="stat-label">
-                        Available Subjects
+                        Available <?= htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8') ?>
                     </div>
 
                 </div>
@@ -1446,7 +1522,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                     </div>
 
                     <div class="stat-label">
-                        Subjects Scheduled Today
+                        <?= htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8') ?> Scheduled Today
                     </div>
 
                 </div>
@@ -1470,17 +1546,17 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                 <h2 class="card-title">
                     <i class="fas fa-calendar-plus text-primary me-2"></i>
-                    Create Exam Schedule
+                    <?= $is_school_institution ? 'Create Exam Schedule' : 'Create Assessment Schedule' ?>
                 </h2>
 
                 <p class="card-subtitle">
-                    Select a date and assign the subjects that will be examined.
+                    Select a date and assign the institution's available <?= htmlspecialchars(strtolower($schedule_value_heading), ENT_QUOTES, 'UTF-8') ?>.
                 </p>
 
             </div>
 
             <span class="badge bg-light text-dark">
-                <?php echo $total_subjects; ?> subjects available
+                <?php echo $total_subjects; ?> <?= htmlspecialchars(strtolower($schedule_value_heading), ENT_QUOTES, 'UTF-8') ?> available
             </span>
 
         </div>
@@ -1492,6 +1568,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                 method="POST"
                 id="scheduleForm"
             >
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($examScheduleCsrf, ENT_QUOTES, 'UTF-8') ?>">
 
                 <div class="row g-4">
 
@@ -1503,7 +1580,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                             for="exam_date"
                             class="form-label"
                         >
-                            Exam Date
+                            <?= $is_school_institution ? 'Exam Date' : 'Assessment Date' ?>
                         </label>
 
                         <input
@@ -1519,14 +1596,14 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                             <i class="fas fa-info-circle"></i>
 
-                            Choose the day students will write the selected subjects.
+                            Choose the date for the selected <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?>.
 
                         </div>
 
                     </div>
 
 
-                    <!-- SUBJECTS -->
+                    <!-- INSTITUTION-SPECIFIC ASSESSMENT VALUES -->
 
                     <div class="col-12 col-lg-7">
 
@@ -1536,7 +1613,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                                 for="subjects"
                                 class="form-label mb-0"
                             >
-                                Subjects
+                                <?= htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8') ?>
                             </label>
 
                             <span
@@ -1587,7 +1664,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                                 <i class="fas fa-mouse-pointer"></i>
 
-                                Hold Ctrl/Cmd to select multiple subjects.
+                                Hold Ctrl/Cmd to select multiple <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?>.
 
                             </div>
 
@@ -1597,7 +1674,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                                 <i class="fas fa-info-circle me-2"></i>
 
-                                No subjects are available. Add subjects first.
+                                No <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?> are available for this institution and selection. Configure tests and their institution context first.
 
                             </div>
 
@@ -1605,18 +1682,19 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                     </div>
 
-                    <?php if ($universal_schedule_available): ?>
+                    <?php if ($universal_schedule_available && ($show_unit_filter || $show_course_filter || $show_period_filter)): ?>
                         <div class="col-12">
                             <div class="alert alert-info mb-0">
                                 <i class="fas fa-layer-group me-2"></i>
-                                Universal filters narrow the subjects to tests configured for the selected unit, course, or academic period. The legacy schedule remains subject/date based for backward compatibility.
+                                These filters use this institution's configured tests and periods.
                             </div>
                         </div>
 
+                        <?php if ($show_unit_filter): ?>
                         <div class="col-12 col-md-4">
-                            <label for="organizational_unit_id" class="form-label">Organizational Unit</label>
+                            <label for="organizational_unit_id" class="form-label"><?= htmlspecialchars($schedule_unit_label, ENT_QUOTES, 'UTF-8') ?></label>
                             <select name="organizational_unit_id" id="organizational_unit_id" class="form-select">
-                                <option value="0">All Units</option>
+                                <option value="0">Any <?= htmlspecialchars(strtolower($schedule_unit_label), ENT_QUOTES, 'UTF-8') ?></option>
                                 <?php foreach ($organizational_units as $unit): ?>
                                     <option value="<?= (int)$unit['id'] ?>" <?= $schedule_unit_id === (int)$unit['id'] ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($unit['unit_name'] . ($unit['unit_code'] ? ' (' . $unit['unit_code'] . ')' : '')) ?>
@@ -1624,11 +1702,13 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <?php endif; ?>
 
+                        <?php if ($show_course_filter): ?>
                         <div class="col-12 col-md-4">
-                            <label for="course_id" class="form-label">Course</label>
+                            <label for="course_id" class="form-label"><?= htmlspecialchars($schedule_course_label, ENT_QUOTES, 'UTF-8') ?></label>
                             <select name="course_id" id="course_id" class="form-select">
-                                <option value="0">All Courses</option>
+                                <option value="0">Any <?= htmlspecialchars(strtolower($schedule_course_label), ENT_QUOTES, 'UTF-8') ?></option>
                                 <?php foreach ($courses as $course): ?>
                                     <option value="<?= (int)$course['id'] ?>" <?= $schedule_course_id === (int)$course['id'] ? 'selected' : '' ?>>
                                         <?= htmlspecialchars(($course['course_code'] ? $course['course_code'] . ' - ' : '') . $course['course_name']) ?>
@@ -1636,18 +1716,21 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <?php endif; ?>
 
+                        <?php if ($show_period_filter): ?>
                         <div class="col-12 col-md-4">
-                            <label for="academic_period_id" class="form-label">Academic Period</label>
+                            <label for="academic_period_id" class="form-label"><?= htmlspecialchars($schedule_period_label, ENT_QUOTES, 'UTF-8') ?></label>
                             <select name="academic_period_id" id="academic_period_id" class="form-select">
-                                <option value="0">All Periods</option>
+                                <option value="0">Any period</option>
                                 <?php foreach ($academic_periods as $period): ?>
                                     <option value="<?= (int)$period['id'] ?>" <?= $schedule_period_id === (int)$period['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($period['period_type'] . ': ' . $period['period_name']) ?>
+                                        <?= htmlspecialchars(($period_type_labels[$period['period_type']] ?? ucwords(str_replace('_', ' ', $period['period_type']))) . ': ' . $period['period_name'], ENT_QUOTES, 'UTF-8') ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <?php endif; ?>
                     <?php endif; ?>
 
                 </div>
@@ -1741,7 +1824,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                 <?php else: ?>
 
                     <span class="text-muted small">
-                        No subjects scheduled for today.
+                        No <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?> scheduled for today.
                     </span>
 
                 <?php endif; ?>
@@ -1767,13 +1850,13 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                     <i class="fas fa-list-alt text-primary me-2"></i>
 
-                    Current Exam Schedule
+                    Current <?= $is_school_institution ? 'Exam' : 'Assessment' ?> Schedule
 
                 </h2>
 
                 <p class="card-subtitle">
 
-                    Review the subjects currently assigned to each exam date.
+                    Review the <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?> currently assigned to each date.
 
                 </p>
 
@@ -1805,15 +1888,15 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                         <tr>
 
                             <th>
-                                Exam Date
+                                <?= $is_school_institution ? 'Exam Date' : 'Assessment Date' ?>
                             </th>
 
                             <th>
-                                Subjects
+                                <?= htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8') ?>
                             </th>
 
                             <th>
-                                Subjects Count
+                                <?= htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8') ?> Count
                             </th>
 
                             <th>
@@ -1899,7 +1982,7 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                                     <span class="text-muted small">
 
-                                        subject<?php
+                                        <?= htmlspecialchars(strtolower($schedule_value_label), ENT_QUOTES, 'UTF-8') ?><?php
                                         echo count($subjects) === 1
                                             ? ''
                                             : 's';
@@ -1943,11 +2026,11 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
                 </div>
 
                 <h5>
-                    No Exam Schedule Yet
+                    No <?= $is_school_institution ? 'Exam' : 'Assessment' ?> Schedule Yet
                 </h5>
 
                 <p>
-                    No subjects have been scheduled for any exam date.
+                    No <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?> have been scheduled for any date.
                     Use the form above to create the first schedule.
                 </p>
 

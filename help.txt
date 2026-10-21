@@ -42,6 +42,16 @@
 --   institution_membership_id are NOT canonical runtime names. Migration
 --   20261007_0005 reads old installations and backfills canonical fields.
 --
+-- UNIVERSAL SESSION MANAGEMENT
+--   admin/manage_session.php now uses academic_periods for operational and
+--   academic period hierarchies, assessment_groups for assessment grouping,
+--   and assessment_group_assignments to associate a group with a period.
+--   Tests continue to reference these independently through tests.academic_period_id
+--   and tests.assessment_group_id. Existing school academic_years rows remain
+--   supported by the legacy school workflow.
+--   SCHEMA CHANGE: NONE. This implementation reuses the existing tables and
+--   columns documented below. No live database update is required.
+--
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS cbt_app_db

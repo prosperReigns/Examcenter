@@ -121,6 +121,16 @@ if (!$test) {
 
 $test_id = (int)$test['id'];
 $_SESSION['current_test_id'] = $test_id;
+$previewAuthorization = $_SESSION['exam_preview_authorized'] ?? null;
+if (
+    !is_array($previewAuthorization)
+    || (int)($previewAuthorization['student_id'] ?? 0) !== $user_id
+    || (int)($previewAuthorization['test_id'] ?? 0) !== $test_id
+    || ($previewAuthorization['mode'] ?? '') !== 'objective'
+) {
+    header('Location: exam_preview.php');
+    exit;
+}
 $exam_duration = isset($test['duration'])
     ? (int)$test['duration'] * 60
     : 3600;
