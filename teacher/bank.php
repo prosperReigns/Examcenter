@@ -1358,6 +1358,10 @@ try {
                 <i class="fas fa-plus-circle"></i>
                 <span>Add Questions</span>
             </a>
+            <a href="add_question.php#theory-assessment">
+                <i class="fas fa-pen-to-square"></i>
+                Theory Questions
+            </a>
 
             <a
                 href="bank.php"
