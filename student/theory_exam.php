@@ -56,7 +56,7 @@ if (!$submission) {
     $stmt->close();
 }
 if ($submission['status'] === 'submitted' || $submission['status'] === 'graded') {
-    \n ?>
+?>
     <!doctype html>
     <html>
 
