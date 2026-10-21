@@ -3000,8 +3000,15 @@ try {
                         </h6>
 
                         <p class="text-muted small mb-0">
-                            Add questions to this test before previewing it.
+                            Add objective questions here, or open the theory assessment to add written-response questions.
                         </p>
+                        <?php if (!empty($current_test['id'])): ?>
+                            <div class="d-flex flex-wrap gap-2 mt-3" id="theory-assessment">
+                                <a class="btn btn-outline-primary" href="theory_assessment.php?test_id=<?= (int)$current_test['id'] ?>">
+                                    <i class="fas fa-pen-to-square me-1"></i> Set Theory Questions
+                                </a>
+                            </div>
+                        <?php endif; ?>
 
                     </div>
 
