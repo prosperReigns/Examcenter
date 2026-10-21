@@ -411,8 +411,13 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                         <span><i class="bi bi-people-fill"></i> <?php echo htmlspecialchars($_SESSION['student_class']); ?></span>
                     </div>
                 </div>
-                <div class="timer-container">
-                    <div class="timer" id="examTimer">00:00:00</div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a class="btn btn-outline-success btn-sm" href="exam_preview.php" title="Return to the assessment section selector">
+                        <i class="bi bi-arrow-left-right"></i> Switch Exam Section
+                    </a>
+                    <div class="timer-container">
+                        <div class="timer" id="examTimer">00:00:00</div>
+                    </div>
                 </div>
             </div>
         </div>

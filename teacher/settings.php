@@ -178,6 +178,18 @@ $conn->close();
         <div class="sidebar-menu mt-4">
             <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
             <a href="add_question.php"><i class="fas fa-plus-circle"></i>Add Questions</a>
+            <a href="pro_question_bank.php"><i class="fas fa-layer-group"></i>Pro: Question Bank</a>
+            <a href="pro_blueprints.php"><i class="fas fa-sitemap"></i>Pro: Blueprints</a>
+            <a href="pro_ai.php"><i class="fas fa-magic"></i>Pro: AI Assessment</a>
+            <a href="pro_moderation.php"><i class="fas fa-clipboard-check"></i>Pro: Moderation</a>
+            <a href="pro_coding.php"><i class="fas fa-code"></i>Pro: Coding</a>
+            <a href="theory_assessment.php"><i class="fas fa-pen-to-square"></i>Theory Assessment</a>
+            <a href="theory_review.php"><i class="fas fa-check-double"></i>Theory Review</a>
+            <a href="grade_theory.php"><i class="fas fa-robot"></i>Theory Grading</a>
+            <a href="add_question.php#theory-assessment">
+                <i class="fas fa-pen-to-square"></i>
+                Theory Questions
+            </a>
             <a href="bank.php">
                 <i class="fas fa-database"></i>
                 Question Bank

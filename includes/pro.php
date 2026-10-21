@@ -5,11 +5,28 @@ require_once __DIR__ . '/../license/ProEntitlementVerifier.php';
 
 function pro_enabled(string $feature = 'pro'): bool
 {
+    if (
+        defined('EXAMCENTER_PRO_GATES_DISABLED_FOR_DEVELOPMENT')
+        && EXAMCENTER_PRO_GATES_DISABLED_FOR_DEVELOPMENT
+    ) {
+        return true;
+    }
+
     return ProEntitlementVerifier::hasFeature($feature);
 }
 
+// TEMPORARY DEVELOPMENT SWITCH: set to false to restore Pro entitlement checks.
+// Do not ship production builds with this enabled.
+const EXAMCENTER_PRO_GATES_DISABLED_FOR_DEVELOPMENT = true;
+
 function require_pro(string $feature = 'pro', string $message = 'This feature requires Examcenter Pro.'): void
 {
+    if (EXAMCENTER_PRO_GATES_DISABLED_FOR_DEVELOPMENT) {
+        // Development-only bypass. Original entitlement check is preserved below.
+        return;
+    }
+
+    // if (pro_enabled($feature)) return;
     if (pro_enabled($feature)) return;
 
     http_response_code(402);

@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id']) || strtolower((string)($_SESSION['user_role'] ?
     header('Location: ../login.php?error=Not logged in');
     exit;
 }
-require_pro('ai_theory', 'Offline AI theory review is an Examcenter Pro feature.');
+require_pro('ai_assessment', 'Offline AI theory review is an Examcenter Pro feature.');
 $db = Database::connection();
 $testId = (int)($_GET['test_id'] ?? 0);
 $stmt = $db->prepare("SELECT ta.id,t.title,t.subject FROM theory_assessments ta JOIN tests t ON t.id=ta.test_id WHERE ta.test_id=? LIMIT 1");
