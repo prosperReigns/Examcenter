@@ -4,6 +4,7 @@ require_once '../db.php';
 require_once '../includes/system_guard.php';
 require_once '../includes/universal_architecture.php';
 require_once '../includes/test_context.php';
+require_once '../includes/audit.php';
 
 // Initialize database connection
 $database = Database::getInstance();
@@ -357,16 +358,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_test'])) {
                     if ($stmt->execute()) {
                         $_SESSION['current_test_id'] = $stmt->insert_id;
                         $_SESSION['success'] = "Test created successfully!";
-                        // Log activity
-                        $ip_address = filter_var($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', FILTER_VALIDATE_IP) ?: '0.0.0.0';
-                        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-                        $activity = "Teacher created test: $title (academic_level_id$academic_level_id, $subject)";
-                        $stmt_log = $conn->prepare("INSERT INTO activities_log (activity, admin_id, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, NOW())");
-                        if ($stmt_log) {
-                            $stmt_log->bind_param("siss", $activity, $teacher_id, $ip_address, $user_agent);
-                            $stmt_log->execute();
-                            $stmt_log->close();
-                        }
+                        logAudit(
+                            $conn,
+                            null,
+                            'Teacher Tests',
+                            "Teacher created test: {$title} (academic level {$academic_level_id}, {$subject})",
+                            'CREATE'
+                        );
                     } else {
                         error_log("Execute failed for test creation: " . $stmt->error);
                         $_SESSION['error'] = "Error creating test.";

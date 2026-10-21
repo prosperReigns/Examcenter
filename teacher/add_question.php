@@ -190,10 +190,16 @@ try {
         $stmt->close();
 
         $stmt = $conn->prepare(
-            "SELECT id, name AS period_name, period_type, code AS period_code
-             FROM academic_periods
-             WHERE institution_id = ? AND status IN ('planned', 'active')
-             ORDER BY period_type, name"
+            "SELECT ap.id, ap.name AS period_name, ap.period_type,
+                    ap.code AS period_code, parent.name AS parent_period_name
+             FROM academic_periods ap
+             LEFT JOIN academic_periods parent
+               ON parent.id = ap.parent_id
+              AND parent.institution_id = ap.institution_id
+             WHERE ap.institution_id = ?
+               AND ap.status IN ('planned', 'active')
+             ORDER BY COALESCE(parent.starts_at, ap.starts_at),
+                      parent.name, ap.starts_at, ap.name"
         );
         $stmt->bind_param('i', $institutionId);
         $stmt->execute();
@@ -1559,8 +1565,19 @@ try {
                                         <select class="form-select" name="academic_period_id" id="academic_period_id" <?= ($is_school_institution || $allows_standalone_assessment) ? '' : 'required' ?>>
                                             <option value=""><?= $is_school_institution ? 'Optional term' : 'Select period' ?></option>
                                             <?php foreach ($academic_periods as $period): ?>
+                                                <?php
+                                                $periodName = trim((string)$period['period_name']);
+                                                $parentPeriodName = trim((string)($period['parent_period_name'] ?? ''));
+                                                $periodType = ucwords(str_replace('_', ' ', (string)$period['period_type']));
+                                                $periodLabel = $is_school_institution
+                                                    ? $periodName
+                                                    : $periodType . ': ' . $periodName;
+                                                if ($parentPeriodName !== '') {
+                                                    $periodLabel .= ' (' . $parentPeriodName . ')';
+                                                }
+                                                ?>
                                                 <option value="<?= (int)$period['id'] ?>">
-                                                    <?= e($period['period_type'] . ': ' . $period['period_name']) ?>
+                                                    <?= e($periodLabel) ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>

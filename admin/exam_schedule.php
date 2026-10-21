@@ -142,7 +142,9 @@ $institution_profile = examcenterInstitutionProfile($conn);
 $active_institution_id = $institution_profile['id'];
 $institution_test_scope_available = $active_institution_id !== null
     && examcenterUniversalColumnExists($conn, 'tests', 'institution_id');
-$institution_category = $active_institution_id === null ? 'secondary_school' : $institution_profile['category'];
+$institution_category = $active_institution_id === null || $institution_profile['type_id'] === null
+    ? 'secondary_school'
+    : $institution_profile['category'];
 $active_institution_name = '';
 if ($active_institution_id !== null) {
     $institutionStmt = $conn->prepare('SELECT name FROM institutions WHERE id = ? LIMIT 1');
@@ -246,10 +248,88 @@ if (!$show_period_filter) $schedule_period_id = 0;
 // ---------------------------------------------------------
 try {
 
-    $loadScheduleValues = static function (int $unitId, int $courseId, int $periodId) use ($conn, $universal_schedule_available, $institution_test_scope_available, $is_school_institution, $active_institution_id): array {
+    $loadScheduleValues = static function (int $unitId, int $courseId, int $periodId) use (
+        $conn,
+        $universal_schedule_available,
+        $institution_test_scope_available,
+        $is_school_institution,
+        $institution_category,
+        $active_institution_id
+    ): array {
+        if ($is_school_institution) {
+            // School subjects are maintained in subjects/subject_levels. They
+            // must be schedulable before a test has been created for them.
+            if (!examcenterUniversalTableExists($conn, 'subjects')) {
+                return [];
+            }
+
+            $classLevels = $institution_category === 'primary_school'
+                ? ['PRIMARY']
+                : ($institution_category === 'secondary_school' ? ['JSS', 'SS'] : ['PRIMARY', 'JSS', 'SS']);
+            if (!examcenterUniversalTableExists($conn, 'subject_levels')) {
+                $result = $conn->query("SELECT DISTINCT LOWER(subject_name) AS schedule_value FROM subjects WHERE subject_name IS NOT NULL AND TRIM(subject_name) <> '' ORDER BY schedule_value");
+                return $result ? array_column($result->fetch_all(MYSQLI_ASSOC), 'schedule_value') : [];
+            }
+
+            $placeholders = implode(',', array_fill(0, count($classLevels), '?'));
+            $sql = "SELECT DISTINCT LOWER(s.subject_name) AS schedule_value
+                    FROM subjects s
+                    INNER JOIN subject_levels sl ON sl.subject_id = s.id
+                    WHERE sl.class_level IN ({$placeholders})
+                      AND s.subject_name IS NOT NULL AND TRIM(s.subject_name) <> ''
+                    ORDER BY schedule_value";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param(str_repeat('s', count($classLevels)), ...$classLevels);
+            $stmt->execute();
+            $values = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'schedule_value');
+            $stmt->close();
+            return $values;
+        }
+
+        // Non-school subjects are institution courses. Do not require a test
+        // row to exist before a configured course can be scheduled.
+        if ($active_institution_id !== null && examcenterUniversalTableExists($conn, 'courses')) {
+            $params = [(int)$active_institution_id];
+            $types = 'i';
+            $sql = "SELECT DISTINCT LOWER(c.name) AS schedule_value
+                    FROM courses c
+                    WHERE c.institution_id = ? AND c.is_active = 1
+                      AND c.name IS NOT NULL AND TRIM(c.name) <> ''";
+            if ($courseId > 0) {
+                $sql .= ' AND c.id = ?';
+                $params[] = $courseId;
+                $types .= 'i';
+            }
+            if ($unitId > 0 || $periodId > 0) {
+                if (!examcenterUniversalTableExists($conn, 'course_assignments')) {
+                    return [];
+                }
+                $sql .= ' AND EXISTS (SELECT 1 FROM course_assignments ca WHERE ca.course_id = c.id';
+                if ($unitId > 0) {
+                    $sql .= ' AND ca.unit_id = ?';
+                    $params[] = $unitId;
+                    $types .= 'i';
+                }
+                if ($periodId > 0) {
+                    $sql .= ' AND ca.academic_period_id = ?';
+                    $params[] = $periodId;
+                    $types .= 'i';
+                }
+                $sql .= ')';
+            }
+            $sql .= ' ORDER BY schedule_value';
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $values = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'schedule_value');
+            $stmt->close();
+            return $values;
+        }
+
+        // Compatibility for older non-school installs that have not migrated
+        // to the institution-scoped courses table yet.
         if (!$institution_test_scope_available && $active_institution_id === null) {
-            $sql = "SELECT DISTINCT LOWER(subject_name) AS schedule_value FROM subjects WHERE subject_name IS NOT NULL AND TRIM(subject_name) <> '' ORDER BY schedule_value";
-            $result = $conn->query($sql);
+            $result = $conn->query("SELECT DISTINCT LOWER(subject_name) AS schedule_value FROM subjects WHERE subject_name IS NOT NULL AND TRIM(subject_name) <> '' ORDER BY schedule_value");
             return $result ? array_column($result->fetch_all(MYSQLI_ASSOC), 'schedule_value') : [];
         }
         if (!$institution_test_scope_available) {
@@ -258,17 +338,9 @@ try {
 
         $params = [(int)$active_institution_id];
         $types = 'i';
-        if ($is_school_institution) {
-            $sql = "SELECT DISTINCT LOWER(s.subject_name) AS schedule_value
-                    FROM subjects s
-                    INNER JOIN tests t ON LOWER(t.subject) = LOWER(s.subject_name)
-                        OR LOWER(t.subject) LIKE CONCAT(LOWER(s.subject_name), ' (%)')
-                    WHERE t.institution_id = ? AND s.subject_name IS NOT NULL AND TRIM(s.subject_name) <> ''";
-        } else {
-            $sql = "SELECT DISTINCT LOWER(t.subject) AS schedule_value
-                    FROM tests t
-                    WHERE t.institution_id = ? AND t.subject IS NOT NULL AND TRIM(t.subject) <> ''";
-        }
+        $sql = "SELECT DISTINCT LOWER(t.subject) AS schedule_value
+                FROM tests t
+                WHERE t.institution_id = ? AND t.subject IS NOT NULL AND TRIM(t.subject) <> ''";
         foreach ([['organizational_unit_id', $unitId], ['course_id', $courseId], ['academic_period_id', $periodId]] as [$column, $value]) {
             if (!$universal_schedule_available) break;
             if ($value > 0) {
@@ -1674,7 +1746,13 @@ $today_schedule = $active_subjects[date('Y-m-d')] ?? [];
 
                                 <i class="fas fa-info-circle me-2"></i>
 
-                                No <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?> are available for this institution and selection. Configure tests and their institution context first.
+                                <?php if ($is_school_institution): ?>
+                                    No school subjects are linked to this institution's school levels. Add or assign subjects in Manage Subjects first.
+                                <?php elseif ($active_institution_id !== null): ?>
+                                    No institution courses are available for this selection. Add or activate courses in Manage Subjects first.
+                                <?php else: ?>
+                                    No <?= strtolower(htmlspecialchars($schedule_value_heading, ENT_QUOTES, 'UTF-8')) ?> are available for this selection yet.
+                                <?php endif; ?>
 
                             </div>
 

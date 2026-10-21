@@ -2,6 +2,7 @@
 session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
+require_once __DIR__ . '/../includes/universal_architecture.php';
 //require_once __DIR__ . '/../license/license_guard.php';
 //require_once __DIR__ . '/../includes/pro.php';
 
@@ -339,6 +340,9 @@ if (empty($questions)) {
     die("No questions available for this test.");
 }
 
+// A saved position can become stale if the question set changes between visits.
+$current_index = max(0, min((int)$current_index, count($questions) - 1));
+
 $_SESSION['exam_questions'] = $questions;
 
 // Fetch show_results_immediately setting (unchanged)
@@ -626,8 +630,8 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     <script>
         let currentIndex = <?php echo $current_index; ?>;
         const totalQuestions = <?php echo count($questions); ?>;
-        const proSecureEnabled = <?php echo $proSecureEnabled ? 'true' : 'false'; ?>;
-        const securePolicy = <?php echo json_encode($securePolicy, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+        const proSecureEnabled = <?php echo !empty($proSecureEnabled) ? 'true' : 'false'; ?>;
+        const securePolicy = <?php echo json_encode(is_array($securePolicy ?? null) ? $securePolicy : new stdClass(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
         const containers = document.querySelectorAll('.question-container');
         const questionBoxes = document.querySelectorAll('.question-box');
         const timerEl = document.getElementById('examTimer');
@@ -657,10 +661,29 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
 
         // Timer
+        function renderTimer() {
+            const safeTimeLeft = Math.max(0, Number(timeLeft) || 0);
+            const hours = Math.floor(safeTimeLeft / 3600);
+            const minutes = Math.floor((safeTimeLeft % 3600) / 60);
+            const seconds = safeTimeLeft % 60;
+            timerEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            if (safeTimeLeft <= 60) {
+                timerEl.classList.remove('warning');
+                timerEl.classList.add('danger');
+            } else if (safeTimeLeft <= 300) {
+                timerEl.classList.add('warning');
+            }
+        }
+
         function startTimer() {
-            const interval = setInterval(() => {
+            renderTimer();
+            if (window.examTimerInterval) {
+                clearInterval(window.examTimerInterval);
+            }
+            window.examTimerInterval = setInterval(() => {
                 if (timeLeft <= 0) {
-                    clearInterval(interval);
+                    clearInterval(window.examTimerInterval);
                     alert('Time has run out. Submitting exam automatically...');
                     submitExam('timeout', () => {
                         window.location.href = 'register.php';
@@ -668,10 +691,7 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                     return;
                 }
                 timeLeft--;
-                const hours = Math.floor(timeLeft / 3600);
-                const minutes = Math.floor((timeLeft % 3600) / 60);
-                const seconds = timeLeft % 60;
-                timerEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                renderTimer();
 
                 if (timeLeft <= 300 && !timerWarning) {
                     timerEl.classList.add('warning');
@@ -691,21 +711,23 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
         // Question Navigation
         function showQuestion(index) {
+            index = Number(index);
+            if (!Number.isInteger(index) || index < 0 || index >= containers.length) return;
+
             containers.forEach(c => c.style.display = 'none');
             containers[index].style.display = 'block';
+            containers[index].classList.add('active');
             questionBoxes.forEach(b => b.classList.remove('current'));
-            questionBoxes[index].classList.add('current');
+            if (questionBoxes[index]) questionBoxes[index].classList.add('current');
 
-            prevBtn.style.display = index === 0 ? 'none' : 'inline-block';
-            nextBtn.style.display = index === totalQuestions - 1 ? 'none' : 'inline-block';
-            submitBtn.style.display = index === totalQuestions - 1 ? 'inline-block' : 'none';
+            if (prevBtn) prevBtn.style.display = index === 0 ? 'none' : 'inline-block';
+            if (nextBtn) nextBtn.style.display = index === totalQuestions - 1 ? 'none' : 'inline-block';
+            if (submitBtn) submitBtn.style.display = index === totalQuestions - 1 ? 'inline-block' : 'none';
 
             currentIndex = index;
             saveState();
-            window.scrollTo({
-                top: document.getElementById(`question-${index}`).offsetTop - 100,
-                behavior: 'smooth'
-            });
+            const questionElement = document.getElementById(`question-${index}`);
+            if (questionElement) questionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function nextQuestion() {
@@ -961,18 +983,26 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         });
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        function initializeExam() {
             try {
                 requestFullscreen();
                 startTimer();
                 showQuestion(currentIndex);
-                formEl.insertAdjacentHTML('beforeend', '<input type="hidden" name="submit_reason" value="manual">');
+                if (formEl && !formEl.querySelector('[name="submit_reason"]')) {
+                    formEl.insertAdjacentHTML('beforeend', '<input type="hidden" name="submit_reason" value="manual">');
+                }
                 console.log('DOM loaded, currentIndex:', currentIndex, 'totalQuestions:', totalQuestions);
                 console.log('Containers length:', containers.length, 'QuestionBoxes length:', questionBoxes.length);
             } catch (e) {
                 console.error('Initialization error:', e);
             }
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeExam, { once: true });
+        } else {
+            initializeExam();
+        }
 
         function confirmSubmission() {
             return confirm(

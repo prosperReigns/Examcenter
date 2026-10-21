@@ -146,8 +146,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Validate inputs
         if (empty($name) || empty($class) || empty($subject) || empty($test_title)) {
             $error = "All fields are required";
-        } elseif (!preg_match("/^[a-zA-Z\s]+$/", $name)) {
-            $error = "Name must contain only letters and spaces";
+        } elseif (!preg_match("/^[\p{L}\p{M} .'-]+$/u", $name)) {
+            $error = "Enter a valid student name";
         } elseif (!array_key_exists($class, $classes)) {
             $error = "Invalid class selected";
         } elseif (!in_array(strtolower($subject), array_map('strtolower',$active_subjects))) {
@@ -267,14 +267,45 @@ if ($stmt) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Registration | Examcenter</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --reg-ink:#172b4d; --reg-muted:#66758b; --reg-blue:#2459a6; --reg-line:#e4eaf2; }
+        body.registration-page { min-height:100vh; color:var(--reg-ink); background:radial-gradient(ellipse at 80% 0%,rgba(77,132,211,.13),transparent 34rem),linear-gradient(180deg,#f5f8fc 0%,#eef3f9 100%); }
+        .registration-topbar { height:72px; display:flex; align-items:center; padding:0 clamp(20px,5vw,72px); background:rgba(255,255,255,.9); border-bottom:1px solid rgba(223,231,241,.9); }
+        .registration-brand { display:flex; align-items:center; gap:11px; color:var(--reg-ink); font-size:18px; font-weight:750; letter-spacing:-.3px; text-decoration:none; }
+        .registration-brand-mark { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; color:#fff; background:linear-gradient(145deg,#3475ce,#1e4f95); font-size:15px; font-weight:800; box-shadow:0 5px 12px rgba(36,89,166,.22); }
+        .registration-shell { max-width:900px; padding-top:clamp(30px,6vh,64px); padding-bottom:56px; }
+        .registration-heading { margin-bottom:24px; }
+        .registration-eyebrow { color:var(--reg-blue); font-size:12px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; }
+        .registration-heading h1 { margin:8px 0 7px; font-size:clamp(27px,4vw,36px); font-weight:750; letter-spacing:-1px; }
+        .registration-heading p { margin:0; color:var(--reg-muted); }
+        .registration-card { overflow:hidden; border:1px solid var(--reg-line); border-radius:16px; background:#fff; box-shadow:0 20px 55px rgba(31,55,88,.09); }
+        .registration-card .card-header { padding:22px 26px; border-bottom:1px solid var(--reg-line); background:#fff; }
+        .registration-card .card-header h2 { margin:0 0 4px; font-size:17px; font-weight:750; }
+        .registration-card .card-header p { margin:0; color:var(--reg-muted); font-size:13px; }
+        .registration-card .card-body { padding:26px; }
+        .registration-card .form-label { margin-bottom:7px; color:#31445f; font-size:13px; font-weight:700; }
+        .registration-card .form-control,.registration-card .form-select { min-height:46px; padding:10px 12px; border-color:#d7e0eb; border-radius:8px; box-shadow:none; }
+        .registration-card .form-control:focus,.registration-card .form-select:focus { border-color:#6d9bd6; box-shadow:0 0 0 3px rgba(36,89,166,.12); }
+        .registration-card .btn-primary { min-height:48px; border:0; border-radius:8px; background:linear-gradient(110deg,#2b68b8,#24559b); box-shadow:0 7px 16px rgba(36,89,166,.18); font-weight:700; }
+        .registration-card .alert { border-radius:9px; }
+        @media(max-width:767.98px) { .registration-topbar { height:62px; } .registration-shell { padding-top:26px; } .registration-card .card-header,.registration-card .card-body { padding:20px; } }
+    </style>
 </head>
-<body>
-    <div class="container mt-5">
+<body class="registration-page">
+    <header class="registration-topbar">
+        <a class="registration-brand" href="register.php" aria-label="Examcenter registration">
+            <span class="registration-brand-mark" aria-hidden="true">E</span>
+            <span>Examcenter</span>
+        </a>
+    </header>
+    <main class="container registration-shell">
         <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h3 class="text-center">Student Registration</h3>
+            <div class="col-lg-9 col-xl-8">
+                <div class="card registration-card">
+                    <div class="card-header">
+                        <span class="registration-eyebrow">Candidate portal</span>
+                        <h2>Student Registration</h2>
+                        <p>Enter your details and choose the exam you are attending.</p>
                     </div>
                     <div class="card-body">
                         <?php if (!empty($error)): ?>
@@ -284,6 +315,11 @@ if ($stmt) {
                         <?php endif; ?>
                         <form method="POST" action="">
                             <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Student Name</label>
+                                <input type="text" class="form-control" id="name" name="name" maxlength="150" autocomplete="name" value="<?php echo htmlspecialchars($name); ?>" required>
+                            </div>
 
                             <!-- Year dropdown -->
                             <div class="mb-3">
@@ -317,10 +353,6 @@ if ($stmt) {
                                 </select>
                             </div>
                             <div class="mb-3">
-    <label for="name" class="form-label">Full Name</label>
-    <input type="text" class="form-control" id="name" name="name" pattern="[A-Za-z\s]+" value="<?php echo htmlspecialchars($name); ?>" required>
-</div>
-                            <div class="mb-3">
                                 <label for="subject" class="form-label">Subject</label>
                                 <select class="form-select" id="subject" name="subject" required>
                                     <option value="">Select your subject</option>
@@ -332,7 +364,7 @@ if ($stmt) {
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
     // Subject categories

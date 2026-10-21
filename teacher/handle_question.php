@@ -1727,31 +1727,34 @@ if (
                     . substr($question_text, 0, 50);
 
 
-        $stmt_log = $conn->prepare("
-            INSERT INTO activities_log
-            (
-                activity,
-                admin_id,
-                ip_address,
-                user_agent,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, NOW())
-        ");
+        // Activity logging is optional; a missing log table must not turn a
+        // successfully committed question into a reported save failure.
+        try {
+            if (examcenterUniversalTableExists($conn, 'activities_log')) {
+                $stmt_log = $conn->prepare("
+                    INSERT INTO activities_log
+                    (
+                        activity,
+                        admin_id,
+                        ip_address,
+                        user_agent,
+                        created_at
+                    )
+                    VALUES (?, ?, ?, ?, NOW())
+                ");
 
-
-        if ($stmt_log) {
-
-            $stmt_log->bind_param(
-                "siss",
-                $activity,
-                $teacher_id,
-                $ip_address,
-                $user_agent
-            );
-
-            $stmt_log->execute();
-            $stmt_log->close();
+                $stmt_log->bind_param(
+                    "siss",
+                    $activity,
+                    $teacher_id,
+                    $ip_address,
+                    $user_agent
+                );
+                $stmt_log->execute();
+                $stmt_log->close();
+            }
+        } catch (Throwable $loggingError) {
+            // Logging errors are isolated from the teacher-facing save result.
         }
 
     } catch (Exception $e) {

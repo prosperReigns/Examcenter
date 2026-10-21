@@ -139,93 +139,132 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
     <title>Exam Preview | Examcenter</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #f3f6fb; color: #1f2937; }
-        .preview-wrap { max-width: 980px; }
-        .preview-hero { background: linear-gradient(120deg, #123d70, #1769aa); color: #fff; border-radius: 1rem; }
-        .detail-card, .instruction-card { border: 0; border-radius: .9rem; box-shadow: 0 8px 24px rgba(15, 38, 66, .07); }
-        .detail-label { color: #64748b; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
-        .start-button { min-width: 210px; }
+        :root { --preview-ink:#172b4d; --preview-muted:#66758b; --preview-blue:#2459a6; --preview-line:#e4eaf2; }
+        body { min-height:100vh; background:radial-gradient(ellipse at 78% 0%,rgba(77,132,211,.12),transparent 34rem),#f3f6fb; color:var(--preview-ink); }
+        .preview-topbar { height:68px; display:flex; align-items:center; justify-content:space-between; padding:0 clamp(20px,5vw,64px); background:rgba(255,255,255,.92); border-bottom:1px solid var(--preview-line); }
+        .preview-brand { display:flex; align-items:center; gap:10px; color:var(--preview-ink); font-size:17px; font-weight:750; text-decoration:none; }
+        .brand-mark { width:32px; height:32px; display:grid; place-items:center; border-radius:9px; color:#fff; background:linear-gradient(145deg,#3475ce,#1e4f95); font-size:14px; font-weight:800; }
+        .secure-note { color:var(--preview-muted); font-size:12px; }
+        .preview-wrap { max-width:1180px; padding-top:38px; padding-bottom:54px; }
+        .preview-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:26px; }
+        .eyebrow { color:var(--preview-blue); font-size:11px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; }
+        .preview-heading h1 { margin:5px 0 4px; font-size:clamp(25px,3vw,32px); font-weight:750; letter-spacing:-.7px; }
+        .preview-heading p { margin:0; color:var(--preview-muted); }
+        .start-actions { display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; margin:0; }
+        .start-button { min-width:180px; min-height:46px; border:0; border-radius:8px; font-size:14px; font-weight:700; box-shadow:0 6px 15px rgba(36,89,166,.15); }
+        .start-objective { background:linear-gradient(110deg,#2b68b8,#24559b); }
+        .start-objective:hover { background:#1f4f92; }
+        .start-theory { background:linear-gradient(110deg,#18856c,#116b57); }
+        .start-theory:hover { background:#0e604e; }
+        .preview-card { overflow:hidden; border:1px solid var(--preview-line); border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(31,55,88,.07); }
+        .preview-card-header { padding:19px 22px; border-bottom:1px solid var(--preview-line); }
+        .preview-card-header h2 { margin:0; font-size:16px; font-weight:750; }
+        .preview-card-body { padding:21px 22px; }
+        .detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 20px; }
+        .detail-label { margin-bottom:4px; color:var(--preview-muted); font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; }
+        .detail-value { overflow-wrap:anywhere; color:var(--preview-ink); font-size:15px; font-weight:650; }
+        .assessment-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:20px; }
+        .summary-item { padding:15px; border:1px solid var(--preview-line); border-radius:10px; background:#f8fafd; }
+        .summary-item strong { display:block; margin-bottom:3px; font-size:13px; }
+        .summary-item span { color:var(--preview-muted); font-size:13px; }
+        .instruction-card { margin-bottom:16px; }
+        .instruction-card:last-child { margin-bottom:0; }
+        .instruction-card .preview-card-header { display:flex; align-items:center; gap:10px; }
+        .instruction-icon { width:30px; height:30px; display:grid; place-items:center; flex:0 0 30px; border-radius:9px; color:var(--preview-blue); background:#eaf2fc; font-weight:800; }
+        .instruction-list { margin:0; padding-left:19px; color:#475467; font-size:13px; }
+        .instruction-list li { padding-left:3px; margin-bottom:11px; }
+        .instruction-list li:last-child { margin-bottom:0; }
+        .theory-copy { color:#475467; font-size:13px; white-space:pre-wrap; }
+        .empty-warning { border:1px solid #f2d28a; border-radius:10px; background:#fff8e6; color:#725410; }
+        .bottom-note { margin-top:18px; color:var(--preview-muted); font-size:12px; text-align:center; }
+        @media(max-width:991.98px) { .preview-heading { align-items:flex-start; flex-direction:column; } .start-actions { justify-content:flex-start; } }
+        @media(max-width:575.98px) { .preview-topbar { height:60px; } .secure-note { display:none; } .preview-wrap { padding-top:25px; } .start-actions,.start-button { width:100%; } .detail-grid,.assessment-summary { grid-template-columns:1fr; } .preview-card-header,.preview-card-body { padding-left:18px; padding-right:18px; } }
     </style>
 </head>
 <body>
-<main class="container preview-wrap py-4 py-md-5">
-    <header class="preview-hero p-4 p-md-5 mb-4">
-        <div class="small text-uppercase fw-semibold opacity-75 mb-2">Before you begin</div>
-        <h1 class="h2 mb-2">Review your exam details</h1>
-        <p class="mb-0">Check your information and read the exam instructions. Your timed attempt starts after you select a section below.</p>
+<header class="preview-topbar">
+    <a class="preview-brand" href="register.php" aria-label="Examcenter"><span class="brand-mark" aria-hidden="true">E</span><span>Examcenter</span></a>
+    <span class="secure-note">Assessment preview · Review before starting</span>
+</header>
+<main class="container preview-wrap">
+    <header class="preview-heading">
+        <div>
+            <div class="eyebrow">Before you begin</div>
+            <h1>Review your exam details</h1>
+            <p>Check your information and read the instructions before starting your assessment.</p>
+        </div>
+        <?php if ($test && $student && ($objectiveAvailable || $theoryAvailable)): ?>
+            <form method="post" class="start-actions">
+                <input type="hidden" name="csrf_token" value="<?= $h($_SESSION['csrf_token']) ?>">
+                <?php if ($objectiveAvailable): ?><button type="submit" name="mode" value="objective" class="btn btn-primary start-button start-objective">Start Objective Exam</button><?php endif; ?>
+                <?php if ($theoryAvailable): ?><button type="submit" name="mode" value="theory" class="btn btn-success start-button start-theory">Start Theory Exam</button><?php endif; ?>
+            </form>
+        <?php endif; ?>
     </header>
 
-    <?php if ($error !== ''): ?>
-        <div class="alert alert-danger" role="alert"><?= $h($error) ?></div>
-    <?php endif; ?>
+    <?php if ($error !== ''): ?><div class="alert alert-danger" role="alert"><?= $h($error) ?></div><?php endif; ?>
 
     <?php if ($test && $student): ?>
-        <section class="card detail-card mb-4" aria-labelledby="student-details-heading">
-            <div class="card-body p-4">
-                <h2 class="h5 mb-4" id="student-details-heading">Student details</h2>
-                <div class="row g-3">
-                    <div class="col-sm-6"><div class="detail-label">Full name</div><div class="fw-semibold"><?= $h($student['full_name']) ?></div></div>
-                    <?php if ($groupName !== ''): ?><div class="col-sm-6"><div class="detail-label">Class / group</div><div class="fw-semibold"><?= $h($groupName) ?></div></div><?php endif; ?>
-                    <div class="col-sm-6"><div class="detail-label">Candidate number</div><div class="fw-semibold"><?= $h($studentId) ?></div></div>
-                </div>
+        <div class="row g-4 align-items-start">
+            <div class="col-lg-7">
+                <section class="preview-card mb-4" aria-labelledby="student-details-heading">
+                    <div class="preview-card-header"><h2 id="student-details-heading">Student details</h2></div>
+                    <div class="preview-card-body">
+                        <div class="detail-grid">
+                            <div><div class="detail-label">Student name</div><div class="detail-value"><?= $h($student['full_name']) ?></div></div>
+                            <?php if ($groupName !== ''): ?><div><div class="detail-label">Class / group</div><div class="detail-value"><?= $h($groupName) ?></div></div><?php endif; ?>
+                            <div><div class="detail-label">Candidate number</div><div class="detail-value"><?= $h($studentId) ?></div></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="preview-card" aria-labelledby="exam-details-heading">
+                    <div class="preview-card-header"><h2 id="exam-details-heading">Assessment details</h2></div>
+                    <div class="preview-card-body">
+                        <div class="detail-grid">
+                            <div><div class="detail-label">Assessment</div><div class="detail-value"><?= $h($test['title']) ?></div></div>
+                            <div><div class="detail-label">Subject / course</div><div class="detail-value"><?= $h($test['subject'] ?: 'Not specified') ?></div></div>
+                            <div><div class="detail-label">Academic year / period</div><div class="detail-value"><?= $h($test['year'] ?: 'Not specified') ?></div></div>
+                            <?php if ((int)$test['duration'] > 0): ?><div><div class="detail-label">Objective time limit</div><div class="detail-value"><?= $h((int)$test['duration']) ?> minutes</div><?php endif; ?>
+                        </div>
+                        <div class="assessment-summary">
+                            <?php if ($objectiveAvailable): ?><div class="summary-item"><strong>Objective section</strong><span><?= $h($objectiveCount) ?> questions</span></div><?php endif; ?>
+                            <?php if ($theoryAvailable): ?><div class="summary-item"><strong>Theory section</strong><span><?= $h($theoryCount) ?> questions · <?= $h(rtrim(rtrim(number_format($theoryMarks, 2, '.', ''), '0'), '.')) ?> marks</span></div><?php endif; ?>
+                        </div>
+                        <?php if (!$objectiveAvailable && !$theoryAvailable): ?><div class="empty-warning p-3 mt-3">No questions are currently available for this assessment. Please contact the exam administrator.</div><?php endif; ?>
+                    </div>
+                </section>
             </div>
-        </section>
 
-        <section class="card detail-card mb-4" aria-labelledby="exam-details-heading">
-            <div class="card-body p-4">
-                <h2 class="h5 mb-4" id="exam-details-heading">Assessment details</h2>
-                <div class="row g-3 mb-4">
-                    <div class="col-sm-6"><div class="detail-label">Assessment</div><div class="fw-semibold"><?= $h($test['title']) ?></div></div>
-                    <div class="col-sm-6"><div class="detail-label">Subject / course</div><div class="fw-semibold"><?= $h($test['subject'] ?: 'Not specified') ?></div></div>
-                    <div class="col-sm-6"><div class="detail-label">Year</div><div class="fw-semibold"><?= $h($test['year'] ?: 'Not specified') ?></div></div>
-                    <?php if ((int)$test['duration'] > 0): ?><div class="col-sm-6"><div class="detail-label">Objective time limit</div><div class="fw-semibold"><?= $h((int)$test['duration']) ?> minutes</div></div><?php endif; ?>
-                </div>
-                <div class="row g-3">
-                    <?php if ($objectiveAvailable): ?>
-                        <div class="col-md-6"><div class="border rounded-3 p-3 h-100"><div class="fw-semibold mb-1">Objective section</div><div><?= $h($objectiveCount) ?> questions</div><div class="text-secondary small">Multiple choice and other selected response questions</div></div></div>
-                    <?php endif; ?>
-                    <?php if ($theoryAvailable): ?>
-                        <div class="col-md-6"><div class="border rounded-3 p-3 h-100"><div class="fw-semibold mb-1">Theory section</div><div><?= $h($theoryCount) ?> questions · <?= $h(rtrim(rtrim(number_format($theoryMarks, 2, '.', ''), '0'), '.')) ?> marks</div><?php if (trim((string)$theory['instructions']) !== ''): ?><div class="text-secondary small mt-2"><?= nl2br($h($theory['instructions'])) ?></div><?php endif; ?></div></div>
-                    <?php endif; ?>
-                    <?php if (!$objectiveAvailable && !$theoryAvailable): ?><div class="col-12"><div class="alert alert-warning mb-0">No questions are currently available for this assessment. Please contact the exam administrator.</div></div><?php endif; ?>
-                </div>
-            </div>
-        </section>
-
-        <?php if ($objectiveAvailable): ?>
-            <section class="card instruction-card mb-4" aria-labelledby="instructions-heading">
-                <div class="card-body p-4">
-                    <h2 class="h5" id="instructions-heading">Objective exam instructions</h2>
-                    <ul class="mb-0">
-                        <li>Keep this exam open in the current browser tab. The first tab switch shows a warning; a second tab switch terminates and submits the exam.</li>
-                        <li>Stay in full-screen mode. If you exit full screen, return using the prompt shown on the exam page.</li>
-                        <li>Copying, pasting, and the browser context menu are disabled during the objective exam.</li>
-                        <li>Use the exam page to move between questions and submit your own answers. Avoid browser Back navigation.</li>
-                    </ul>
-                </div>
-            </section>
-        <?php endif; ?>
-        <?php if ($theoryAvailable): ?>
-            <section class="card instruction-card mb-4">
-                <div class="card-body p-4">
-                    <h2 class="h5">Theory exam instructions</h2>
-                    <ul class="mb-0">
-                        <li>Read the assessment instructions above before starting, then write your answers in the response boxes.</li>
-                        <li>Use your own words and submit only when you have finished reviewing your answers.</li>
-                    </ul>
-                </div>
-            </section>
-        <?php endif; ?>
-
-        <form method="post" class="d-flex flex-column flex-sm-row gap-2 justify-content-center pb-4">
-            <input type="hidden" name="csrf_token" value="<?= $h($_SESSION['csrf_token']) ?>">
-            <?php if ($objectiveAvailable): ?>
-                <button type="submit" name="mode" value="objective" class="btn btn-primary btn-lg start-button">Start Objective Exam</button>
-            <?php endif; ?>
-            <?php if ($theoryAvailable): ?>
-                <button type="submit" name="mode" value="theory" class="btn btn-success btn-lg start-button">Start Theory Exam</button>
-            <?php endif; ?>
-        </form>
+            <aside class="col-lg-5" aria-label="Exam instructions">
+                <?php if ($objectiveAvailable): ?>
+                    <section class="preview-card instruction-card" aria-labelledby="objective-instructions-heading">
+                        <div class="preview-card-header"><span class="instruction-icon" aria-hidden="true">!</span><h2 id="objective-instructions-heading">Objective exam instructions</h2></div>
+                        <div class="preview-card-body">
+                            <ul class="instruction-list">
+                                <li>Keep this exam open in the current browser tab. The first tab switch shows a warning; a second tab switch terminates and submits the exam.</li>
+                                <li>Stay in full-screen mode. If you exit full screen, return using the prompt shown on the exam page.</li>
+                                <li>Copying, pasting, and the browser context menu are disabled during the objective exam.</li>
+                                <li>Use the exam page to move between questions and submit your own answers. Avoid browser Back navigation.</li>
+                            </ul>
+                        </div>
+                    </section>
+                <?php endif; ?>
+                <?php if ($theoryAvailable): ?>
+                    <section class="preview-card instruction-card" aria-labelledby="theory-instructions-heading">
+                        <div class="preview-card-header"><span class="instruction-icon" aria-hidden="true">i</span><h2 id="theory-instructions-heading">Theory exam instructions</h2></div>
+                        <div class="preview-card-body">
+                            <?php if (trim((string)$theory['instructions']) !== ''): ?><p class="theory-copy mb-3"><?= nl2br($h($theory['instructions'])) ?></p><?php endif; ?>
+                            <ul class="instruction-list">
+                                <li>Read the assessment instructions before starting, then write your answers in the response boxes.</li>
+                                <li>Use your own words and submit only when you have finished reviewing your answers.</li>
+                            </ul>
+                        </div>
+                    </section>
+                <?php endif; ?>
+            </aside>
+        </div>
+        <div class="bottom-note">Your exam attempt starts when you select a Start button above.</div>
     <?php endif; ?>
 </main>
 </body>
