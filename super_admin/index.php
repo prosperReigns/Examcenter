@@ -1140,6 +1140,26 @@ $daysText = $daysRemaining < 0
 
 
     <div class="sidebar-section">
+        Development / Pro Testing
+    </div>
+
+    <a href="../admin/pro_suite.php"><i class="fas fa-layer-group"></i><span>Pro Suite</span></a>
+    <a href="../admin/pro_sessions.php"><i class="fas fa-calendar-check"></i><span>Pro: Exam Sessions</span></a>
+    <a href="../admin/pro_security.php"><i class="fas fa-shield-alt"></i><span>Pro: Secure Exam</span></a>
+    <a href="../admin/pro_analytics.php"><i class="fas fa-chart-line"></i><span>Pro: Analytics</span></a>
+    <a href="../admin/pro_certificates.php"><i class="fas fa-certificate"></i><span>Pro: Certificates</span></a>
+    <a href="../admin/pro_campuses.php"><i class="fas fa-building"></i><span>Pro: Multi-Campus</span></a>
+    <a href="../admin/pro_corporate.php"><i class="fas fa-briefcase"></i><span>Pro: Corporate</span></a>
+    <a href="../teacher/pro_question_bank.php"><i class="fas fa-layer-group"></i><span>Pro: Question Bank</span></a>
+    <a href="../teacher/pro_blueprints.php"><i class="fas fa-sitemap"></i><span>Pro: Blueprints</span></a>
+    <a href="../teacher/pro_ai.php"><i class="fas fa-magic"></i><span>Pro: AI Assessment</span></a>
+    <a href="../teacher/pro_moderation.php"><i class="fas fa-clipboard-check"></i><span>Pro: Moderation</span></a>
+    <a href="../teacher/pro_coding.php"><i class="fas fa-code"></i><span>Pro: Coding</span></a>
+    <a href="../teacher/theory_assessment.php"><i class="fas fa-pen-to-square"></i><span>Theory Assessment</span></a>
+    <a href="../teacher/theory_review.php"><i class="fas fa-check-double"></i><span>Theory Review</span></a>
+    <a href="../teacher/grade_theory.php"><i class="fas fa-robot"></i><span>Theory Grading</span></a>
+
+    <div class="sidebar-section">
         Management
     </div>
 
