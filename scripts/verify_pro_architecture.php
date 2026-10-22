@@ -29,6 +29,8 @@ $required = [
     'theory/TheoryGradingQueue.php',
     'scripts/theory_grading_worker.php',
     'database/migrations/20261022_0002_theory_grading_queue.sql',
+    'database/migrations/20261022_0002_theory_grading_queue.php',
+    'database/migrations/20261022_0001_combined_theory_exam_scores.sql',
     'teacher/theory_assessment.php',
     'teacher/theory_review.php',
     'teacher/grade_theory.php',
@@ -72,6 +74,7 @@ foreach ($required as $path) {
 
 $phpFiles = [
     'database/migrate.php',
+    'database/migrations/20261022_0002_theory_grading_queue.php',
     'database/backfill_legacy.php',
     'license/ProEntitlementVerifier.php',
     'license/ProEntitlementAPI.php',
