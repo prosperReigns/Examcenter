@@ -127,7 +127,7 @@ if (
     !is_array($previewAuthorization)
     || (int)($previewAuthorization['student_id'] ?? 0) !== $user_id
     || (int)($previewAuthorization['test_id'] ?? 0) !== $test_id
-    || ($previewAuthorization['mode'] ?? '') !== 'objective'
+    || !in_array(($previewAuthorization['mode'] ?? ''), ['objective', 'combined'], true)
 ) {
     header('Location: exam_preview.php');
     exit;
