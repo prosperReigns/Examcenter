@@ -59,7 +59,7 @@ $stmt->close();
     <h2><?= htmlspecialchars($assessment['title']) ?> — Theory Review</h2>
     <p><a href="grade_theory.php?test_id=<?= $testId ?>">Run local AI grading for submitted answers</a></p>
     <?php foreach ($subs as $s): ?><h3><?= htmlspecialchars($s['full_name']) ?> — <?= htmlspecialchars((string)$s['status']) ?> / <?= htmlspecialchars((string)$s['grading_status']) ?></h3>
-        <?php $st = $db->prepare("SELECT a.id,a.answer_text,q.question_number,q.question_text,q.maximum_marks,m.id mark_id,m.awarded_marks,m.status,m.explanation FROM theory_answers a JOIN theory_questions q ON q.id=a.theory_question_id LEFT JOIN theory_marks m ON m.answer_id=a.id WHERE a.submission_id=? ORDER BY q.question_number");
+        <?php $st = $db->prepare("SELECT a.id,a.answer_text,q.question_number,q.question_text,q.maximum_marks,m.id mark_id,m.awarded_marks,m.status,m.explanation,m.confidence,m.weaknesses,m.missing_points FROM theory_answers a JOIN theory_questions q ON q.id=a.theory_question_id LEFT JOIN theory_marks m ON m.answer_id=a.id WHERE a.submission_id=? ORDER BY q.question_number");
         $st->bind_param('i', $s['id']);
         $st->execute();
         $marks = $st->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -67,7 +67,11 @@ $stmt->close();
         foreach ($marks as $m): ?><article><b>Q<?= $m['question_number'] ?> / <?= $m['maximum_marks'] ?> marks</b>
                 <p><?= nl2br(htmlspecialchars($m['question_text'])) ?></p>
                 <p><strong>Student:</strong> <?= nl2br(htmlspecialchars($m['answer_text'])) ?></p>
-                <p><strong>AI provisional:</strong> <?= htmlspecialchars((string)$m['awarded_marks']) ?> — <?= nl2br(htmlspecialchars((string)$m['explanation'])) ?></p><?php if ($m['mark_id']): ?><form method="post"><input type="hidden" name="mark_id" value="<?= $m['mark_id'] ?>"><input type="number" name="final_mark" min="0" max="<?= $m['maximum_marks'] ?>" step="0.01" value="<?= $m['awarded_marks'] ?>"><input name="reason" placeholder="Reason for teacher review" required><button name="save_mark">Save final mark</button></form><?php endif; ?>
+                <p><strong>AI provisional score:</strong> <?= htmlspecialchars((string)$m['awarded_marks']) ?> / <?= htmlspecialchars((string)$m['maximum_marks']) ?></p>
+                <p><strong>AI explanation / review reason:</strong> <?= nl2br(htmlspecialchars((string)$m['explanation'])) ?></p>
+                <?php if ($m['confidence'] !== null): ?><p><strong>AI confidence:</strong> <?= htmlspecialchars((string)round((float)$m['confidence'] * 100, 1)) ?>%</p><?php endif; ?>
+                <?php if (!empty($m['weaknesses'])): ?><p><strong>Potential weaknesses:</strong> <?= nl2br(htmlspecialchars((string)$m['weaknesses'])) ?></p><?php endif; ?>
+                <?php if (!empty($m['missing_points'])): ?><p><strong>Points to review:</strong> <?= nl2br(htmlspecialchars((string)$m['missing_points'])) ?></p><?php endif; ?><?php if ($m['mark_id']): ?><form method="post"><input type="hidden" name="mark_id" value="<?= $m['mark_id'] ?>"><input type="number" name="final_mark" min="0" max="<?= $m['maximum_marks'] ?>" step="0.01" value="<?= $m['awarded_marks'] ?>"><input name="reason" placeholder="Reason for teacher review" required><button name="save_mark">Save final mark</button></form><?php endif; ?>
             </article><?php endforeach; ?><?php endforeach; ?>
 </body>
 
