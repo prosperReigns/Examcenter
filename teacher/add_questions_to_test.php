@@ -172,7 +172,8 @@ try {
                 question_text,
                 class,
                 subject,
-                question_type
+                question_type,
+                maximum_marks
                 {$question_context_select}
             FROM new_questions
             WHERE id = ?
@@ -243,6 +244,35 @@ try {
          */
 
         switch ($question['question_type']) {
+
+            case "theory":
+                $marks = (float)($question['maximum_marks'] ?? 0);
+                if ($marks <= 0) throw new Exception('The selected theory bank question has no maximum marks. Edit it in bank.php and set maximum marks first.');
+                $assessmentStmt = $conn->prepare("SELECT id FROM theory_assessments WHERE test_id = ? LIMIT 1");
+                $assessmentStmt->bind_param('i', $test_id);
+                $assessmentStmt->execute();
+                $assessment = $assessmentStmt->get_result()->fetch_assoc();
+                $assessmentStmt->close();
+                if (!$assessment) {
+                    $instructions = '';
+                    $model = (string)(getenv('EXAMCENTER_THEORY_MODEL') ?: 'qwen3:1.7b');
+                    $createAssessment = $conn->prepare("INSERT INTO theory_assessments(test_id, instructions, ai_model, status) VALUES (?, ?, ?, 'draft')");
+                    $createAssessment->bind_param('iss', $test_id, $instructions, $model);
+                    if (!$createAssessment->execute()) throw new Exception('Unable to create theory assessment: ' . $createAssessment->error);
+                    $assessment = ['id' => $createAssessment->insert_id];
+                    $createAssessment->close();
+                }
+                $assessmentId = (int)$assessment['id'];
+                $numberStmt = $conn->prepare("SELECT COALESCE(MAX(question_number), 0) + 1 AS next_number FROM theory_questions WHERE theory_assessment_id = ?");
+                $numberStmt->bind_param('i', $assessmentId);
+                $numberStmt->execute();
+                $number = (int)$numberStmt->get_result()->fetch_assoc()['next_number'];
+                $numberStmt->close();
+                $theoryStmt = $conn->prepare("INSERT INTO theory_questions(theory_assessment_id, question_number, question_text, maximum_marks) VALUES (?, ?, ?, ?)");
+                $theoryStmt->bind_param('iisd', $assessmentId, $number, $question['question_text'], $marks);
+                if (!$theoryStmt->execute()) throw new Exception('Unable to attach theory question: ' . $theoryStmt->error);
+                $theoryStmt->close();
+                break;
 
             case "multiple_choice_single":
 
