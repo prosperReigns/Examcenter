@@ -1277,18 +1277,26 @@ if (
 
         $stmt->close();
 
-        // Store maximum marks on the canonical question-bank record.
-        if ($question_type === 'theory') {
-            $marksStmt = $conn->prepare("UPDATE new_questions SET maximum_marks = ? WHERE id = ?");
-            if (!$marksStmt) throw new Exception('Unable to prepare maximum-marks update: ' . $conn->error);
-            $marksStmt->bind_param('di', $maximum_marks, $question_id);
-        } else {
-            $marksStmt = $conn->prepare("UPDATE new_questions SET maximum_marks = NULL WHERE id = ?");
-            if (!$marksStmt) throw new Exception('Unable to prepare maximum-marks reset: ' . $conn->error);
-            $marksStmt->bind_param('i', $question_id);
+        // Store maximum marks on the canonical question-bank record when the
+        // schema migration is installed. Objective authoring remains compatible
+        // with existing databases; theory authoring explains the required migration.
+        $question_marks_available = examcenterUniversalColumnExists($conn, 'new_questions', 'maximum_marks');
+        if ($question_type === 'theory' && !$question_marks_available) {
+            throw new Exception('Theory question marks are not installed yet. Apply the ADDED maximum_marks migration in help.txt.');
         }
-        if (!$marksStmt->execute()) throw new Exception('Unable to save maximum marks: ' . $marksStmt->error);
-        $marksStmt->close();
+        if ($question_marks_available) {
+            if ($question_type === 'theory') {
+                $marksStmt = $conn->prepare("UPDATE new_questions SET maximum_marks = ? WHERE id = ?");
+                if (!$marksStmt) throw new Exception('Unable to prepare maximum-marks update: ' . $conn->error);
+                $marksStmt->bind_param('di', $maximum_marks, $question_id);
+            } else {
+                $marksStmt = $conn->prepare("UPDATE new_questions SET maximum_marks = NULL WHERE id = ?");
+                if (!$marksStmt) throw new Exception('Unable to prepare maximum-marks reset: ' . $conn->error);
+                $marksStmt->bind_param('i', $question_id);
+            }
+            if (!$marksStmt->execute()) throw new Exception('Unable to save maximum marks: ' . $marksStmt->error);
+            $marksStmt->close();
+        }
 
         /*
          |--------------------------------------------------------------------------
