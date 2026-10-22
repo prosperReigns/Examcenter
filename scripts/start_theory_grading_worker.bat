@@ -20,5 +20,6 @@ if not exist "%ROOT%\scripts\theory_grading_worker.php" (
     exit /b 1
 )
 
+cd /d "%ROOT%"
 start "Examcenter Theory Grading Worker" /min "%PHP_EXE%" "%ROOT%\scripts\theory_grading_worker.php"
 exit /b 0
