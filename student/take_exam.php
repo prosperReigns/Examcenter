@@ -412,9 +412,19 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <a class="btn btn-outline-success btn-sm" href="exam_preview.php" title="Return to the assessment section selector">
-                        <i class="bi bi-arrow-left-right"></i> Switch Exam Section
+                    <?php
+                    $theoryLinkStmt = $conn->prepare("SELECT id FROM theory_assessments WHERE test_id=? AND status<>'archived' LIMIT 1");
+                    $theoryLinkStmt->bind_param('i', $test_id);
+                    $theoryLinkStmt->execute();
+                    $hasTheorySection = (bool)$theoryLinkStmt->get_result()->fetch_assoc();
+                    $theoryLinkStmt->close();
+                    if ($hasTheorySection):
+                    ?>
+                    <a class="btn btn-outline-success btn-sm" href="theory_exam.php?test_id=<?= $test_id ?>">
+                        <i class="bi bi-pencil-square"></i> Answer Theory
                     </a>
+                    <?php endif; ?>
+                    <a class="btn btn-outline-secondary btn-sm" href="exam_preview.php">Exam Preview</a>
                     <div class="timer-container">
                         <div class="timer" id="examTimer">00:00:00</div>
                     </div>
