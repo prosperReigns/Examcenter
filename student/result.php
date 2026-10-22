@@ -76,6 +76,14 @@ $stmt->close();
                         <h4>Congratulations, <?php echo htmlspecialchars($student_name); ?>!</h4>
                         <p class="lead">You have completed your exam.</p>
 
+                        <?php if (!empty($_SESSION['theory_grading_notice'])): ?>
+                            <div class="alert alert-warning text-start" role="alert">
+                                <strong>Theory grading needs attention.</strong>
+                                <?= htmlspecialchars((string)$_SESSION['theory_grading_notice'], ENT_QUOTES, 'UTF-8') ?>
+                            </div>
+                            <?php unset($_SESSION['theory_grading_notice']); ?>
+                        <?php endif; ?>
+
                         <?php if ($show_results): ?>
                             <hr>
                             <h5>Your Score</h5>
