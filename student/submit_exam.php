@@ -161,6 +161,70 @@ foreach ($questions as $question) {
     }
 }
 
+// Grade any theory section attached to this test before persisting the combined result.
+// Ollama runs only on this computer; no cloud grading endpoint is used.
+$theoryMaximum = 0.0;
+$theoryScore = 0.0;
+$theoryAssessmentId = 0;
+$theorySubmissionId = 0;
+$theoryGradingError = '';
+$stmt = $conn->prepare("SELECT id FROM theory_assessments WHERE test_id=? AND status<>'archived' LIMIT 1");
+$stmt->bind_param('i', $test_id);
+$stmt->execute();
+$theoryAssessment = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+if ($theoryAssessment) {
+    $theoryAssessmentId = (int)$theoryAssessment['id'];
+    $stmt = $conn->prepare("SELECT id,status FROM theory_submissions WHERE theory_assessment_id=? AND student_id=? LIMIT 1");
+    $stmt->bind_param('ii', $theoryAssessmentId, $student_id);
+    $stmt->execute();
+    $theorySubmission = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($theorySubmission) {
+        $theorySubmissionId = (int)$theorySubmission['id'];
+        $stmt = $conn->prepare("SELECT COALESCE(SUM(maximum_marks),0) AS max_marks FROM theory_questions WHERE theory_assessment_id=?");
+        $stmt->bind_param('i', $theoryAssessmentId);
+        $stmt->execute();
+        $theoryMaximum = (float)($stmt->get_result()->fetch_assoc()['max_marks'] ?? 0);
+        $stmt->close();
+        // Save this attempt's answers as submitted before invoking the local model.
+        $stmt = $conn->prepare("UPDATE theory_submissions SET status='submitted',submitted_at=NOW(),grading_status='grading' WHERE id=? AND status='in_progress'");
+        $stmt->bind_param('i', $theorySubmissionId);
+        $stmt->execute();
+        $stmt->close();
+        try {
+            require_once __DIR__ . '/../theory/TheoryGradingService.php';
+            require_once __DIR__ . '/../theory/OllamaTheoryGrader.php';
+            $model = (string)(getenv('EXAMCENTER_THEORY_MODEL') ?: 'qwen3:1.7b');
+            $grader = new OllamaTheoryGrader('http://127.0.0.1:11434', $model, 300);
+            $gradingService = new TheoryGradingService($grader);
+            $stmt = $conn->prepare("SELECT id FROM theory_answers WHERE submission_id=? ORDER BY id");
+            $stmt->bind_param('i', $theorySubmissionId);
+            $stmt->execute();
+            $theoryAnswers = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            foreach ($theoryAnswers as $theoryAnswer) {
+                $graded = $gradingService->gradeAnswer((int)$theoryAnswer['id']);
+                $theoryScore += (float)$graded['awarded_marks'];
+            }
+            $stmt = $conn->prepare("UPDATE theory_submissions SET status='graded',grading_status='completed',total_marks=?,maximum_marks=? WHERE id=?");
+            $stmt->bind_param('ddi', $theoryScore, $theoryMaximum, $theorySubmissionId);
+            $stmt->execute();
+            $stmt->close();
+        } catch (Throwable $e) {
+            $theoryGradingError = $e->getMessage();
+            error_log('Offline theory grading failed for submission '.$theorySubmissionId.': '.$theoryGradingError);
+            $stmt = $conn->prepare("UPDATE theory_submissions SET grading_status='failed' WHERE id=?");
+            $stmt->bind_param('i', $theorySubmissionId);
+            $stmt->execute();
+            $stmt->close();
+            $_SESSION['theory_grading_notice'] = 'Your objective answers were submitted, but local AI grading of theory failed. Ask your teacher to retry grading in Theory Review. Details: '.$theoryGradingError;
+        }
+    }
+}
+$score = (int)round($score + $theoryScore);
+$total_questions = (int)round($total_questions + $theoryMaximum);
+
 // Finalize the result atomically so a partial submission cannot leave
 // the database in an inconsistent state.
 $conn->begin_transaction();
