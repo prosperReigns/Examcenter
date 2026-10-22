@@ -26,9 +26,9 @@ final class TheoryGradingQueue
                     locked_at=IF(status='completed',locked_at,NULL),
                     locked_by=IF(status='completed',locked_by,NULL),
                     last_error=IF(status='completed',last_error,NULL),
-                    result_id=VALUES(result_id),
-                    test_id=VALUES(test_id),
-                    student_id=VALUES(student_id),
+                    result_id=IF(status='completed',result_id,VALUES(result_id)),
+                    test_id=IF(status='completed',test_id,VALUES(test_id)),
+                    student_id=IF(status='completed',student_id,VALUES(student_id)),
                     status=IF(status='completed','completed','pending')";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param('iiii', $submissionId, $resultId, $testId, $studentId);
