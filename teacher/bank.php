@@ -479,6 +479,8 @@ try {
     $question_context_select = $question_context_available
         ? 'new_questions.course_id, new_questions.organizational_unit_id, new_questions.academic_period_id, co.name AS course_name, ou.name AS unit_name, ap.name AS period_name'
         : 'NULL AS course_id, NULL AS organizational_unit_id, NULL AS academic_period_id, NULL AS course_name, NULL AS unit_name, NULL AS period_name';
+    $question_marks_available = examcenterUniversalColumnExists($conn, 'new_questions', 'maximum_marks');
+    $question_marks_select = $question_marks_available ? 'new_questions.maximum_marks' : 'NULL AS maximum_marks';
     $question_context_joins = $question_context_available
         ? ' LEFT JOIN courses co ON co.id = new_questions.course_id LEFT JOIN organizational_units ou ON ou.id = new_questions.organizational_unit_id LEFT JOIN academic_periods ap ON ap.id = new_questions.academic_period_id'
         : '';
@@ -522,7 +524,7 @@ try {
                 new_questions.subject,
                 {$question_context_select},
                 new_questions.question_type,
-                new_questions.maximum_marks,
+                {$question_marks_select},
                 new_questions.created_at
             FROM new_questions
             {$question_context_joins}
