@@ -180,8 +180,22 @@ if ($theoryAssessment) {
     $stmt->execute();
     $theorySubmission = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    if (!$theorySubmission) {
+        $stmt = $conn->prepare("INSERT INTO theory_submissions(theory_assessment_id,student_id,started_at,status,maximum_marks)
+            SELECT ?,?,NOW(),'in_progress',COALESCE(SUM(maximum_marks),0) FROM theory_questions WHERE theory_assessment_id=?");
+        $stmt->bind_param('iii', $theoryAssessmentId, $student_id, $theoryAssessmentId);
+        $stmt->execute();
+        $theorySubmission = ['id' => $stmt->insert_id, 'status' => 'in_progress'];
+        $stmt->close();
+    }
     if ($theorySubmission) {
         $theorySubmissionId = (int)$theorySubmission['id'];
+        // Ensure unanswered theory questions are represented as blank answers and receive zero marks.
+        $stmt = $conn->prepare("INSERT IGNORE INTO theory_answers(submission_id,theory_question_id,answer_text,word_count)
+            SELECT ?,q.id,'',0 FROM theory_questions q WHERE q.theory_assessment_id=?");
+        $stmt->bind_param('ii', $theorySubmissionId, $theoryAssessmentId);
+        $stmt->execute();
+        $stmt->close();
         $stmt = $conn->prepare("SELECT COALESCE(SUM(maximum_marks),0) AS max_marks FROM theory_questions WHERE theory_assessment_id=?");
         $stmt->bind_param('i', $theoryAssessmentId);
         $stmt->execute();
@@ -222,8 +236,8 @@ if ($theoryAssessment) {
         }
     }
 }
-$score = (int)round($score + $theoryScore);
-$total_questions = (int)round($total_questions + $theoryMaximum);
+$score = (float)$score + $theoryScore;
+$total_questions = (float)$total_questions + $theoryMaximum;
 
 // Finalize the result atomically so a partial submission cannot leave
 // the database in an inconsistent state.
@@ -233,7 +247,7 @@ try {
                 (user_id, test_id, score, total_questions, created_at, status, reattempt_approved)
             VALUES (?, ?, ?, ?, NOW(), 'completed', 0)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iiii", $student_id, $test_id, $score, $total_questions);
+    $stmt->bind_param("iidd", $student_id, $test_id, $score, $total_questions);
     if (!$stmt->execute()) {
         throw new RuntimeException('Unable to store examination result.');
     }
