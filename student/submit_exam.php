@@ -301,5 +301,5 @@ $_SESSION['total_questions'] = $total_questions;
 unset($_SESSION['exam_questions']);
 unset($_SESSION['current_test_id']);
 
-header("Location: result.php");
+header("Location: result.php?test_id=" . $test_id . "&user_id=" . $student_id);
 exit();
