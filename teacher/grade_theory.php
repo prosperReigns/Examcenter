@@ -75,7 +75,7 @@ $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     <p class="text-muted"><?= $h($assessment['title']) ?> — <?= $h($assessment['subject']) ?></p>
     <div class="alert alert-info">
         Exam submissions are graded by the separate CLI worker. This page does not run AI inference inside a browser request.
-        Start the worker on the main Examcenter computer with <code>php scripts/theory_grading_worker.php</code>.
+        Start the worker on the main Examcenter computer with <code>php scripts/theory_grading_worker.php</code>, or launch <code>scripts/start_theory_grading_worker.bat</code> in the bundled Windows build.
         It processes one grading job at a time and sends no more than five questions per model request.
     </div>
     <?php if ($message !== ''): ?><div class="alert alert-secondary"><?= $h($message) ?></div><?php endif; ?>
