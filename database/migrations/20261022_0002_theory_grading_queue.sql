@@ -6,7 +6,7 @@
 ALTER TABLE results
     ADD COLUMN objective_score DECIMAL(10,2) NULL AFTER score,
     ADD COLUMN objective_total DECIMAL(10,2) NULL AFTER objective_score,
-    ADD COLUMN theory_score DECIMAL(10,2) NULL AFTER objective_score,
+    ADD COLUMN theory_score DECIMAL(10,2) NULL AFTER objective_total,
     ADD COLUMN theory_grading_status VARCHAR(20) NOT NULL DEFAULT 'not_required' AFTER status;
 
 CREATE TABLE IF NOT EXISTS theory_grading_jobs (
