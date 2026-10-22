@@ -49,6 +49,7 @@ $stmt->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php if ($show_results && in_array($grading_status, ['pending','processing'], true)): ?><meta http-equiv="refresh" content="5"><?php endif; ?>
     <title>Exam Results - D-Portal</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
