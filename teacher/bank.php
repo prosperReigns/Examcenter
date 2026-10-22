@@ -5,10 +5,10 @@ session_start();
 require_once '../db.php';
 require_once '../includes/system_guard.php';
 require_once '../includes/universal_architecture.php';
-//require_once '../license/license_guard.php';
-require_once '../vendor/autoload.php';
+                    //require_once '../license/license_guard.php';
+                    // require_once '../vendor/autoload.php';
 
-use PhpOffice\PhpWord\PhpWord;
+                    use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\IOFactory;
 
 
