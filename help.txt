@@ -49,7 +49,7 @@
 --   Tests continue to reference these independently through tests.academic_period_id
 --   and tests.assessment_group_id. Existing school academic_years rows remain
 --   supported by the legacy school workflow.
---   SCHEMA CHANGE: NONE. This implementation reuses the existing tables and
+--   SCHEMA CHANGE: the theory grading queue is additive; see migration 20261022_0002. This implementation reuses the existing tables and
 --   columns documented below. No live database update is required.
 --
 -- ============================================================
