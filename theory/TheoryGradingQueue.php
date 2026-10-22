@@ -100,6 +100,20 @@ final class TheoryGradingQueue
             $stmt->execute();
             $claimed = $stmt->affected_rows === 1;
             $stmt->close();
+            if ($claimed) {
+                $submissionId = (int)$job['submission_id'];
+                $stmt = $this->db->prepare("UPDATE theory_submissions SET grading_status='processing' WHERE id=? AND status='submitted'");
+                $stmt->bind_param('i', $submissionId);
+                $stmt->execute();
+                $stmt->close();
+                $resultId = (int)($job['result_id'] ?? 0);
+                if ($resultId > 0) {
+                    $stmt = $this->db->prepare("UPDATE results SET theory_grading_status='processing' WHERE id=?");
+                    $stmt->bind_param('i', $resultId);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+            }
             $this->db->commit();
 
             if (!$claimed) {
@@ -176,7 +190,7 @@ final class TheoryGradingQueue
                 return false;
             }
             $stmt = $this->db->prepare(
-                "UPDATE theory_grading_jobs SET status='pending',available_at=NOW(),locked_at=NULL,locked_by=NULL,last_error=NULL WHERE id=?"
+                "UPDATE theory_grading_jobs SET status='pending',max_attempts=attempt_count+3,available_at=NOW(),locked_at=NULL,locked_by=NULL,last_error=NULL WHERE id=?"
             );
             $stmt->bind_param('i', $jobId);
             $stmt->execute();
