@@ -25,7 +25,6 @@ final class TheoryGradingQueue
                     available_at=IF(status='completed',available_at,NOW()),
                     locked_at=IF(status='completed',locked_at,NULL),
                     locked_by=IF(status='completed',locked_by,NULL),
-                    last_error=IF(status='completed',last_error,NULL),
                     result_id=IF(status='completed',result_id,VALUES(result_id)),
                     test_id=IF(status='completed',test_id,VALUES(test_id)),
                     student_id=IF(status='completed',student_id,VALUES(student_id)),
@@ -110,7 +109,7 @@ final class TheoryGradingQueue
 
             $stmt = $this->db->prepare(
                 "UPDATE theory_grading_jobs
-                 SET status='processing',attempt_count=attempt_count+1,locked_at=NOW(),locked_by=?,last_error=NULL
+                 SET status='processing',attempt_count=attempt_count+1,locked_at=NOW(),locked_by=?
                  WHERE id=? AND status='pending'"
             );
             $jobId = (int)$job['id'];
@@ -150,7 +149,7 @@ final class TheoryGradingQueue
     {
         $stmt = $this->db->prepare(
             "UPDATE theory_grading_jobs
-             SET status='completed',locked_at=NULL,locked_by=NULL,last_error=NULL,completed_at=NOW()
+             SET status='completed',locked_at=NULL,locked_by=NULL,completed_at=NOW()
              WHERE id=?"
         );
         $stmt->bind_param('i', $jobId);
@@ -167,7 +166,8 @@ final class TheoryGradingQueue
         $stmt = $this->db->prepare(
             "UPDATE theory_grading_jobs
              SET status=?,available_at=DATE_ADD(NOW(), INTERVAL ? SECOND),
-                 locked_at=NULL,locked_by=NULL,last_error=?
+                 locked_at=NULL,locked_by=NULL,
+                 last_error=CONCAT(COALESCE(last_error,''),CASE WHEN last_error IS NULL OR last_error='' THEN '' ELSE ' | RETRY | ' END,?)
              WHERE id=?"
         );
         $stmt->bind_param('sisi', $status, $delay, $safeError, $jobId);
@@ -208,7 +208,7 @@ final class TheoryGradingQueue
                 return false;
             }
             $stmt = $this->db->prepare(
-                "UPDATE theory_grading_jobs SET status='pending',max_attempts=attempt_count+3,available_at=NOW(),locked_at=NULL,locked_by=NULL,last_error=NULL WHERE id=?"
+                "UPDATE theory_grading_jobs SET status='pending',max_attempts=attempt_count+3,available_at=NOW(),locked_at=NULL,locked_by=NULL WHERE id=?"
             );
             $stmt->bind_param('i', $jobId);
             $stmt->execute();
