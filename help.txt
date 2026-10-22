@@ -453,8 +453,9 @@ CREATE TABLE IF NOT EXISTS results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     test_id INT,
-    score INT,
-    total_questions INT,
+    -- DECIMAL supports fractional AI theory marks combined with objective marks.
+    score DECIMAL(10,2),
+    total_questions DECIMAL(10,2),
     created_at DATETIME,
     status VARCHAR(50),
     reattempt_approved BOOLEAN,
