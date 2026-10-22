@@ -48,18 +48,20 @@ final class TheoryGradingService
         if ($items === []) {
             throw new RuntimeException('The submitted theory paper has no answer rows.');
         }
-        if (count($items) > 5) {
-            throw new RuntimeException('A student-subject grading job may contain at most five theory questions.');
-        }
-
-        if (method_exists($this->grader, 'gradeBatch')) {
-            $grades = $this->grader->gradeBatch($items);
-        } else {
+        if (!method_exists($this->grader, 'gradeBatch')) {
             throw new RuntimeException('The configured theory grader does not support five-question batch grading.');
         }
-        foreach ($items as $item) {
-            if (!isset($grades[(int)$item['answer_id']])) {
-                throw new RuntimeException('The batch grader did not return a valid grade for every answer.');
+
+        // Each model request contains no more than five questions, even if a future assessment is longer.
+        $grades = [];
+        foreach (array_chunk($items, 5) as $chunk) {
+            $chunkGrades = $this->grader->gradeBatch($chunk);
+            foreach ($chunk as $item) {
+                $answerId = (int)$item['answer_id'];
+                if (!isset($chunkGrades[$answerId])) {
+                    throw new RuntimeException('The batch grader did not return a valid grade for every answer.');
+                }
+                $grades[$answerId] = $chunkGrades[$answerId];
             }
         }
         return ['items' => $items, 'grades' => $grades];
