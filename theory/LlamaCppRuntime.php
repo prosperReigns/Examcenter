@@ -10,11 +10,12 @@ final class LlamaCppRuntime
     private string $endpoint;
     private string $alias;
     private int $startupTimeout;
+    private bool $ready = false;
 
     public function __construct(
         ?string $endpoint = null,
         ?string $alias = null,
-        int $startupTimeout = 60
+        int $startupTimeout = 120
     ) {
         $this->endpoint = rtrim($endpoint ?: (getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:8080'), '/');
         $this->alias = $alias ?: (getenv('EXAMCENTER_LLAMA_MODEL_ALIAS') ?: 'qwen3-1.7b');
@@ -27,7 +28,11 @@ final class LlamaCppRuntime
      */
     public function ensureReady(): void
     {
+        if ($this->ready) {
+            return;
+        }
         if ($this->isReady()) {
+            $this->ready = true;
             return;
         }
 
@@ -60,6 +65,7 @@ final class LlamaCppRuntime
         do {
             usleep(500000);
             if ($this->isReady()) {
+                $this->ready = true;
                 return;
             }
         } while (microtime(true) < $deadline);
@@ -133,12 +139,24 @@ final class LlamaCppRuntime
             }
         }
 
-        $command = PHP_OS_FAMILY === 'Windows' ? 'where.exe llama-server.exe 2>NUL' : 'command -v llama-server 2>/dev/null';
-        $found = [];
-        @exec($command, $found);
-        foreach ($found as $line) {
-            $line = trim($line);
-            if ($line !== '' && is_file($line)) {
+        $commands = PHP_OS_FAMILY === 'Windows'
+            ? ['where.exe llama-server.exe 2>NUL', 'where.exe llama-server 2>NUL', 'where.exe llama-cli.exe 2>NUL']
+            : ['command -v llama-server 2>/dev/null', 'command -v llama-cli 2>/dev/null'];
+        foreach ($commands as $command) {
+            $found = [];
+            @exec($command, $found);
+            foreach ($found as $line) {
+                $line = trim($line);
+                if ($line === '' || !is_file($line)) {
+                    continue;
+                }
+                if (stripos(basename($line), 'llama-cli') === 0) {
+                    $sibling = dirname($line) . DIRECTORY_SEPARATOR . (PHP_OS_FAMILY === 'Windows' ? 'llama-server.exe' : 'llama-server');
+                    if (is_file($sibling)) {
+                        return realpath($sibling) ?: $sibling;
+                    }
+                    continue;
+                }
                 return realpath($line) ?: $line;
             }
         }
