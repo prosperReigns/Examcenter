@@ -5,7 +5,8 @@ require_once '../db.php';
 require_once '../includes/system_guard.php';
 require_once '../includes/pro.php';
 require_once '../theory/TheoryGradingService.php';
-require_once '../theory/OllamaTheoryGrader.php';
+require_once '../theory/LlamaCppRuntime.php';
+require_once '../theory/LlamaCppTheoryGrader.php';
 
 if(!isset($_SESSION['user_id'])||strtolower((string)($_SESSION['user_role']??''))!=='teacher'){http_response_code(403);exit('Unauthorized');}
 // Pro guard intentionally disabled during development; restore before production.
