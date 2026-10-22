@@ -34,7 +34,6 @@ $required = [
     'teacher/grade_theory.php',
     'student/theory_register.php',
     'student/theory_exam.php',
-    'student/grade_theory.php',
     'student/theory_result.php',
     'database/migrations/20261005_0003_pro_assessment_suite.sql',
     'database/migrations/20261007_0004_system_audit_hardening.sql',
