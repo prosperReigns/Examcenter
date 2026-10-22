@@ -57,6 +57,7 @@ final class LlamaCppRuntime
         $args = [
             $server, '-m', $model, '--alias', $this->alias,
             '--host', '127.0.0.1', '--port', (string)$port,
+            '-np', (string)(getenv('EXAMCENTER_LLAMA_PARALLEL') ?: 1),
             '-c', (string)(getenv('EXAMCENTER_LLAMA_CONTEXT_SIZE') ?: 4096)
         ];
         $this->launchDetached($args, $logFile);
