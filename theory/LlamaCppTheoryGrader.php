@@ -9,7 +9,7 @@ final class LlamaCppTheoryGrader implements TheoryGraderInterface
 {
     public function __construct(
         private ?LlamaCppRuntime $runtime = null,
-        private string $endpoint = 'http://127.0.0.1:8080',
+        private string $endpoint = 'http://127.0.0.1:11435',
         private string $model = 'qwen3-1.7b',
         private int $timeout = 300
     ) {
