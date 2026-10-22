@@ -73,7 +73,7 @@ final class TheoryGradingQueue
             "UPDATE theory_submissions s
              JOIN theory_grading_jobs j ON j.submission_id=s.id
              SET s.grading_status=IF(j.status='failed','failed','pending')
-             WHERE j.status IN ('pending','failed') AND s.status='submitted'"
+             WHERE j.status IN ('pending','failed') AND s.status='submitted' AND s.grading_status='processing'"
         );
         $stmt->execute();
         $stmt->close();
@@ -81,7 +81,7 @@ final class TheoryGradingQueue
             "UPDATE results r
              JOIN theory_grading_jobs j ON j.result_id=r.id
              SET r.theory_grading_status=IF(j.status='failed','failed','pending')
-             WHERE j.status IN ('pending','failed')"
+             WHERE j.status IN ('pending','failed') AND r.theory_grading_status='processing'"
         );
         $stmt->execute();
         $stmt->close();
