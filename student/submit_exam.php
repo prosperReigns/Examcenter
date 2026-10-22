@@ -162,7 +162,7 @@ foreach ($questions as $question) {
 }
 
 // Grade any theory section attached to this test before persisting the combined result.
-// Ollama runs only on this computer; no cloud grading endpoint is used.
+// llama.cpp/Qwen runs locally. If unavailable, objective results are still saved and theory can be retried.
 $theoryMaximum = 0.0;
 $theoryScore = 0.0;
 $theoryAssessmentId = 0;
@@ -207,10 +207,13 @@ if ($theoryAssessment) {
         $stmt->execute();
         $stmt->close();
         try {
+            require_once __DIR__ . '/../theory/LlamaCppRuntime.php';
+            require_once __DIR__ . '/../theory/LlamaCppTheoryGrader.php';
             require_once __DIR__ . '/../theory/TheoryGradingService.php';
-            require_once __DIR__ . '/../theory/OllamaTheoryGrader.php';
-            $model = (string)(getenv('EXAMCENTER_THEORY_MODEL') ?: 'qwen3:1.7b');
-            $grader = new OllamaTheoryGrader('http://127.0.0.1:11434', $model, 300);
+            $endpoint = (string)(getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:8080');
+            $model = (string)(getenv('EXAMCENTER_LLAMA_MODEL_ALIAS') ?: 'qwen3-1.7b');
+            $runtime = new LlamaCppRuntime($endpoint);
+            $grader = new LlamaCppTheoryGrader($runtime, $endpoint, $model, 300);
             $gradingService = new TheoryGradingService($grader);
             $stmt = $conn->prepare("SELECT id FROM theory_answers WHERE submission_id=? ORDER BY id");
             $stmt->bind_param('i', $theorySubmissionId);
