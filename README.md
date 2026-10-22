@@ -63,3 +63,30 @@ Configure these optional environment variables when the defaults do not match th
 - `EXAMCENTER_LLAMA_CONTEXT_SIZE`: context size; default `4096`.
 
 Examcenter searches common llama.cpp/Hugging Face cache locations for the local Qwen GGUF. If it cannot find the file or server executable, AI grading reports a clear error rather than downloading model files or blocking objective result storage. During development, make sure a compatible `llama-server` binary is available; `llama-cli` alone is a command-line runner and does not provide the HTTP API used by the PHP grader.
+
+
+## Offline AI theory grading queue
+
+Theory answers are saved before AI grading begins. A persistent MariaDB job is then processed by the CLI worker; browser submission requests never wait for llama.cpp inference. Each model request contains no more than five questions. Longer theory assessments are split into five-question batches within the same durable job.
+
+Apply the queue/result migration once after the theory assessment schema and the combined-score migration:
+
+~~~sql
+SOURCE database/migrations/20261022_0002_theory_grading_queue.sql;
+~~~
+
+Start the worker from the Examcenter project root on the main school computer:
+
+~~~powershell
+php scripts/theory_grading_worker.php
+~~~
+
+For a one-job diagnostic run:
+
+~~~powershell
+php scripts/theory_grading_worker.php --once
+~~~
+
+The worker processes one queue job at a time. llama-server defaults to one parallel inference slot (`EXAMCENTER_LLAMA_PARALLEL=1`). Do not increase concurrency until the target computer has been benchmarked. Keep the worker running on the host computer during grading; it does not need to run on student workstations. If the worker stops, pending jobs remain in MariaDB and resume when it starts again. Jobs abandoned in processing are recovered after a 15-minute lease. Failures retry automatically up to three times; teachers can requeue terminal failures from the Theory Grading Queue page without resubmitting student answers.
+
+The migration adds `objective_score`, `objective_total`, `theory_score`, and `theory_grading_status` to `results`. While theory marks are pending, the result page shows a provisional objective score; after the worker saves the marks, it computes the final combined score from the saved objective score plus the theory score, avoiding double-counting on retries.
