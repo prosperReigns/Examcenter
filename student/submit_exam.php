@@ -161,18 +161,16 @@ foreach ($questions as $question) {
     }
 }
 
-// Grade any theory section attached to this test before persisting the combined result.
-// llama.cpp/Qwen runs locally. If unavailable, objective results are still saved and theory can be retried.
+// Persist theory answers and enqueue grading; never call the model in this request.
 $theoryMaximum = 0.0;
-$theoryScore = 0.0;
 $theoryAssessmentId = 0;
 $theorySubmissionId = 0;
-$theoryGradingError = '';
 $stmt = $conn->prepare("SELECT id FROM theory_assessments WHERE test_id=? AND status<>'archived' LIMIT 1");
 $stmt->bind_param('i', $test_id);
 $stmt->execute();
 $theoryAssessment = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
 if ($theoryAssessment) {
     $theoryAssessmentId = (int)$theoryAssessment['id'];
     $stmt = $conn->prepare("SELECT id,status FROM theory_submissions WHERE theory_assessment_id=? AND student_id=? LIMIT 1");
@@ -180,83 +178,62 @@ if ($theoryAssessment) {
     $stmt->execute();
     $theorySubmission = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
     if (!$theorySubmission) {
-        $stmt = $conn->prepare("INSERT INTO theory_submissions(theory_assessment_id,student_id,started_at,status,maximum_marks)
-            SELECT ?,?,NOW(),'in_progress',COALESCE(SUM(maximum_marks),0) FROM theory_questions WHERE theory_assessment_id=?");
+        $stmt = $conn->prepare("INSERT INTO theory_submissions(theory_assessment_id,student_id,started_at,status,maximum_marks,grading_status)
+            SELECT ?,?,NOW(),'in_progress',COALESCE(SUM(maximum_marks),0),'pending' FROM theory_questions WHERE theory_assessment_id=?");
         $stmt->bind_param('iii', $theoryAssessmentId, $student_id, $theoryAssessmentId);
         $stmt->execute();
         $theorySubmission = ['id' => $stmt->insert_id, 'status' => 'in_progress'];
         $stmt->close();
     }
-    if ($theorySubmission) {
-        $theorySubmissionId = (int)$theorySubmission['id'];
-        // Ensure unanswered theory questions are represented as blank answers and receive zero marks.
-        $stmt = $conn->prepare("INSERT IGNORE INTO theory_answers(submission_id,theory_question_id,answer_text,word_count)
-            SELECT ?,q.id,'',0 FROM theory_questions q WHERE q.theory_assessment_id=?");
-        $stmt->bind_param('ii', $theorySubmissionId, $theoryAssessmentId);
-        $stmt->execute();
-        $stmt->close();
-        $stmt = $conn->prepare("SELECT COALESCE(SUM(maximum_marks),0) AS max_marks FROM theory_questions WHERE theory_assessment_id=?");
-        $stmt->bind_param('i', $theoryAssessmentId);
-        $stmt->execute();
-        $theoryMaximum = (float)($stmt->get_result()->fetch_assoc()['max_marks'] ?? 0);
-        $stmt->close();
-        // Save this attempt's answers as submitted before invoking the local model.
-        $stmt = $conn->prepare("UPDATE theory_submissions SET status='submitted',submitted_at=NOW(),grading_status='grading' WHERE id=? AND status='in_progress'");
-        $stmt->bind_param('i', $theorySubmissionId);
-        $stmt->execute();
-        $stmt->close();
-        try {
-            require_once __DIR__ . '/../theory/LlamaCppRuntime.php';
-            require_once __DIR__ . '/../theory/LlamaCppTheoryGrader.php';
-            require_once __DIR__ . '/../theory/TheoryGradingService.php';
-            $endpoint = (string)(getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:11435');
-            $model = (string)(getenv('EXAMCENTER_LLAMA_MODEL_ALIAS') ?: 'qwen3-1.7b');
-            $runtime = new LlamaCppRuntime($endpoint);
-            $grader = new LlamaCppTheoryGrader($runtime, $endpoint, $model, 300);
-            $gradingService = new TheoryGradingService($grader);
-            $stmt = $conn->prepare("SELECT id FROM theory_answers WHERE submission_id=? ORDER BY id");
-            $stmt->bind_param('i', $theorySubmissionId);
-            $stmt->execute();
-            $theoryAnswers = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-            $stmt->close();
-            foreach ($theoryAnswers as $theoryAnswer) {
-                $graded = $gradingService->gradeAnswer((int)$theoryAnswer['id']);
-                $theoryScore += (float)$graded['awarded_marks'];
-            }
-            $stmt = $conn->prepare("UPDATE theory_submissions SET status='graded',grading_status='completed',total_marks=?,maximum_marks=? WHERE id=?");
-            $stmt->bind_param('ddi', $theoryScore, $theoryMaximum, $theorySubmissionId);
-            $stmt->execute();
-            $stmt->close();
-        } catch (Throwable $e) {
-            // Keep the persisted result objective-only if any theory answer fails; teacher retry adds the complete theory score later.
-            $theoryScore = 0.0;
-            $theoryGradingError = $e->getMessage();
-            error_log('Offline theory grading failed for submission '.$theorySubmissionId.': '.$theoryGradingError);
-            $stmt = $conn->prepare("UPDATE theory_submissions SET grading_status='failed' WHERE id=?");
-            $stmt->bind_param('i', $theorySubmissionId);
-            $stmt->execute();
-            $stmt->close();
-            $_SESSION['theory_grading_notice'] = 'Your objective answers were submitted, but local AI grading of theory failed. Ask your teacher to retry grading in Theory Review. Details: '.$theoryGradingError;
-        }
-    }
+
+    $theorySubmissionId = (int)$theorySubmission['id'];
+    $stmt = $conn->prepare("INSERT IGNORE INTO theory_answers(submission_id,theory_question_id,answer_text,word_count,submitted_at)
+        SELECT ?,q.id,'',0,NOW() FROM theory_questions q WHERE q.theory_assessment_id=?");
+    $stmt->bind_param('ii', $theorySubmissionId, $theoryAssessmentId);
+    $stmt->execute();
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(maximum_marks),0) AS max_marks FROM theory_questions WHERE theory_assessment_id=?");
+    $stmt->bind_param('i', $theoryAssessmentId);
+    $stmt->execute();
+    $theoryMaximum = (float)($stmt->get_result()->fetch_assoc()['max_marks'] ?? 0);
+    $stmt->close();
+
+    $stmt = $conn->prepare("UPDATE theory_submissions
+        SET status='submitted',submitted_at=COALESCE(submitted_at,NOW()),grading_status='pending',maximum_marks=?
+        WHERE id=? AND status='in_progress'");
+    $stmt->bind_param('di', $theoryMaximum, $theorySubmissionId);
+    $stmt->execute();
+    $stmt->close();
 }
-$score = (float)$score + $theoryScore;
-$total_questions = (float)$total_questions + $theoryMaximum;
 
 // Finalize the result atomically so a partial submission cannot leave
 // the database in an inconsistent state.
 $conn->begin_transaction();
 try {
+    $objectiveScore = (float)$score;
+    $objectiveTotal = (float)$total_questions;
+    $total_questions = $objectiveTotal + $theoryMaximum;
+    $gradingStatus = $theoryAssessmentId > 0 ? 'pending' : 'not_required';
+
     $sql = "INSERT INTO results
-                (user_id, test_id, score, total_questions, created_at, status, reattempt_approved)
-            VALUES (?, ?, ?, ?, NOW(), 'completed', 0)";
+                (user_id,test_id,score,total_questions,objective_score,objective_total,theory_grading_status,created_at,status,reattempt_approved)
+            VALUES (?,?,?,?,?,?,?,NOW(),'completed',0)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iidd", $student_id, $test_id, $score, $total_questions);
+    $stmt->bind_param("iidddds", $student_id, $test_id, $objectiveScore, $total_questions, $objectiveScore, $objectiveTotal, $gradingStatus);
     if (!$stmt->execute()) {
         throw new RuntimeException('Unable to store examination result.');
     }
+    $resultId = (int)$stmt->insert_id;
     $stmt->close();
+
+    if ($theoryAssessmentId > 0 && $theorySubmissionId > 0) {
+        require_once __DIR__ . '/../theory/TheoryGradingQueue.php';
+        $queue = new TheoryGradingQueue($conn);
+        $queue->enqueue($theorySubmissionId, $resultId, $test_id, (int)$student_id);
+    }
 
     // A previous approved reattempt is consumed by this submission.
     $stmt = $conn->prepare("
@@ -299,7 +276,7 @@ try {
 }
 
 // Store score in session for result page
-$_SESSION['exam_score'] = $score;
+$_SESSION['exam_score'] = $objectiveScore ?? (float)$score;
 $_SESSION['total_questions'] = $total_questions;
 
 // Clear exam questions and test_id from session
