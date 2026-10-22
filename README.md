@@ -58,7 +58,7 @@ Configure these optional environment variables when the defaults do not match th
 
 - `EXAMCENTER_LLAMA_SERVER`: full path to `llama-server.exe` (or `llama-server`).
 - `EXAMCENTER_LLAMA_MODEL_PATH`: full path to the existing Qwen 3 1.7B Q4_K_M GGUF file.
-- `EXAMCENTER_LLAMA_ENDPOINT`: local server URL; default `http://127.0.0.1:8080`.
+- `EXAMCENTER_LLAMA_ENDPOINT`: local server URL; default `http://127.0.0.1:11435`.
 - `EXAMCENTER_LLAMA_MODEL_ALIAS`: API model alias; default `qwen3-1.7b`.
 - `EXAMCENTER_LLAMA_CONTEXT_SIZE`: context size; default `4096`.
 
