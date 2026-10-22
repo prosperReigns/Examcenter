@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_mark'])) {
             JOIN theory_submissions s ON s.id=a.submission_id
             JOIN theory_questions q ON q.id=a.theory_question_id
             LEFT JOIN theory_marks m ON m.answer_id=a.id
-            WHERE a.id=? GROUP BY s.id");
+            WHERE s.id=(SELECT submission_id FROM theory_answers WHERE id=?) GROUP BY s.id");
         $stmt->bind_param('i', $answerId);
         $stmt->execute();
         $totals = $stmt->get_result()->fetch_assoc();
