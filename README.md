@@ -70,11 +70,13 @@ Examcenter searches common llama.cpp/Hugging Face cache locations for the local 
 
 Theory answers are saved before AI grading begins. A persistent MariaDB job is then processed by the CLI worker; browser submission requests never wait for llama.cpp inference. Each model request contains no more than five questions. Longer theory assessments are split into five-question batches within the same durable job.
 
-For an existing database created before this queue change, apply the queue/result migration once after the theory assessment schema and the combined-score migration. Do not run this ALTER migration on a fresh database already created from the updated `help.txt`; that schema already contains these columns and table:
+For an existing database, run the migration runner from the project root:
 
-~~~sql
-SOURCE database/migrations/20261022_0002_theory_grading_queue.sql;
+~~~powershell
+php database/migrate.php
 ~~~
+
+The runner records and applies the combined-score and theory-queue migrations. The queue migration checks for existing result columns and is safe when the updated `help.txt` schema has already created them. Avoid manually sourcing the raw SQL migration and then separately running the migration runner unless you are deliberately managing the migration history.
 
 Start the worker from the Examcenter project root on the main school computer. On the bundled Windows build, `scripts/start_theory_grading_worker.bat` attempts to locate the bundled PHP CLI and launches the worker minimized. The app launcher/Inno Setup entry should call this helper after MariaDB is ready; the repository does not currently contain the Inno Setup script to wire this automatically. For development, you can also start it manually:
 
