@@ -2198,7 +2198,10 @@ try {
                                             Fill in the Blank
                                         </option>
 
+                                        <option value="theory" <?= ($edit_question && ($edit_question['question_type'] ?? '') === 'theory') ? 'selected' : '' ?>>Theory / Written Answer (AI assessed)</option>
+
                                     </select>
+                                    <div class="form-text">Theory questions require maximum marks and use the theory assessment workflow.</div>
 
                                 </div>
 
@@ -3472,6 +3475,18 @@ const questionTemplates = {
 
             </select>
 
+        </div>
+
+    `,
+
+
+    theory: `
+
+        <div class="form-section">
+            <div class="form-section-title"><i class="fas fa-pen-alt"></i> Theory Marking</div>
+            <label class="form-label" for="maximum_marks">Maximum Marks</label>
+            <input type="number" class="form-control" name="maximum_marks" id="maximum_marks" min="0.01" step="0.01" required placeholder="e.g. 10" value="${escapeHtml(editData.options?.maximum_marks || '')}">
+            <div class="field-help">Provide the question and maximum marks only. No answer key or marking scheme is required.</div>
         </div>
 
     `,
