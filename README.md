@@ -52,7 +52,7 @@ Runtime installation IDs, encrypted license files, caches, logs and secrets must
 
 ## Offline AI theory marking
 
-Examcenter uses `llama-server` from llama.cpp for local Qwen 3 1.7B inference. It does not require Ollama. The runtime is checked and started only when AI theory marking is requested, so objective exams can still be submitted if the AI model or runtime is unavailable. Failed AI grading is recorded for teacher retry; Examcenter does not download a model during an exam.
+Examcenter uses `llama-server` from llama.cpp for local Qwen 3 1.7B inference. It does not require Ollama. The runtime is checked and started on demand when a local AI feature is requested, so ordinary objective exams can still be submitted if the AI model or runtime is unavailable. Failed AI grading is recorded for teacher retry; Examcenter does not download a model during an exam.
 
 Configure these optional environment variables when the defaults do not match the local machine:
 
