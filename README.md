@@ -49,3 +49,17 @@ The Pro client consumes the v2 entitlement API and verifies signed packages loca
 ## Security
 
 Runtime installation IDs, encrypted license files, caches, logs and secrets must not be committed. Use `.env.example` as the configuration template.
+
+## Offline AI theory marking
+
+Examcenter uses `llama-server` from llama.cpp for local Qwen 3 1.7B inference. It does not require Ollama. The runtime is checked and started only when AI theory marking is requested, so objective exams can still be submitted if the AI model or runtime is unavailable. Failed AI grading is recorded for teacher retry; Examcenter does not download a model during an exam.
+
+Configure these optional environment variables when the defaults do not match the local machine:
+
+- `EXAMCENTER_LLAMA_SERVER`: full path to `llama-server.exe` (or `llama-server`).
+- `EXAMCENTER_LLAMA_MODEL_PATH`: full path to the existing Qwen 3 1.7B Q4_K_M GGUF file.
+- `EXAMCENTER_LLAMA_ENDPOINT`: local server URL; default `http://127.0.0.1:8080`.
+- `EXAMCENTER_LLAMA_MODEL_ALIAS`: API model alias; default `qwen3-1.7b`.
+- `EXAMCENTER_LLAMA_CONTEXT_SIZE`: context size; default `4096`.
+
+Examcenter searches common llama.cpp/Hugging Face cache locations for the local Qwen GGUF. If it cannot find the file or server executable, AI grading reports a clear error rather than downloading model files or blocking objective result storage. During development, make sure a compatible `llama-server` binary is available; `llama-cli` alone is a command-line runner and does not provide the HTTP API used by the PHP grader.
