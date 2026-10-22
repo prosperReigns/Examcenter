@@ -102,25 +102,21 @@ if (!$test || !$student) {
         $error = 'This request has expired. Reload the page and try again.';
     } else {
         $mode = (string)($_POST['mode'] ?? '');
-        $allowed = ($mode === 'objective' && $objectiveCount > 0)
-            || ($mode === 'theory' && $theory !== null && $theoryCount > 0);
+        // A combined exam always starts in the objective section when available;
+        // theory-only assessments are supported as well.
+        $mode = 'combined';
+        $allowed = $objectiveCount > 0 || ($theory !== null && $theoryCount > 0);
         if (!$allowed) {
             $error = 'That exam section is not available. Please choose an available section.';
         } else {
-            if ($mode === 'theory') {
-                $_SESSION['theory_test_id'] = $testId;
-            }
+            if ($theory !== null && $theoryCount > 0) { $_SESSION['theory_test_id'] = $testId; }
             $_SESSION['exam_preview_authorized'] = [
                 'student_id' => $studentId,
                 'test_id' => $testId,
                 'mode' => $mode,
                 'authorized_at' => time(),
             ];
-            if ($mode === 'theory') {
-                header('Location: theory_exam.php?test_id=' . $testId);
-            } else {
-                header('Location: take_exam.php');
-            }
+            header('Location: take_exam.php');
             exit;
         }
     }
@@ -196,8 +192,7 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
         <?php if ($test && $student && ($objectiveAvailable || $theoryAvailable)): ?>
             <form method="post" class="start-actions">
                 <input type="hidden" name="csrf_token" value="<?= $h($_SESSION['csrf_token']) ?>">
-                <?php if ($objectiveAvailable): ?><button type="submit" name="mode" value="objective" class="btn btn-primary start-button start-objective">Start Objective Exam</button><?php endif; ?>
-                <?php if ($theoryAvailable): ?><button type="submit" name="mode" value="theory" class="btn btn-success start-button start-theory">Start Theory Exam</button><?php endif; ?>
+                <button type="submit" name="mode" value="combined" class="btn btn-primary start-button start-objective">Start Exam</button>
             </form>
         <?php endif; ?>
     </header>
@@ -225,7 +220,7 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
                             <div><div class="detail-label">Assessment</div><div class="detail-value"><?= $h($test['title']) ?></div></div>
                             <div><div class="detail-label">Subject / course</div><div class="detail-value"><?= $h($test['subject'] ?: 'Not specified') ?></div></div>
                             <div><div class="detail-label">Academic year / period</div><div class="detail-value"><?= $h($test['year'] ?: 'Not specified') ?></div></div>
-                            <?php if ((int)$test['duration'] > 0): ?><div><div class="detail-label">Objective time limit</div><div class="detail-value"><?= $h((int)$test['duration']) ?> minutes</div><?php endif; ?>
+                            <?php if ((int)$test['duration'] > 0): ?><div><div class="detail-label">Total exam time</div><div class="detail-value"><?= $h((int)$test['duration']) ?> minutes</div><?php endif; ?>
                         </div>
                         <div class="assessment-summary">
                             <?php if ($objectiveAvailable): ?><div class="summary-item"><strong>Objective section</strong><span><?= $h($objectiveCount) ?> questions</span></div><?php endif; ?>
@@ -264,7 +259,7 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
                 <?php endif; ?>
             </aside>
         </div>
-        <div class="bottom-note">Your exam attempt starts when you select a Start button above.</div>
+        <div class="bottom-note">Your single exam timer starts when you select Start Exam. You can move between objective and theory sections without restarting it.</div>
     <?php endif; ?>
 </main>
 </body>
