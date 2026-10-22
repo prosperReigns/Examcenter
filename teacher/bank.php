@@ -522,6 +522,7 @@ try {
                 new_questions.subject,
                 {$question_context_select},
                 new_questions.question_type,
+                new_questions.maximum_marks,
                 new_questions.created_at
             FROM new_questions
             {$question_context_joins}
@@ -666,7 +667,8 @@ try {
                 'multiple_choice_single',
                 'multiple_choice_multiple',
                 'true_false',
-                'fill_blanks'
+                'fill_blanks',
+                'theory'
             ];
 
             if (
@@ -1735,6 +1737,7 @@ try {
                                         : ''; ?>>
                                     Fill Blank
                                 </option>
+                                <option value="theory" <?= $type_filter === 'theory' ? 'selected' : ''; ?>>Theory / Written Answer</option>
 
                             </select>
 
@@ -2298,6 +2301,9 @@ try {
                                             $answer = $stmt->get_result()->fetch_assoc();
                                             $stmt->close();
                                             echo "<div>Correct Answer: " . htmlspecialchars($answer['correct_answer'] ?? '') . "</div>";
+                                            break;
+                                        case 'theory':
+                                            echo '<div class="text-muted">Written response · Maximum marks: ' . htmlspecialchars((string)($question['maximum_marks'] ?? '')) . '</div>';
                                             break;
                                     }
                                     ?>
