@@ -210,7 +210,7 @@ if ($theoryAssessment) {
             require_once __DIR__ . '/../theory/LlamaCppRuntime.php';
             require_once __DIR__ . '/../theory/LlamaCppTheoryGrader.php';
             require_once __DIR__ . '/../theory/TheoryGradingService.php';
-            $endpoint = (string)(getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:8080');
+            $endpoint = (string)(getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:11435');
             $model = (string)(getenv('EXAMCENTER_LLAMA_MODEL_ALIAS') ?: 'qwen3-1.7b');
             $runtime = new LlamaCppRuntime($endpoint);
             $grader = new LlamaCppTheoryGrader($runtime, $endpoint, $model, 300);
