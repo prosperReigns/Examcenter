@@ -17,7 +17,7 @@ final class LlamaCppRuntime
         ?string $alias = null,
         int $startupTimeout = 120
     ) {
-        $this->endpoint = rtrim($endpoint ?: (getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:8080'), '/');
+        $this->endpoint = rtrim($endpoint ?: (getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:11435'), '/');
         $this->alias = $alias ?: (getenv('EXAMCENTER_LLAMA_MODEL_ALIAS') ?: 'qwen3-1.7b');
         $this->startupTimeout = max(5, $startupTimeout);
     }
@@ -52,7 +52,7 @@ final class LlamaCppRuntime
             );
         }
 
-        $port = (int)(parse_url($this->endpoint, PHP_URL_PORT) ?: 8080);
+        $port = (int)(parse_url($this->endpoint, PHP_URL_PORT) ?: 11435);
         $logFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'examcenter-llama-server.log';
         $args = [
             $server, '-m', $model, '--alias', $this->alias,
