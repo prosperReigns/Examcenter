@@ -216,7 +216,7 @@ try {
     $objectiveScore = (float)$score;
     $objectiveTotal = (float)$total_questions;
     $total_questions = $objectiveTotal + $theoryMaximum;
-    $gradingStatus = $theoryAssessmentId > 0 ? 'pending' : 'not_required';
+    $gradingStatus = ($theoryAssessmentId > 0 && $theoryMaximum > 0) ? 'pending' : 'not_required';
 
     $sql = "INSERT INTO results
                 (user_id,test_id,score,total_questions,objective_score,objective_total,theory_grading_status,created_at,status,reattempt_approved)
@@ -229,7 +229,7 @@ try {
     $resultId = (int)$stmt->insert_id;
     $stmt->close();
 
-    if ($theoryAssessmentId > 0 && $theorySubmissionId > 0) {
+    if ($theoryAssessmentId > 0 && $theoryMaximum > 0 && $theorySubmissionId > 0) {
         require_once __DIR__ . '/../theory/TheoryGradingQueue.php';
         $queue = new TheoryGradingQueue($conn);
         $queue->enqueue($theorySubmissionId, $resultId, $test_id, (int)$student_id);
