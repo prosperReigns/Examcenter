@@ -22,14 +22,14 @@ final class TheoryGradingQueue
                     (submission_id,result_id,test_id,student_id,status,attempt_count,max_attempts,available_at)
                 VALUES (?,?,?,?, 'pending',0,3,NOW())
                 ON DUPLICATE KEY UPDATE
-                    result_id=VALUES(result_id),
-                    test_id=VALUES(test_id),
-                    student_id=VALUES(student_id),
-                    status=IF(status='completed','completed','pending'),
                     available_at=IF(status='completed',available_at,NOW()),
                     locked_at=IF(status='completed',locked_at,NULL),
                     locked_by=IF(status='completed',locked_by,NULL),
-                    last_error=IF(status='completed',last_error,NULL)";
+                    last_error=IF(status='completed',last_error,NULL),
+                    result_id=VALUES(result_id),
+                    test_id=VALUES(test_id),
+                    student_id=VALUES(student_id),
+                    status=IF(status='completed','completed','pending')";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param('iiii', $submissionId, $resultId, $testId, $studentId);
         $stmt->execute();
@@ -131,7 +131,7 @@ final class TheoryGradingQueue
         $terminal = $attemptCount >= $maxAttempts;
         $status = $terminal ? 'failed' : 'pending';
         $delay = min(300, 5 * (2 ** max(0, $attemptCount - 1)));
-        $safeError = mb_substr($error, 0, 4000);
+        $safeError = substr($error, 0, 4000);
         $stmt = $this->db->prepare(
             "UPDATE theory_grading_jobs
              SET status=?,available_at=DATE_ADD(NOW(), INTERVAL ? SECOND),
