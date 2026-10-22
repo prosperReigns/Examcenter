@@ -166,6 +166,9 @@ try {
         $question_context_select = $question_context_available
             ? ', course_id, organizational_unit_id, academic_period_id'
             : '';
+        $question_marks_select = examcenterUniversalColumnExists($conn, 'new_questions', 'maximum_marks')
+            ? 'maximum_marks'
+            : 'NULL AS maximum_marks';
         $stmt = $conn->prepare("
             SELECT
                 id,
@@ -173,7 +176,7 @@ try {
                 class,
                 subject,
                 question_type,
-                maximum_marks
+                {$question_marks_select}
                 {$question_context_select}
             FROM new_questions
             WHERE id = ?
