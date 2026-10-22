@@ -277,6 +277,8 @@ CREATE TABLE IF NOT EXISTS new_questions (
     organizational_unit_id INT NULL,
     academic_period_id INT NULL,
     question_type VARCHAR(50),
+    -- ADDED: Maximum marks for reusable theory questions; NULL for objective items.
+    maximum_marks DECIMAL(8,2) NULL,
     created_at DATETIME,
     INDEX idx_new_questions_course (course_id),
     INDEX idx_new_questions_unit (organizational_unit_id),
@@ -295,6 +297,8 @@ CREATE TABLE IF NOT EXISTS new_questions (
 -- CREATE INDEX idx_new_questions_course ON new_questions (course_id);
 -- CREATE INDEX idx_new_questions_unit ON new_questions (organizational_unit_id);
 -- CREATE INDEX idx_new_questions_period ON new_questions (academic_period_id);
+-- ADDED MIGRATION for reusable theory-question marks:
+-- ALTER TABLE new_questions ADD COLUMN maximum_marks DECIMAL(8,2) NULL AFTER question_type;
 
 -- 1. 
 CREATE TABLE IF NOT EXISTS fill_blank_questions (
