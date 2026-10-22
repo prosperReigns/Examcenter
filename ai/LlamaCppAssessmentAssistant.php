@@ -11,7 +11,7 @@ final class LlamaCppAssessmentAssistant
 
     public function __construct(?string $model = null, ?string $endpoint = null)
     {
-        $this->endpoint = rtrim($endpoint ?: (getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:8080'), '/');
+        $this->endpoint = rtrim($endpoint ?: (getenv('EXAMCENTER_LLAMA_ENDPOINT') ?: 'http://127.0.0.1:11435'), '/');
         $this->model = $model ?: (getenv('EXAMCENTER_LLAMA_MODEL_ALIAS') ?: 'qwen3-1.7b');
         $this->runtime = new LlamaCppRuntime($this->endpoint);
     }
