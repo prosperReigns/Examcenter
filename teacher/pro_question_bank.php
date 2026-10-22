@@ -31,7 +31,9 @@ $rows = $db->query("SELECT p.*,q.question_text FROM pro_question_bank_items p JO
 <body><?php $teacher = $_SESSION['teacher'] ?? [];
         $admin = $_SESSION['admin'] ?? [];
         $user = $_SESSION['user'] ?? [];
-        require __DIR__ . '/../teacher/sidebar.php'; ?><main class="main-content">
+        //require __DIR__ . '/../teacher/sidebar.php'; 
+        ?>
+    <main class="main-content">
         <h2>Advanced Question Bank</h2><?php if ($msg): ?><div class="alert alert-success"><?= $msg ?></div><?php endif; ?><form method="post" class="card p-3 mb-3">
             <div class="row g-2"><input name="question_id" type="number" class="form-control" placeholder="Existing question ID" required><input name="topic" class="form-control" placeholder="Topic"><input name="subtopic" class="form-control" placeholder="Subtopic"><input name="difficulty" class="form-control" placeholder="Easy / Medium / Hard"><input name="bloom_level" class="form-control" placeholder="Bloom level"><input name="learning_objective" class="form-control" placeholder="Learning objective"><select name="status" class="form-control">
                     <option>draft</option>
