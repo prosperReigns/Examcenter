@@ -67,6 +67,24 @@ final class TheoryGradingQueue
         $stmt->execute();
         $count = $stmt->affected_rows;
         $stmt->close();
+
+        // Keep submission/result status aligned when recovering abandoned jobs.
+        $stmt = $this->db->prepare(
+            "UPDATE theory_submissions s
+             JOIN theory_grading_jobs j ON j.submission_id=s.id
+             SET s.grading_status=IF(j.status='failed','failed','pending')
+             WHERE j.status IN ('pending','failed') AND s.status='submitted'"
+        );
+        $stmt->execute();
+        $stmt->close();
+        $stmt = $this->db->prepare(
+            "UPDATE results r
+             JOIN theory_grading_jobs j ON j.result_id=r.id
+             SET r.theory_grading_status=IF(j.status='failed','failed','pending')
+             WHERE j.status IN ('pending','failed')"
+        );
+        $stmt->execute();
+        $stmt->close();
         return $count;
     }
 
