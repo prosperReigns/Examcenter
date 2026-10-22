@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_mark'])) {
     $final = max(0, (float)$_POST['final_mark']);
     $reason = trim((string)$_POST['reason']);
     $reviewer = (int)$_SESSION['user_id'];
-    $stmt = $db->prepare("SELECT awarded_marks,maximum_marks FROM theory_marks WHERE id=? LIMIT 1");
+    $stmt = $db->prepare("SELECT awarded_marks,maximum_marks,answer_id FROM theory_marks WHERE id=? LIMIT 1");
     $stmt->bind_param('i', $markId);
     $stmt->execute();
     $old = $stmt->get_result()->fetch_assoc();
@@ -39,6 +39,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_mark'])) {
         $stmt->bind_param('iidds', $markId, $reviewer, $old['awarded_marks'], $final, $reason);
         $stmt->execute();
         $stmt->close();
+        // Recalculate from persisted marks; never increment the result score blindly.
+        $answerId = (int)$old['answer_id'];
+        $stmt = $db->prepare("SELECT s.id submission_id,COALESCE(SUM(m.awarded_marks),0) total_marks,COALESCE(SUM(q.maximum_marks),0) maximum_marks
+            FROM theory_answers a
+            JOIN theory_submissions s ON s.id=a.submission_id
+            JOIN theory_questions q ON q.id=a.theory_question_id
+            LEFT JOIN theory_marks m ON m.answer_id=a.id
+            WHERE a.id=? GROUP BY s.id");
+        $stmt->bind_param('i', $answerId);
+        $stmt->execute();
+        $totals = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($totals) {
+            $submissionId = (int)$totals['submission_id'];
+            $totalMarks = (float)$totals['total_marks'];
+            $maximumMarks = (float)$totals['maximum_marks'];
+            $stmt = $db->prepare("UPDATE theory_submissions SET total_marks=?,maximum_marks=? WHERE id=?");
+            $stmt->bind_param('ddi', $totalMarks, $maximumMarks, $submissionId);
+            $stmt->execute();
+            $stmt->close();
+
+            $stmt = $db->prepare("UPDATE results r
+                JOIN theory_grading_jobs j ON j.result_id=r.id
+                SET r.theory_score=?,
+                    r.score=COALESCE(r.objective_score,r.score-COALESCE(r.theory_score,0))+?
+                WHERE j.submission_id=? AND r.theory_grading_status='completed'");
+            $stmt->bind_param('ddi', $totalMarks, $totalMarks, $submissionId);
+            $stmt->execute();
+            $stmt->close();
+        }
     }
 }
 $stmt = $db->prepare("SELECT s.id,s.student_id,st.full_name,s.status,s.grading_status,s.total_marks,s.maximum_marks,j.status AS queue_status,j.attempt_count AS queue_attempts,j.last_error AS queue_error FROM theory_submissions s JOIN students st ON st.id=s.student_id LEFT JOIN theory_grading_jobs j ON j.submission_id=s.id WHERE s.theory_assessment_id=? ORDER BY s.created_at DESC");
