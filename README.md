@@ -76,7 +76,7 @@ For an existing database created before this queue change, apply the queue/resul
 SOURCE database/migrations/20261022_0002_theory_grading_queue.sql;
 ~~~
 
-Start the worker from the Examcenter project root on the main school computer. On the bundled Windows build, `scripts\\start_theory_grading_worker.bat` attempts to locate the bundled PHP CLI and launches the worker minimized. The app launcher/Inno Setup entry should call this helper after MariaDB is ready; the repository does not currently contain the Inno Setup script to wire this automatically. For development, you can also start it manually:
+Start the worker from the Examcenter project root on the main school computer. On the bundled Windows build, `scripts/start_theory_grading_worker.bat` attempts to locate the bundled PHP CLI and launches the worker minimized. The app launcher/Inno Setup entry should call this helper after MariaDB is ready; the repository does not currently contain the Inno Setup script to wire this automatically. For development, you can also start it manually:
 
 ~~~powershell
 php scripts/theory_grading_worker.php
