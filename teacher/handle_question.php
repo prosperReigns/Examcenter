@@ -567,7 +567,8 @@ if (
         'multiple_choice_single',
         'multiple_choice_multiple',
         'true_false',
-        'fill_blanks'
+        'fill_blanks',
+        'theory'
     ];
 
 
@@ -575,13 +576,12 @@ if (
      * Basic validation.
      */
 
+    $maximum_marks = (float)($_POST['maximum_marks'] ?? 0);
+
     if (
         $question_text === '' ||
-        !in_array(
-            $question_type,
-            $valid_types,
-            true
-        )
+        !in_array($question_type, $valid_types, true) ||
+        ($question_type === 'theory' && $maximum_marks <= 0)
     ) {
 
         $_SESSION['error'] =
@@ -1272,6 +1272,18 @@ if (
 
         $stmt->close();
 
+        // Store maximum marks on the canonical question-bank record.
+        if ($question_type === 'theory') {
+            $marksStmt = $conn->prepare("UPDATE new_questions SET maximum_marks = ? WHERE id = ?");
+            if (!$marksStmt) throw new Exception('Unable to prepare maximum-marks update: ' . $conn->error);
+            $marksStmt->bind_param('di', $maximum_marks, $question_id);
+        } else {
+            $marksStmt = $conn->prepare("UPDATE new_questions SET maximum_marks = NULL WHERE id = ?");
+            if (!$marksStmt) throw new Exception('Unable to prepare maximum-marks reset: ' . $conn->error);
+            $marksStmt->bind_param('i', $question_id);
+        }
+        if (!$marksStmt->execute()) throw new Exception('Unable to save maximum marks: ' . $marksStmt->error);
+        $marksStmt->close();
 
         /*
          |--------------------------------------------------------------------------
@@ -1644,6 +1656,36 @@ if (
              * FILL IN THE BLANK
              * ==========================================================
              */
+
+            case 'theory':
+                // Theory bank rows intentionally have no objective answer record.
+                if (!$isBankMode) {
+                    $assessmentStmt = $conn->prepare("SELECT id FROM theory_assessments WHERE test_id = ? LIMIT 1");
+                    $assessmentStmt->bind_param('i', $test_id);
+                    $assessmentStmt->execute();
+                    $assessment = $assessmentStmt->get_result()->fetch_assoc();
+                    $assessmentStmt->close();
+                    if (!$assessment) {
+                        $instructions = '';
+                        $model = (string)(getenv('EXAMCENTER_THEORY_MODEL') ?: 'qwen3:1.7b');
+                        $createAssessment = $conn->prepare("INSERT INTO theory_assessments(test_id, instructions, ai_model, status) VALUES (?, ?, ?, 'draft')");
+                        $createAssessment->bind_param('iss', $test_id, $instructions, $model);
+                        if (!$createAssessment->execute()) throw new Exception('Unable to create theory assessment: ' . $createAssessment->error);
+                        $assessment = ['id' => $createAssessment->insert_id];
+                        $createAssessment->close();
+                    }
+                    $assessmentId = (int)$assessment['id'];
+                    $numberStmt = $conn->prepare("SELECT COALESCE(MAX(question_number), 0) + 1 AS next_number FROM theory_questions WHERE theory_assessment_id = ?");
+                    $numberStmt->bind_param('i', $assessmentId);
+                    $numberStmt->execute();
+                    $number = (int)$numberStmt->get_result()->fetch_assoc()['next_number'];
+                    $numberStmt->close();
+                    $theoryStmt = $conn->prepare("INSERT INTO theory_questions(theory_assessment_id, question_number, question_text, maximum_marks) VALUES (?, ?, ?, ?)");
+                    $theoryStmt->bind_param('iisd', $assessmentId, $number, $question_text, $maximum_marks);
+                    if (!$theoryStmt->execute()) throw new Exception('Unable to save theory question: ' . $theoryStmt->error);
+                    $theoryStmt->close();
+                }
+                break;
 
             case 'fill_blanks':
 
