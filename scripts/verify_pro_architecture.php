@@ -84,6 +84,8 @@ $phpFiles = [
     'theory/LlamaCppRuntime.php',
     'theory/LlamaCppTheoryGrader.php',
     'theory/TheoryGradingService.php',
+    'theory/TheoryGradingQueue.php',
+    'scripts/theory_grading_worker.php',
     'teacher/theory_assessment.php',
     'teacher/theory_review.php',
     'teacher/grade_theory.php',
