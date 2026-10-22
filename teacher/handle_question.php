@@ -408,7 +408,8 @@ if (
             test_id,
             teacher_id,
             class,
-            subject
+            subject,
+            maximum_marks
             {$edit_context_columns}
         FROM new_questions
         WHERE id = ?
@@ -448,6 +449,10 @@ if (
 
             $question_type =
                 $edit_question['question_type'];
+
+            if ($question_type === 'theory') {
+                $edit_question['options'] = ['maximum_marks' => $edit_question['maximum_marks'] ?? ''];
+            }
 
             if (isset($answer_table_map[$question_type])) {
 
