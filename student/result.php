@@ -14,7 +14,7 @@ $user_id = (int)$_GET['user_id'];
 $student_name = $_SESSION['student_name'];
 
 // Fetch result
-$stmt = $conn->prepare("SELECT score, total_questions, status FROM results WHERE user_id = ? AND test_id = ?");
+$stmt = $conn->prepare("SELECT score,total_questions,status,objective_score,objective_total,theory_score,theory_grading_status FROM results WHERE user_id = ? AND test_id = ? ORDER BY created_at DESC,id DESC LIMIT 1");
 $stmt->bind_param("ii", $user_id, $test_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -28,7 +28,10 @@ if (!$result_data) {
 
 $score = $result_data['score'];
 $total_questions = $result_data['total_questions'];
-$percentage = $total_questions > 0 ? ($score / $total_questions) * 100 : 0;
+$grading_status = (string)($result_data['theory_grading_status'] ?? 'not_required');
+$objective_score = $result_data['objective_score'] !== null ? (float)$result_data['objective_score'] : (float)$score;
+$objective_total = $result_data['objective_total'] !== null ? (float)$result_data['objective_total'] : (float)$total_questions;
+$percentage = $total_questions > 0 ? ((float)$score / (float)$total_questions) * 100 : 0;
 
 // Fetch show_results_immediately setting
 $stmt = $conn->prepare("SELECT setting_value FROM settings WHERE setting_name = ?");
@@ -86,9 +89,22 @@ $stmt->close();
 
                         <?php if ($show_results): ?>
                             <hr>
-                            <h5>Your Score</h5>
-                            <p class="display-4"><?php echo $score; ?> / <?php echo $total_questions; ?></p>
-                            <p class="lead">Percentage: <?php echo number_format($percentage, 2); ?>%</p>
+                            <?php if (in_array($grading_status, ['pending','processing','failed'], true)): ?>
+                                <h5>Provisional Objective Score</h5>
+                                <p class="display-4"><?= htmlspecialchars((string)$objective_score) ?> / <?= htmlspecialchars((string)$objective_total) ?></p>
+                                <div class="alert alert-warning text-start" role="status">
+                                    <strong>Overall result is not final.</strong>
+                                    <?php if ($grading_status === 'failed'): ?>
+                                        Theory grading needs teacher attention. Your submitted answers are saved and can be retried.
+                                    <?php else: ?>
+                                        Your theory answers are saved and awaiting offline AI grading. You do not need to submit the exam again.
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <h5>Final Score</h5>
+                                <p class="display-4"><?php echo htmlspecialchars((string)$score); ?> / <?php echo htmlspecialchars((string)$total_questions); ?></p>
+                                <p class="lead">Percentage: <?php echo number_format($percentage, 2); ?>%</p>
+                            <?php endif; ?>
                             <?php if ($result_data['status'] === 'terminated'): ?>
                                 <p class="text-danger">Note: Your exam was terminated due to multiple tab switches.</p>
                             <?php endif; ?>
