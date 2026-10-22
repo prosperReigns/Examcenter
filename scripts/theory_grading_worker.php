@@ -12,6 +12,15 @@ require_once __DIR__ . '/../theory/LlamaCppRuntime.php';
 require_once __DIR__ . '/../theory/LlamaCppTheoryGrader.php';
 
 set_time_limit(0);
+
+// Prevent two launcher invocations on the same host from starting parallel workers.
+$workerLockPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'examcenter-theory-worker.lock';
+$workerLock = @fopen($workerLockPath, 'c');
+if ($workerLock === false || !flock($workerLock, LOCK_EX | LOCK_NB)) {
+    fwrite(STDERR, "[theory-worker] Another worker already holds the host lock; exiting.\n");
+    exit(0);
+}
+
 $options = $argv ?? [];
 $once = in_array('--once', $options, true);
 $sleepSeconds = 2;
