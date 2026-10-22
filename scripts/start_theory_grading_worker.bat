@@ -8,7 +8,7 @@ if exist "%ROOT%\php\php.exe" set "PHP_EXE=%ROOT%\php\php.exe"
 if not defined PHP_EXE if exist "%ROOT%\xampp\php\php.exe" set "PHP_EXE=%ROOT%\xampp\php\php.exe"
 if not defined PHP_EXE if exist "%ROOT%\apache\bin\php.exe" set "PHP_EXE=%ROOT%\apache\bin\php.exe"
 if not defined PHP_EXE if exist "%ROOT%\bin\php.exe" set "PHP_EXE=%ROOT%\bin\php.exe"
-if not defined PHP_EXE for /f "delims=" %%P in ('where php.exe 2^>nul') do if not defined PHP_EXE set "PHP_EXE=%%P"
+if not defined PHP_EXE for /f "delims=" %%P in ('where php.exe 2^>nul') do if exist "%%P" if not defined PHP_EXE set "PHP_EXE=%%P"
 
 if not defined PHP_EXE (
     echo Examcenter PHP CLI was not found. Configure this launcher with the bundled php.exe path.
