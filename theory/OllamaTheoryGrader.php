@@ -8,7 +8,16 @@ final class OllamaTheoryGrader {
         $ch=curl_init(rtrim($this->endpoint,'/').'/api/generate');
         curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>$this->timeout,CURLOPT_HTTPHEADER=>['Content-Type: application/json'],CURLOPT_POSTFIELDS=>json_encode(['model'=>$this->model,'prompt'=>$prompt,'stream'=>false,'format'=>'json','options'=>['temperature'=>0.1]],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
         $raw=curl_exec($ch); if($raw===false){$e=curl_error($ch);curl_close($ch);throw new RuntimeException('Local Ollama request failed: '.$e);}
-        $status=curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch); if($status>=400)throw new RuntimeException('Ollama returned HTTP '.$status);
+        $status=curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch); if ($status >= 400) {
+            $detail = trim((string)$raw);
+            $hint = '';
+            if ($status === 404 && stripos($detail, 'model') !== false) {
+                $hint = ' The configured model is not installed locally. Run `ollama list` and set EXAMCENTER_THEORY_MODEL to an installed model; do not download a model during an exam.';
+            } elseif ($status === 404) {
+                $hint = ' Confirm Ollama is running at '.$this->endpoint.' and supports the /api/generate endpoint.';
+            }
+            throw new RuntimeException('Ollama returned HTTP '.$status.($detail !== '' ? ': '.substr($detail, 0, 700) : '.').$hint);
+        }
         $response=json_decode($raw,true); $data=json_decode((string)($response['response']??''),true);
         if(!is_array($data))throw new RuntimeException('Ollama returned invalid grading JSON.');
         return GradingResult::fromModel($data,$max);
