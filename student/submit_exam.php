@@ -229,6 +229,8 @@ if ($theoryAssessment) {
             $stmt->execute();
             $stmt->close();
         } catch (Throwable $e) {
+            // Keep the persisted result objective-only if any theory answer fails; teacher retry adds the complete theory score later.
+            $theoryScore = 0.0;
             $theoryGradingError = $e->getMessage();
             error_log('Offline theory grading failed for submission '.$theorySubmissionId.': '.$theoryGradingError);
             $stmt = $conn->prepare("UPDATE theory_submissions SET grading_status='failed' WHERE id=?");
