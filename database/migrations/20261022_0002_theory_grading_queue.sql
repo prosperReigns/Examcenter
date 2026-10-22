@@ -28,7 +28,5 @@ CREATE TABLE IF NOT EXISTS theory_grading_jobs (
     UNIQUE KEY uq_theory_grading_submission (submission_id),
     KEY idx_theory_grading_claim (status, available_at, id),
     KEY idx_theory_grading_stale (status, locked_at),
-    KEY idx_theory_grading_test_student (test_id, student_id),
-    CONSTRAINT fk_theory_grading_job_submission
-        FOREIGN KEY (submission_id) REFERENCES theory_submissions(id) ON DELETE CASCADE
+    KEY idx_theory_grading_test_student (test_id, student_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
