@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_mark'])) {
         $stmt->close();
     }
 }
-$stmt = $db->prepare("SELECT s.id,s.student_id,st.full_name,s.status,s.grading_status,s.total_marks,s.maximum_marks FROM theory_submissions s JOIN students st ON st.id=s.student_id WHERE s.theory_assessment_id=? ORDER BY s.created_at DESC");
+$stmt = $db->prepare("SELECT s.id,s.student_id,st.full_name,s.status,s.grading_status,s.total_marks,s.maximum_marks,j.status AS queue_status,j.attempt_count AS queue_attempts,j.last_error AS queue_error FROM theory_submissions s JOIN students st ON st.id=s.student_id LEFT JOIN theory_grading_jobs j ON j.submission_id=s.id WHERE s.theory_assessment_id=? ORDER BY s.created_at DESC");
 $stmt->bind_param('i', $assessment['id']);
 $stmt->execute();
 $subs = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -57,8 +57,8 @@ $stmt->close();
 
 <body>
     <h2><?= htmlspecialchars($assessment['title']) ?> — Theory Review</h2>
-    <p><a href="grade_theory.php?test_id=<?= $testId ?>">Run local AI grading for submitted answers</a></p>
-    <?php foreach ($subs as $s): ?><h3><?= htmlspecialchars($s['full_name']) ?> — <?= htmlspecialchars((string)$s['status']) ?> / <?= htmlspecialchars((string)$s['grading_status']) ?></h3>
+    <p><a href="grade_theory.php?test_id=<?= $testId ?>">View grading queue / retry failed jobs</a></p>
+    <?php foreach ($subs as $s): ?><h3><?= htmlspecialchars($s['full_name']) ?> — <?= htmlspecialchars((string)$s['status']) ?> / <?= htmlspecialchars((string)$s['grading_status']) ?> / queue: <?= htmlspecialchars((string)($s['queue_status'] ?? 'not queued')) ?></h3><?php if (!empty($s['queue_error'])): ?><p class="text-danger">Last grading error: <?= htmlspecialchars((string)$s['queue_error']) ?></p><?php endif; ?>
         <?php $st = $db->prepare("SELECT a.id,a.answer_text,q.question_number,q.question_text,q.maximum_marks,m.id mark_id,m.awarded_marks,m.status,m.explanation,m.confidence,m.weaknesses,m.missing_points FROM theory_answers a JOIN theory_questions q ON q.id=a.theory_question_id LEFT JOIN theory_marks m ON m.answer_id=a.id WHERE a.submission_id=? ORDER BY q.question_number");
         $st->bind_param('i', $s['id']);
         $st->execute();
