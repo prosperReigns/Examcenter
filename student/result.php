@@ -50,7 +50,7 @@ $stmt->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php if ($show_results && in_array($grading_status, ['pending','processing'], true)): ?><meta http-equiv="refresh" content="5"><?php endif; ?>
-    <title>Exam Results - D-Portal</title>
+    <title>Exam Results | Examcenter</title>
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <style>
@@ -79,8 +79,8 @@ $stmt->close();
                         <h3>Exam Results</h3>
                     </div>
                     <div class="card-body text-center">
-                        <h4>Congratulations, <?php echo htmlspecialchars($student_name); ?>!</h4>
-                        <p class="lead">You have completed your exam.</p>
+                        <h4><?php echo htmlspecialchars($student_name, ENT_QUOTES, 'UTF-8'); ?></h4>
+                        <p class="lead"><?php echo in_array($grading_status, ['pending', 'processing', 'failed'], true) ? 'Your exam submission has been saved.' : 'Your exam has been completed.'; ?></p>
 
                         <?php if (!empty($_SESSION['theory_grading_notice'])): ?>
                             <div class="alert alert-warning text-start" role="alert">
