@@ -74,7 +74,20 @@ $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Theory section | Examcenter</title><link href="../css/bootstrap.min.css" rel="stylesheet">
-<style>body{background:#f3f6fb;color:#172b4d}.wrap{max-width:950px;margin:30px auto;padding:0 16px}.panel{background:#fff;border:1px solid #e4eaf2;border-radius:12px;padding:22px;margin-bottom:16px}.timer{font-size:1.2rem;font-weight:800;color:#a12626;position:sticky;top:0;background:#fff;padding:12px;border-radius:8px;z-index:5}</style>
+<style>
+        :root{--theory-ink:#172b4d;--theory-muted:#64748b;--theory-line:#e1e8f0;--theory-blue:#2459a6}
+        body{min-height:100vh;background:radial-gradient(ellipse at 85% 0%,rgba(50,105,190,.10),transparent 35rem),#f3f6fb;color:var(--theory-ink)}
+        .wrap{max-width:1000px;margin:28px auto;padding:0 clamp(14px,3vw,24px)}
+        .panel{background:#fff;border:1px solid var(--theory-line);border-radius:16px;padding:clamp(18px,3vw,26px);margin-bottom:16px;box-shadow:0 8px 25px rgba(20,43,77,.045)}
+        .panel h1{font-weight:800;letter-spacing:-.035em}
+        .panel h2{font-weight:750}
+        .timer{font-size:1rem;font-weight:800;color:#9f2525;position:sticky;top:12px;background:#fff;border:1px solid #f0caca;padding:12px 16px;border-radius:12px;z-index:5;box-shadow:0 5px 16px rgba(90,25,25,.08);white-space:nowrap}
+        .alert{border-radius:12px}
+        textarea.form-control{min-height:150px;padding:14px;line-height:1.65;border-color:#d5deea;border-radius:10px}
+        textarea.form-control:focus{border-color:#6b98d8;box-shadow:0 0 0 .2rem rgba(36,89,166,.12)}
+        .btn{border-radius:10px;font-weight:700;padding:11px 16px}
+        @media(max-width:640px){.wrap{margin:14px auto}.panel.d-flex{align-items:flex-start!important;flex-direction:column}.timer{position:static;width:100%}}
+ </style>
 </head><body><main class="wrap">
 <div class="panel d-flex justify-content-between align-items-center flex-wrap gap-3"><div><h1 class="h3"><?= $h($test['title']) ?> — Theory</h1><p class="mb-0">Student: <?= $h($_SESSION['student_name'] ?? 'Student') ?></p></div><div class="timer">Time remaining: <span id="timer">--:--</span></div></div>
 <div class="alert alert-info">This is one section of your examination. The original exam timer continues while you are here. Save your answers and return to the objective section; submit the entire exam from the objective page.</div>
