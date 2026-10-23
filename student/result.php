@@ -54,19 +54,21 @@ $stmt->close();
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
     <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .result-card {
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        .btn-next-student {
-            background: linear-gradient(135deg, #28a745, #1e7e34);
-            color: white;
-            font-weight: bold;
-        }
-    </style>
+        :root{--result-ink:#172b4d;--result-muted:#66758b;--result-line:#e2e8f0;--result-blue:#2459a6}
+        body{min-height:100vh;background:radial-gradient(ellipse at 80% 0%,rgba(50,105,190,.12),transparent 34rem),#f3f6fb;color:var(--result-ink);padding:28px 0}
+        .result-card{overflow:hidden;border:1px solid var(--result-line);border-radius:20px;box-shadow:0 18px 50px rgba(20,43,77,.09)}
+        .result-card .card-header{padding:22px 24px;background:linear-gradient(125deg,#2459a6,#183e78)!important;border:0}
+        .result-card .card-header h3{margin:0;font-size:1.25rem;font-weight:750;letter-spacing:-.02em}
+        .result-card .card-body{padding:clamp(22px,5vw,42px)}
+        .result-card h4{font-weight:750;letter-spacing:-.025em}
+        .result-card .display-4{font-size:clamp(2.25rem,7vw,4rem);font-weight:800;letter-spacing:-.05em;color:var(--result-blue)}
+        .result-card .lead{color:var(--result-muted)}
+        .result-card .alert{border-radius:12px;border:1px solid transparent}
+        .result-card .btn{border-radius:10px;padding:11px 18px;font-weight:700}
+        .btn-next-student{background:linear-gradient(135deg,#2459a6,#183e78);border:0;color:#fff;box-shadow:0 8px 18px rgba(36,89,166,.18)}
+        .btn-next-student:hover{color:#fff;filter:brightness(1.06)}
+        @media(max-width:575px){body{padding:14px 0}.result-card .card-body{padding:22px 18px}}
+ </style>
 </head>
 <body>
     <div class="container mt-5">
