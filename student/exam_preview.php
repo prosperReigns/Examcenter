@@ -175,6 +175,17 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
         .bottom-note { margin-top:18px; color:var(--preview-muted); font-size:12px; text-align:center; }
         @media(max-width:991.98px) { .preview-heading { align-items:flex-start; flex-direction:column; } .start-actions { justify-content:flex-start; } }
         @media(max-width:575.98px) { .preview-topbar { height:60px; } .secure-note { display:none; } .preview-wrap { padding-top:25px; } .start-actions,.start-button { width:100%; } .detail-grid,.assessment-summary { grid-template-columns:1fr; } .preview-card-header,.preview-card-body { padding-left:18px; padding-right:18px; } }
+    
+        /* Examcenter professional preview refinements */
+        .preview-wrap{padding-inline:clamp(16px,3vw,30px)}
+        .preview-card,.preview-instructions,.preview-summary{box-shadow:0 10px 30px rgba(24,49,83,.055);border-radius:16px}
+        .preview-card-header{padding:18px 22px;border-bottom:1px solid var(--preview-line)}
+        .preview-card-header h2{font-size:15px;font-weight:750;margin:0}
+        .start-button{border-radius:10px;box-shadow:0 7px 16px rgba(36,89,166,.18);font-weight:750;transition:transform .18s ease,box-shadow .18s ease}
+        .start-button:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(36,89,166,.22)}
+        .preview-card{overflow:hidden}
+        @media(max-width:700px){.preview-topbar{height:auto;min-height:60px;padding:14px 18px;gap:12px}.secure-note{max-width:46%;text-align:right}.preview-heading{align-items:stretch;flex-direction:column}.start-actions,.start-button{width:100%}}
+ 
     </style>
 </head>
 <body>
