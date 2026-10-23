@@ -102,25 +102,21 @@ if (!$test || !$student) {
         $error = 'This request has expired. Reload the page and try again.';
     } else {
         $mode = (string)($_POST['mode'] ?? '');
-        $allowed = ($mode === 'objective' && $objectiveCount > 0)
-            || ($mode === 'theory' && $theory !== null && $theoryCount > 0);
+        // A combined exam always starts in the objective section when available;
+        // theory-only assessments are supported as well.
+        $mode = 'combined';
+        $allowed = $objectiveCount > 0 || ($theory !== null && $theoryCount > 0);
         if (!$allowed) {
             $error = 'That exam section is not available. Please choose an available section.';
         } else {
-            if ($mode === 'theory') {
-                $_SESSION['theory_test_id'] = $testId;
-            }
+            if ($theory !== null && $theoryCount > 0) { $_SESSION['theory_test_id'] = $testId; }
             $_SESSION['exam_preview_authorized'] = [
                 'student_id' => $studentId,
                 'test_id' => $testId,
                 'mode' => $mode,
                 'authorized_at' => time(),
             ];
-            if ($mode === 'theory') {
-                header('Location: theory_exam.php?test_id=' . $testId);
-            } else {
-                header('Location: take_exam.php');
-            }
+            header('Location: take_exam.php');
             exit;
         }
     }
@@ -179,6 +175,17 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
         .bottom-note { margin-top:18px; color:var(--preview-muted); font-size:12px; text-align:center; }
         @media(max-width:991.98px) { .preview-heading { align-items:flex-start; flex-direction:column; } .start-actions { justify-content:flex-start; } }
         @media(max-width:575.98px) { .preview-topbar { height:60px; } .secure-note { display:none; } .preview-wrap { padding-top:25px; } .start-actions,.start-button { width:100%; } .detail-grid,.assessment-summary { grid-template-columns:1fr; } .preview-card-header,.preview-card-body { padding-left:18px; padding-right:18px; } }
+    
+        /* Examcenter professional preview refinements */
+        .preview-wrap{padding-inline:clamp(16px,3vw,30px)}
+        .preview-card,.preview-instructions,.preview-summary{box-shadow:0 10px 30px rgba(24,49,83,.055);border-radius:16px}
+        .preview-card-header{padding:18px 22px;border-bottom:1px solid var(--preview-line)}
+        .preview-card-header h2{font-size:15px;font-weight:750;margin:0}
+        .start-button{border-radius:10px;box-shadow:0 7px 16px rgba(36,89,166,.18);font-weight:750;transition:transform .18s ease,box-shadow .18s ease}
+        .start-button:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(36,89,166,.22)}
+        .preview-card{overflow:hidden}
+        @media(max-width:700px){.preview-topbar{height:auto;min-height:60px;padding:14px 18px;gap:12px}.secure-note{max-width:46%;text-align:right}.preview-heading{align-items:stretch;flex-direction:column}.start-actions,.start-button{width:100%}}
+ 
     </style>
 </head>
 <body>
@@ -196,8 +203,7 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
         <?php if ($test && $student && ($objectiveAvailable || $theoryAvailable)): ?>
             <form method="post" class="start-actions">
                 <input type="hidden" name="csrf_token" value="<?= $h($_SESSION['csrf_token']) ?>">
-                <?php if ($objectiveAvailable): ?><button type="submit" name="mode" value="objective" class="btn btn-primary start-button start-objective">Start Objective Exam</button><?php endif; ?>
-                <?php if ($theoryAvailable): ?><button type="submit" name="mode" value="theory" class="btn btn-success start-button start-theory">Start Theory Exam</button><?php endif; ?>
+                <button type="submit" name="mode" value="combined" class="btn btn-primary start-button start-objective">Start Exam</button>
             </form>
         <?php endif; ?>
     </header>
@@ -225,7 +231,7 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
                             <div><div class="detail-label">Assessment</div><div class="detail-value"><?= $h($test['title']) ?></div></div>
                             <div><div class="detail-label">Subject / course</div><div class="detail-value"><?= $h($test['subject'] ?: 'Not specified') ?></div></div>
                             <div><div class="detail-label">Academic year / period</div><div class="detail-value"><?= $h($test['year'] ?: 'Not specified') ?></div></div>
-                            <?php if ((int)$test['duration'] > 0): ?><div><div class="detail-label">Objective time limit</div><div class="detail-value"><?= $h((int)$test['duration']) ?> minutes</div><?php endif; ?>
+                            <?php if ((int)$test['duration'] > 0): ?><div><div class="detail-label">Total exam time</div><div class="detail-value"><?= $h((int)$test['duration']) ?> minutes</div><?php endif; ?>
                         </div>
                         <div class="assessment-summary">
                             <?php if ($objectiveAvailable): ?><div class="summary-item"><strong>Objective section</strong><span><?= $h($objectiveCount) ?> questions</span></div><?php endif; ?>
@@ -264,7 +270,7 @@ $h = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, '
                 <?php endif; ?>
             </aside>
         </div>
-        <div class="bottom-note">Your exam attempt starts when you select a Start button above.</div>
+        <div class="bottom-note">Your single exam timer starts when you select Start Exam. You can move between objective and theory sections without restarting it.</div>
     <?php endif; ?>
 </main>
 </body>

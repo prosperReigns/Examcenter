@@ -161,19 +161,79 @@ foreach ($questions as $question) {
     }
 }
 
+// Persist theory answers and enqueue grading; never call the model in this request.
+$theoryMaximum = 0.0;
+$theoryAssessmentId = 0;
+$theorySubmissionId = 0;
+$stmt = $conn->prepare("SELECT id FROM theory_assessments WHERE test_id=? AND status<>'archived' LIMIT 1");
+$stmt->bind_param('i', $test_id);
+$stmt->execute();
+$theoryAssessment = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if ($theoryAssessment) {
+    $theoryAssessmentId = (int)$theoryAssessment['id'];
+    $stmt = $conn->prepare("SELECT id,status FROM theory_submissions WHERE theory_assessment_id=? AND student_id=? LIMIT 1");
+    $stmt->bind_param('ii', $theoryAssessmentId, $student_id);
+    $stmt->execute();
+    $theorySubmission = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$theorySubmission) {
+        $stmt = $conn->prepare("INSERT INTO theory_submissions(theory_assessment_id,student_id,started_at,status,maximum_marks,grading_status)
+            SELECT ?,?,NOW(),'in_progress',COALESCE(SUM(maximum_marks),0),'pending' FROM theory_questions WHERE theory_assessment_id=?");
+        $stmt->bind_param('iii', $theoryAssessmentId, $student_id, $theoryAssessmentId);
+        $stmt->execute();
+        $theorySubmission = ['id' => $stmt->insert_id, 'status' => 'in_progress'];
+        $stmt->close();
+    }
+
+    $theorySubmissionId = (int)$theorySubmission['id'];
+    $stmt = $conn->prepare("INSERT IGNORE INTO theory_answers(submission_id,theory_question_id,answer_text,word_count,submitted_at)
+        SELECT ?,q.id,'',0,NOW() FROM theory_questions q WHERE q.theory_assessment_id=?");
+    $stmt->bind_param('ii', $theorySubmissionId, $theoryAssessmentId);
+    $stmt->execute();
+    $stmt->close();
+
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(maximum_marks),0) AS max_marks FROM theory_questions WHERE theory_assessment_id=?");
+    $stmt->bind_param('i', $theoryAssessmentId);
+    $stmt->execute();
+    $theoryMaximum = (float)($stmt->get_result()->fetch_assoc()['max_marks'] ?? 0);
+    $stmt->close();
+
+    $stmt = $conn->prepare("UPDATE theory_submissions
+        SET status='submitted',submitted_at=COALESCE(submitted_at,NOW()),grading_status='pending',maximum_marks=?
+        WHERE id=? AND status='in_progress'");
+    $stmt->bind_param('di', $theoryMaximum, $theorySubmissionId);
+    $stmt->execute();
+    $stmt->close();
+}
+
 // Finalize the result atomically so a partial submission cannot leave
 // the database in an inconsistent state.
 $conn->begin_transaction();
 try {
+    $objectiveScore = (float)$score;
+    $objectiveTotal = (float)$total_questions;
+    $total_questions = $objectiveTotal + $theoryMaximum;
+    $gradingStatus = ($theoryAssessmentId > 0 && $theoryMaximum > 0) ? 'pending' : 'not_required';
+
     $sql = "INSERT INTO results
-                (user_id, test_id, score, total_questions, created_at, status, reattempt_approved)
-            VALUES (?, ?, ?, ?, NOW(), 'completed', 0)";
+                (user_id,test_id,score,total_questions,objective_score,objective_total,theory_grading_status,created_at,status,reattempt_approved)
+            VALUES (?,?,?,?,?,?,?,NOW(),'completed',0)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iiii", $student_id, $test_id, $score, $total_questions);
+    $stmt->bind_param("iidddds", $student_id, $test_id, $objectiveScore, $total_questions, $objectiveScore, $objectiveTotal, $gradingStatus);
     if (!$stmt->execute()) {
         throw new RuntimeException('Unable to store examination result.');
     }
+    $resultId = (int)$stmt->insert_id;
     $stmt->close();
+
+    if ($theoryAssessmentId > 0 && $theoryMaximum > 0 && $theorySubmissionId > 0) {
+        require_once __DIR__ . '/../theory/TheoryGradingQueue.php';
+        $queue = new TheoryGradingQueue($conn);
+        $queue->enqueue($theorySubmissionId, $resultId, $test_id, (int)$student_id);
+    }
 
     // A previous approved reattempt is consumed by this submission.
     $stmt = $conn->prepare("
@@ -216,12 +276,12 @@ try {
 }
 
 // Store score in session for result page
-$_SESSION['exam_score'] = $score;
+$_SESSION['exam_score'] = $objectiveScore ?? (float)$score;
 $_SESSION['total_questions'] = $total_questions;
 
 // Clear exam questions and test_id from session
 unset($_SESSION['exam_questions']);
 unset($_SESSION['current_test_id']);
 
-header("Location: result.php");
+header("Location: result.php?test_id=" . $test_id . "&user_id=" . $student_id);
 exit();

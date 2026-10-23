@@ -9,6 +9,8 @@ const MIGRATION_KEYS = [
     '20261005_0003_pro_assessment_suite',
     '20261007_0004_system_audit_hardening',
     '20261007_0005_legacy_universal_reconciliation',
+    '20261022_0001_combined_theory_exam_scores',
+    '20261022_0002_theory_grading_queue',
 ];
 
 $connection = Database::connection();

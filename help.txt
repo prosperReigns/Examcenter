@@ -49,8 +49,9 @@
 --   Tests continue to reference these independently through tests.academic_period_id
 --   and tests.assessment_group_id. Existing school academic_years rows remain
 --   supported by the legacy school workflow.
---   SCHEMA CHANGE: NONE. This implementation reuses the existing tables and
---   columns documented below. No live database update is required.
+--   SCHEMA CHANGE: this schema now includes provisional result columns and
+--   theory_grading_jobs. Fresh installs use this definition directly. Existing
+--   databases created before this change must apply migration 20261022_0002 once.
 --
 -- ============================================================
 
@@ -453,10 +454,15 @@ CREATE TABLE IF NOT EXISTS results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     test_id INT,
-    score INT,
-    total_questions INT,
+    -- score is the displayed total; while theory grading is pending it remains objective-only.
+    score DECIMAL(10,2),
+    objective_score DECIMAL(10,2) NULL,
+    objective_total DECIMAL(10,2) NULL,
+    theory_score DECIMAL(10,2) NULL,
+    total_questions DECIMAL(10,2),
     created_at DATETIME,
     status VARCHAR(50),
+    theory_grading_status VARCHAR(20) NOT NULL DEFAULT 'not_required',
     reattempt_approved BOOLEAN,
 
     institution_membership_id INT NULL,
@@ -1049,6 +1055,32 @@ CREATE TABLE IF NOT EXISTS theory_grading_runs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 1. 
+-- ADDED: persistent queue for asynchronous local AI theory marking.
+-- Migration: database/migrations/20261022_0002_theory_grading_queue.sql
+-- Each job represents one student-subject submission. The worker sends at most
+-- five questions per llama-server request and may split longer assessments.
+CREATE TABLE IF NOT EXISTS theory_grading_jobs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    submission_id BIGINT UNSIGNED NOT NULL,
+    result_id INT NULL,
+    test_id INT NOT NULL,
+    student_id INT NOT NULL,
+    status ENUM('pending','processing','completed','failed') NOT NULL DEFAULT 'pending',
+    attempt_count SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    max_attempts SMALLINT UNSIGNED NOT NULL DEFAULT 3,
+    available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at DATETIME NULL,
+    locked_by VARCHAR(120) NULL,
+    last_error TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    completed_at DATETIME NULL,
+    UNIQUE KEY uq_theory_grading_submission (submission_id),
+    KEY idx_theory_grading_claim (status, available_at, id),
+    KEY idx_theory_grading_stale (status, locked_at),
+    KEY idx_theory_grading_test_student (test_id, student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS theory_grading_events (
     id INT AUTO_INCREMENT PRIMARY KEY,
     grading_run_id INT NOT NULL,

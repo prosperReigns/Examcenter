@@ -127,7 +127,7 @@ if (
     !is_array($previewAuthorization)
     || (int)($previewAuthorization['student_id'] ?? 0) !== $user_id
     || (int)($previewAuthorization['test_id'] ?? 0) !== $test_id
-    || ($previewAuthorization['mode'] ?? '') !== 'objective'
+    || !in_array(($previewAuthorization['mode'] ?? ''), ['objective', 'combined'], true)
 ) {
     header('Location: exam_preview.php');
     exit;
@@ -373,6 +373,25 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     <link rel="stylesheet" href="../css/all.min.css">
     <link rel="stylesheet" href="../css/take_exam.css">
     <script src="../js/math.min.js"></script>
+<style>
+        /* Examcenter exam-room UI polish; exam controls and timer behavior remain unchanged. */
+        body{background:#f3f6fb;color:#172b4d}
+        .exam-header{background:linear-gradient(120deg,#163d74,#2459a6);box-shadow:0 5px 20px rgba(20,43,77,.14)}
+        .exam-header h4{font-weight:750;letter-spacing:-.02em}
+        .exam-header .container{padding-top:14px;padding-bottom:14px}
+        .exam-header .container > .d-flex{gap:14px;flex-wrap:wrap}
+        .exam-header .container > .d-flex > div:first-child{min-width:0;flex:1 1 340px}
+        .exam-header .container > .d-flex > div:first-child .d-flex{flex-wrap:wrap;row-gap:5px}
+        .timer-container{flex:0 0 auto}
+        .question-container{scroll-margin-top:16px}
+        .question-container,.question-box,.question-card,.exam-content,.question-navigation,.navigation-panel{border-radius:14px}
+        .question-box,.question-card{border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(20,43,77,.055);background:#fff}
+        .btn{border-radius:9px;font-weight:650}
+        .form-control,.form-select,textarea{border-radius:9px;border-color:#d5deea}
+        .form-control:focus,textarea:focus{border-color:#6b98d8;box-shadow:0 0 0 .2rem rgba(36,89,166,.12)}
+        .full-screen-warning{border-radius:16px}
+        @media(max-width:700px){.exam-header .container{padding-inline:14px}.exam-header h4{font-size:1rem}.exam-header .container > .d-flex{align-items:flex-start!important}.exam-header .container > .d-flex > div:first-child{flex-basis:100%}.exam-header .container > .d-flex > div:first-child .d-flex{font-size:.8rem}.exam-header .container > .d-flex > div:last-child{width:100%;justify-content:space-between}.timer-container{margin-left:auto}}
+ </style>
 </head>
 
 <body>
@@ -412,9 +431,19 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <a class="btn btn-outline-success btn-sm" href="exam_preview.php" title="Return to the assessment section selector">
-                        <i class="bi bi-arrow-left-right"></i> Switch Exam Section
+                    <?php
+                    $theoryLinkStmt = $conn->prepare("SELECT id FROM theory_assessments WHERE test_id=? AND status<>'archived' LIMIT 1");
+                    $theoryLinkStmt->bind_param('i', $test_id);
+                    $theoryLinkStmt->execute();
+                    $hasTheorySection = (bool)$theoryLinkStmt->get_result()->fetch_assoc();
+                    $theoryLinkStmt->close();
+                    if ($hasTheorySection):
+                    ?>
+                    <a class="btn btn-outline-success btn-sm" href="theory_exam.php?test_id=<?= $test_id ?>">
+                        <i class="bi bi-pencil-square"></i> Answer Theory
                     </a>
+                    <?php endif; ?>
+                    <a class="btn btn-outline-secondary btn-sm" href="exam_preview.php">Exam Preview</a>
                     <div class="timer-container">
                         <div class="timer" id="examTimer">00:00:00</div>
                     </div>
