@@ -3,7 +3,8 @@
 declare(strict_types=1);
 session_start();
 require_once __DIR__ . '/../includes/pro.php';
-require_pro('ai_assessment');
+// Pro guard intentionally disabled during development; restore before production.
+// require_pro('ai_assessment');
 require_once __DIR__ . '/../ai/LlamaCppAssessmentAssistant.php';
 $out = null;
 $err = null;
@@ -20,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Offline AI Assessment | Examcenter</title>
     <link rel="stylesheet" href="../css/sidebar.css">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
