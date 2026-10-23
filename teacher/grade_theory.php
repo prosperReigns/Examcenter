@@ -63,6 +63,8 @@ $stmt->bind_param('i', $assessment['id']);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+$queueStats = ['total' => count($rows), 'pending' => 0, 'processing' => 0, 'completed' => 0, 'failed' => 0];
+foreach ($rows as $queueRow) { $state = (string)($queueRow['job_status'] ?? ''); if (isset($queueStats[$state])) { $queueStats[$state]++; } }
 $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
@@ -85,12 +87,27 @@ $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
         .queue-panel .badge{padding:.45rem .65rem;border-radius:999px;font-weight:700}
         .queue-panel .btn{border-radius:8px;font-weight:700}
         .queue-panel .text-danger{overflow-wrap:anywhere;max-width:360px}
+        .queue-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:20px}
+        .queue-stat{background:#fff;border:1px solid var(--queue-line);border-radius:14px;padding:16px 18px;box-shadow:0 6px 18px rgba(20,43,77,.035)}
+        .queue-stat-label{color:var(--queue-muted);font-size:.76rem;font-weight:750;text-transform:uppercase;letter-spacing:.055em}
+        .queue-stat-value{font-size:1.75rem;font-weight:850;letter-spacing:-.045em;line-height:1.2;margin-top:7px}
+        .queue-stat.total .queue-stat-value{color:#2459a6}.queue-stat.pending .queue-stat-value{color:#9a6700}.queue-stat.processing .queue-stat-value{color:#2459a6}.queue-stat.completed .queue-stat-value{color:#16804a}.queue-stat.failed .queue-stat-value{color:#b42318}
+        .queue-empty{padding:38px 18px;color:var(--queue-muted);text-align:center}
+        @media(max-width:900px){.queue-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+        @media(max-width:575px){.queue-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.queue-stat{padding:13px}.queue-stat-value{font-size:1.5rem}}
         @media(max-width:700px){.queue-heading{flex-direction:column}.queue-heading .btn{width:100%}}
  </style>
 </head>
 <body class="bg-light">
 <main class="container queue-shell py-4">
     <header class="queue-heading"><div><div class="text-uppercase small fw-bold text-primary mb-2">Assessment operations</div><h1 class="h3">Theory Grading Queue</h1><p><?= $h($assessment['title']) ?> <span aria-hidden="true">·</span> <?= $h($assessment['subject']) ?></p></div><a class="btn btn-outline-primary" href="theory_review.php?test_id=<?= $testId ?>">Review marks</a></header>
+    <section class="queue-stats" aria-label="Queue summary">
+        <div class="queue-stat total"><div class="queue-stat-label">Submissions</div><div class="queue-stat-value"><?= $queueStats['total'] ?></div></div>
+        <div class="queue-stat pending"><div class="queue-stat-label">Pending</div><div class="queue-stat-value"><?= $queueStats['pending'] ?></div></div>
+        <div class="queue-stat processing"><div class="queue-stat-label">Processing</div><div class="queue-stat-value"><?= $queueStats['processing'] ?></div></div>
+        <div class="queue-stat completed"><div class="queue-stat-label">Completed</div><div class="queue-stat-value"><?= $queueStats['completed'] ?></div></div>
+        <div class="queue-stat failed"><div class="queue-stat-label">Failed</div><div class="queue-stat-value"><?= $queueStats['failed'] ?></div></div>
+    </section>
     <div class="queue-info mb-4">
         Exam submissions are graded by the separate CLI worker. This page does not run AI inference inside a browser request.
         Start the worker on the main Examcenter computer with <code>php scripts/theory_grading_worker.php</code>, or launch <code>scripts/start_theory_grading_worker.bat</code> in the bundled Windows build.
@@ -117,7 +134,7 @@ $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                 </td>
             </tr>
         <?php endforeach; ?>
-        <?php if (!$rows): ?><tr><td colspan="6" class="text-center">No student submissions yet.</td></tr><?php endif; ?>
+        <?php if (!$rows): ?><tr><td colspan="6"><div class="queue-empty"><strong class="d-block mb-1">No submissions yet</strong><span>Student theory submissions will appear here once they finish an exam.</span></div></td></tr><?php endif; ?>
         </tbody></table></div></section>
     <p class="text-muted small mt-3">Refresh this page to see updated job states. Original submitted answers are retained across retries.</p>
 </main>
