@@ -379,13 +379,18 @@ $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         .exam-header{background:linear-gradient(120deg,#163d74,#2459a6);box-shadow:0 5px 20px rgba(20,43,77,.14)}
         .exam-header h4{font-weight:750;letter-spacing:-.02em}
         .exam-header .container{padding-top:14px;padding-bottom:14px}
+        .exam-header .container > .d-flex{gap:14px;flex-wrap:wrap}
+        .exam-header .container > .d-flex > div:first-child{min-width:0;flex:1 1 340px}
+        .exam-header .container > .d-flex > div:first-child .d-flex{flex-wrap:wrap;row-gap:5px}
+        .timer-container{flex:0 0 auto}
+        .question-container{scroll-margin-top:16px}
         .question-container,.question-box,.question-card,.exam-content,.question-navigation,.navigation-panel{border-radius:14px}
         .question-box,.question-card{border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(20,43,77,.055);background:#fff}
         .btn{border-radius:9px;font-weight:650}
         .form-control,.form-select,textarea{border-radius:9px;border-color:#d5deea}
         .form-control:focus,textarea:focus{border-color:#6b98d8;box-shadow:0 0 0 .2rem rgba(36,89,166,.12)}
         .full-screen-warning{border-radius:16px}
-        @media(max-width:700px){.exam-header .container{padding-inline:14px}.exam-header h4{font-size:1rem}}
+        @media(max-width:700px){.exam-header .container{padding-inline:14px}.exam-header h4{font-size:1rem}.exam-header .container > .d-flex{align-items:flex-start!important}.exam-header .container > .d-flex > div:first-child{flex-basis:100%}.exam-header .container > .d-flex > div:first-child .d-flex{font-size:.8rem}.exam-header .container > .d-flex > div:last-child{width:100%;justify-content:space-between}.timer-container{margin-left:auto}}
  </style>
 </head>
 
