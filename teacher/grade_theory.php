@@ -68,19 +68,36 @@ $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Theory Grading Queue | Examcenter</title>
-<link href="../css/bootstrap.min.css" rel="stylesheet"></head>
+<link href="../css/bootstrap.min.css" rel="stylesheet"><style>
+        :root{--queue-ink:#172b4d;--queue-muted:#64748b;--queue-line:#e2e8f0}
+        body{min-height:100vh;background:radial-gradient(ellipse at 90% 0%,rgba(50,105,190,.09),transparent 34rem),#f3f6fb;color:var(--queue-ink)}
+        .queue-shell{max-width:1440px}
+        .queue-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:22px}
+        .queue-heading h1{font-weight:800;letter-spacing:-.035em}
+        .queue-heading p{color:var(--queue-muted);margin:0}
+        .queue-info{border:1px solid #d7e5f8;border-radius:14px;background:#eef5ff;color:#25446e;padding:16px 18px}
+        .queue-info code{color:#193f78}
+        .queue-panel{background:#fff;border:1px solid var(--queue-line);border-radius:16px;box-shadow:0 10px 28px rgba(20,43,77,.05);overflow:hidden}
+        .queue-panel table{margin:0}
+        .queue-panel thead th{background:#f7f9fc;color:#53657d;font-size:.76rem;text-transform:uppercase;letter-spacing:.045em;border-bottom:1px solid var(--queue-line);white-space:nowrap}
+        .queue-panel td,.queue-panel th{padding:14px 16px;vertical-align:middle}
+        .queue-panel tbody tr:hover{background:#f8fbff}
+        .queue-panel .badge{padding:.45rem .65rem;border-radius:999px;font-weight:700}
+        .queue-panel .btn{border-radius:8px;font-weight:700}
+        .queue-panel .text-danger{overflow-wrap:anywhere;max-width:360px}
+        @media(max-width:700px){.queue-heading{flex-direction:column}.queue-heading .btn{width:100%}}
+ </style>
+</head>
 <body class="bg-light">
-<main class="container py-4">
-    <h1 class="h3">Theory Grading Queue</h1>
-    <p class="text-muted"><?= $h($assessment['title']) ?> — <?= $h($assessment['subject']) ?></p>
-    <div class="alert alert-info">
+<main class="container queue-shell py-4">
+    <header class="queue-heading"><div><div class="text-uppercase small fw-bold text-primary mb-2">Assessment operations</div><h1 class="h3">Theory Grading Queue</h1><p><?= $h($assessment['title']) ?> <span aria-hidden="true">·</span> <?= $h($assessment['subject']) ?></p></div><a class="btn btn-outline-primary" href="theory_review.php?test_id=<?= $testId ?>">Review marks</a></header>
+    <div class="queue-info mb-4">
         Exam submissions are graded by the separate CLI worker. This page does not run AI inference inside a browser request.
         Start the worker on the main Examcenter computer with <code>php scripts/theory_grading_worker.php</code>, or launch <code>scripts/start_theory_grading_worker.bat</code> in the bundled Windows build.
         It processes one grading job at a time and sends no more than five questions per model request.
     </div>
     <?php if ($message !== ''): ?><div class="alert alert-secondary"><?= $h($message) ?></div><?php endif; ?>
-    <p><a class="btn btn-outline-primary" href="theory_review.php?test_id=<?= $testId ?>">Open teacher review</a></p>
-    <div class="table-responsive"><table class="table table-bordered table-striped align-middle bg-white">
+    <section class="queue-panel"><div class="table-responsive"><table class="table align-middle">
         <thead><tr><th>Student</th><th>Submission</th><th>Queue status</th><th>Attempts</th><th>Last error</th><th>Action</th></tr></thead><tbody>
         <?php foreach ($rows as $row): ?>
             <tr>
@@ -101,7 +118,7 @@ $h = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
             </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?><tr><td colspan="6" class="text-center">No student submissions yet.</td></tr><?php endif; ?>
-        </tbody></table></div>
-    <p class="text-muted small">Refresh this page to see updated job states. Original submitted answers are retained across retries.</p>
+        </tbody></table></div></section>
+    <p class="text-muted small mt-3">Refresh this page to see updated job states. Original submitted answers are retained across retries.</p>
 </main>
 </body></html>
